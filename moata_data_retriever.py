@@ -66,6 +66,11 @@ RAIN_GAUGE_ASSET_TYPE_ID = 100      # rain gauge assetTypeId
 REQUESTS_PER_SECOND = 2.0
 REQUEST_SLEEP = 1.0 / REQUESTS_PER_SECOND
 
+# OAuth token lifetime handling
+# Tokens issued by the Moata OAuth server are valid for ~1 hour.
+# Refresh the token if it's within this buffer of expiry to avoid 401s
+TOKEN_TTL_SECONDS = 3600
+TOKEN_REFRESH_BUFFER_SECONDS = 300  # refresh 5 minutes before expiry
 # Output directory
 OUTPUT_DIR = Path("moata_output")
 
@@ -380,6 +385,10 @@ def main():
     client_secret = creds["client_secret"]
 
     access_token = get_access_token(client_id, client_secret)
+    # Track when token was acquired so we can refresh during long runs
+    token_acquired_at = time.time()
+    token_ttl = TOKEN_TTL_SECONDS
+    token_refresh_buffer = TOKEN_REFRESH_BUFFER_SECONDS
 
     # 2. Fetch rain gauges
     logging.info("\nStep 1: Fetching rain gauge assets...")
@@ -412,6 +421,17 @@ def main():
             "\nProcessing gauge %d/%d: '%s' (asset_id=%s)...", 
             idx, total_gauges, gauge_name, asset_id
         )
+
+        # Refresh access token if it's close to expiry to avoid 401 Unauthorized
+        elapsed = time.time() - token_acquired_at
+        if elapsed >= (token_ttl - token_refresh_buffer):
+            logging.info("Access token nearing expiry (%.0fs elapsed) - refreshing...", elapsed)
+            try:
+                access_token = get_access_token(client_id, client_secret)
+                token_acquired_at = time.time()
+                logging.info("Access token refreshed successfully.")
+            except Exception as e:
+                logging.warning("Failed to refresh access token: %s. Continuing with existing token.", e)
 
         # Get traces for this gauge
         traces = get_traces_for_asset(access_token, asset_id)
