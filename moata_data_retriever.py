@@ -40,7 +40,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables from a .env file (if present)
 from dotenv import load_dotenv
-load_dotenv()
+# Load from explicit path in case working directory is different
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # =========================
 # CONFIGURATION
@@ -178,6 +180,11 @@ def safe_get(
         logging.debug(f"404 for {url} - resource not found (this is OK)")
         return None
     
+    # Handle 403 Forbidden gracefully if allowed (e.g., endpoint not accessible)
+    if resp.status_code == 403 and allow_404:
+        logging.debug(f"403 Forbidden for {url} - endpoint not accessible (this is OK)")
+        return None
+    
     resp.raise_for_status()
     return resp.json()
 
@@ -291,6 +298,61 @@ def get_alarms_for_trace(
     return alarms
 
 
+def get_detailed_alarms_by_project(
+    access_token: str,
+    project_id: int = AUCKLAND_RAINFALL_PROJECT_ID,
+) -> Dict[int, Dict[str, Any]]:
+    """
+    Fetch ALL detailed alarm information for a project (both overflow and recency alarms).
+    
+    Uses endpoint from Swagger spec:
+        GET /alarms/detailed-alarms?projectId={projectId}
+    
+    Returns a dictionary mapping traceId -> alarm details (including thresholds, severity, etc.)
+    
+    Note: This endpoint returns both:
+    - 'OverflowMonitoring' alarms (threshold-based)
+    - 'DataRecency' alarms (staleness-based) with configuration like maxLookbackOverride
+    
+    This provides the missing threshold/severity/enabled data for recency alarms.
+    
+    If the endpoint is not available (403 Forbidden), returns empty dict and continues.
+    """
+    url = f"{BASE_API_URL}/alarms/detailed-alarms"
+    headers = auth_headers(access_token)
+    params = {"projectId": project_id}
+
+    logging.info("Fetching detailed alarms for project_id=%s (all types)...", project_id)
+    try:
+        data = safe_get(url, headers=headers, params=params, allow_404=True)
+    except Exception as e:
+        # If endpoint not available (403, etc.), log and continue
+        logging.warning(
+            f"Could not fetch detailed alarms (endpoint may not be available): {e}. "
+            f"Will continue with overflow alarms only."
+        )
+        return {}
+    
+    if data is None:
+        logging.info("No alarms found for project %s.", project_id)
+        return {}
+
+    # Parse response - should be a list of alarm objects with traceId field
+    alarms_list = data if isinstance(data, list) else data.get("items", [])
+    
+    # Build dictionary indexed by traceId for easy lookup
+    alarms_by_trace: Dict[int, Dict[str, Any]] = {}
+    for alarm in alarms_list:
+        trace_id = alarm.get("traceId")
+        if trace_id is not None:
+            alarms_by_trace[trace_id] = alarm
+            alarm_type = alarm.get("alarmType", "Unknown")
+            logging.debug(f"  Alarm for trace {trace_id}: type={alarm_type}")
+    
+    logging.info("Fetched %d detailed alarms for project.", len(alarms_by_trace))
+    return alarms_by_trace
+
+
 # =========================
 # ORCHESTRATION / MAIN
 # =========================
@@ -301,7 +363,8 @@ def main():
     1. Get rain gauge assets from project 594
     2. For each rain gauge, get its traces
     3. For each trace, get configured overflow alarms
-    4. Save all data for analysis
+    4. Fetch detailed alarm info (including recency alarms with thresholds)
+    5. Save all data for analysis
     
     Note: Sequential processing only (no async) per Sam's request.
     """
@@ -324,6 +387,11 @@ def main():
     gauges_path = OUTPUT_DIR / "rain_gauges.json"
     gauges_path.write_text(json.dumps(rain_gauges, indent=2))
     logging.info("✓ Saved %d rain gauges to %s", len(rain_gauges), gauges_path)
+
+    # 2b. Fetch detailed alarms for the project (both overflow and recency)
+    logging.info("\nStep 1b: Fetching detailed alarms (overflow + recency)...")
+    detailed_alarms = get_detailed_alarms_by_project(access_token)
+    logging.info("✓ Fetched %d detailed alarms", len(detailed_alarms))
 
     # 3. For each gauge, fetch traces and alarms
     logging.info("\nStep 2: Fetching traces and alarms for each gauge...")
@@ -363,9 +431,14 @@ def main():
                 logging.info("  → Found main 'Rainfall' trace (id=%s)", trace_id)
 
             alarms = get_alarms_for_trace(access_token, trace_id)
+            
+            # Add detailed alarm info if available for this trace
+            detailed_alarm = detailed_alarms.get(trace_id)
+            
             trace_entry = {
                 "trace": trace,
                 "overflow_alarms": alarms,  # Renamed for clarity
+                "detailed_alarm": detailed_alarm,  # NEW: includes recency alarm details
             }
             traces_with_alarms.append(trace_entry)
 
@@ -388,12 +461,18 @@ def main():
         for g in all_data 
         for t in g["traces"]
     )
+    total_detailed = sum(
+        1 for g in all_data 
+        for t in g["traces"] 
+        if t.get("detailed_alarm") is not None
+    )
     
     logging.info("\n" + "=" * 60)
     logging.info("Summary:")
     logging.info("  Rain gauges: %d", len(all_data))
     logging.info("  Total traces: %d", total_traces)
     logging.info("  Total overflow alarms: %d", total_alarms)
+    logging.info("  Total traces with detailed alarms: %d", total_detailed)
     logging.info("=" * 60)
     logging.info("Done! Check the '%s' directory for output files.", OUTPUT_DIR)
 

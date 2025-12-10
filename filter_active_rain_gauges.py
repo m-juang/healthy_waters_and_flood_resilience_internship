@@ -321,7 +321,11 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
     Create a summary table showing:
     - Gauge name
     - Traces with alarms
-    - Alarm thresholds
+    - Alarm thresholds (from both overflow and detailed/recency alarms)
+    
+    Now extracts threshold/severity/enabled from:
+    - overflow_alarms: Traditional overflow/threshold alarms
+    - detailed_alarm: Comprehensive alarm data including recency alarms with thresholds
     """
     records = []
     
@@ -339,8 +343,36 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
             trace_id = trace.get("id")
             has_alarms = trace.get("hasAlarms", False)
             
+            # Get overflow alarms (traditional method)
             alarms = trace_data.get("overflow_alarms", [])
             
+            # Get detailed alarm info (includes both overflow and recency alarms)
+            detailed_alarm = trace_data.get("detailed_alarm")
+            
+            # Extract threshold info from detailed_alarm if available
+            detailed_threshold = None
+            detailed_severity = None
+            detailed_enabled = None
+            alarm_type = None
+            
+            if detailed_alarm:
+                alarm_type = detailed_alarm.get("alarmType", "Unknown")
+                
+                # Get alarm thresholds array
+                alarm_thresholds = detailed_alarm.get("alarmThresholds", [])
+                if alarm_thresholds:
+                    # Use first threshold
+                    first_threshold = alarm_thresholds[0]
+                    detailed_threshold = first_threshold.get("thresholdValue")
+                    detailed_severity = first_threshold.get("alarmSeverity")
+                
+                # For recency alarms, get configuration from other fields
+                if alarm_type == "DataRecency":
+                    # Recency alarms use maxLookbackOverride for staleness threshold
+                    detailed_threshold = detailed_alarm.get("maxLookbackOverride", detailed_threshold)
+                    detailed_enabled = detailed_alarm.get("alarmState") == "Enabled"
+            
+            # Process overflow alarms
             if alarms:
                 for alarm in alarms:
                     records.append({
@@ -351,24 +383,43 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "trace_name": trace_name,
                         "alarm_id": alarm.get("id"),
                         "alarm_name": alarm.get("name", ""),
-                        "threshold": alarm.get("threshold"),
-                        "severity": alarm.get("severity", ""),
-                        "enabled": alarm.get("enabled", True),
+                        "alarm_type": "OverflowMonitoring",
+                        "threshold": alarm.get("threshold", detailed_threshold),
+                        "severity": alarm.get("severity", detailed_severity),
+                        "enabled": alarm.get("enabled", detailed_enabled if detailed_enabled is not None else True),
                     })
             elif has_alarms:
-                # Trace has alarms flag but no overflow alarms (might be recency alarms)
-                records.append({
-                    "gauge_id": gauge_id,
-                    "gauge_name": gauge_name,
-                    "last_data": last_data.strftime('%Y-%m-%d') if last_data else None,
-                    "trace_id": trace_id,
-                    "trace_name": trace_name,
-                    "alarm_id": None,
-                    "alarm_name": "Has alarms (not overflow)",
-                    "threshold": None,
-                    "severity": None,
-                    "enabled": None,
-                })
+                # Trace has alarms flag (might be recency alarms)
+                # Use detailed_alarm data if available
+                if detailed_alarm:
+                    records.append({
+                        "gauge_id": gauge_id,
+                        "gauge_name": gauge_name,
+                        "last_data": last_data.strftime('%Y-%m-%d') if last_data else None,
+                        "trace_id": trace_id,
+                        "trace_name": trace_name,
+                        "alarm_id": detailed_alarm.get("alarmId"),
+                        "alarm_name": detailed_alarm.get("description", f"{alarm_type} Alarm"),
+                        "alarm_type": alarm_type,
+                        "threshold": detailed_threshold,
+                        "severity": detailed_severity,
+                        "enabled": detailed_enabled,
+                    })
+                else:
+                    # Has alarms flag but no detailed data (recency alarms)
+                    records.append({
+                        "gauge_id": gauge_id,
+                        "gauge_name": gauge_name,
+                        "last_data": last_data.strftime('%Y-%m-%d') if last_data else None,
+                        "trace_id": trace_id,
+                        "trace_name": trace_name,
+                        "alarm_id": None,
+                        "alarm_name": "Has alarms (recency)",
+                        "alarm_type": "DataRecency",
+                        "threshold": None,
+                        "severity": None,
+                        "enabled": None,
+                    })
     
     df = pd.DataFrame(records)
     return df
