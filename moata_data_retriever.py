@@ -54,8 +54,8 @@ TOKEN_URL = (
     "moata.onmicrosoft.com/B2C_1A_CLIENTCREDENTIALSFLOW/oauth2/v2.0/token"
 )
 
-# Base API URL from Sam's email
-BASE_API_URL = "https://api.moata.io/ae/v1"
+# Base API URL - updated to match Swagger documentation
+BASE_API_URL = "https://api.moata.com/v1"
 
 # Project & filters
 AUCKLAND_RAINFALL_PROJECT_ID = 594  # from Sam
@@ -301,8 +301,8 @@ def get_alarms_for_trace(
     """
     Fetch overflow alarms configured for a given trace.
     
-    Uses endpoint from Sam's workflow:
-        GET /alarms/overflow/detailed-info-by-trace?traceId={traceId}
+    Uses endpoint from Swagger documentation:
+        GET /v1/alarms/overflow-detailed-info-by-trace?traceId={traceId}
     
     Note from Sam:
     - This returns 'overflow' alarms (triggered when trace value exceeds a threshold)
@@ -310,7 +310,7 @@ def get_alarms_for_trace(
     - The main 'Rainfall' trace has recency alarms that send messages to council
     - Not all traces have alarms configured (will return 404)
     """
-    url = f"{BASE_API_URL}/alarms/overflow/detailed-info-by-trace"
+    url = f"{BASE_API_URL}/alarms/overflow-detailed-info-by-trace"
     headers = auth_headers(access_token)
     params = {"traceId": trace_id}
 
@@ -341,7 +341,7 @@ def get_detailed_alarms_by_project(
     Fetch ALL detailed alarm information for a project (both overflow and recency alarms).
     
     Uses endpoint from Swagger spec:
-        GET /alarms/detailed-alarms?projectId={projectId}
+        GET /v1/alarms/detailed-alarms?projectId={projectId}
     
     Returns a dictionary mapping traceId -> alarm details (including thresholds, severity, etc.)
     
