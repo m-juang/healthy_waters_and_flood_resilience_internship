@@ -607,7 +607,8 @@ def main():
     report = create_summary_report(filtered_data, alarms_df)
     
     report_path = OUTPUT_DIR / "analysis_report.txt"
-    with open(report_path, 'w') as f:
+    # Write report using UTF-8 to avoid Windows encoding errors for special characters
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write(report)
     logging.info(f"✓ Saved report to {report_path}")
     

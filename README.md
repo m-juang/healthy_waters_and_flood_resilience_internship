@@ -99,7 +99,7 @@ python moata_data_retriever.py
 - `moata_output/rain_gauges.json` - All assets
 - `moata_output/rain_gauges_traces_alarms.json` - Complete data structure
 
-**Execution time:** ~5-10 minutes (sequential processing, respects rate limits)
+**Execution time:** ~ 1 hour or more (sequential processing, respects rate limits)
 
 ### Step 2: Filter and Analyze Data
 
