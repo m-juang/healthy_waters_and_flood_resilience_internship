@@ -31,7 +31,7 @@ import time
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 import requests
 # Disable SSL warnings when verify=False is used
@@ -71,6 +71,12 @@ REQUEST_SLEEP = 1.0 / REQUESTS_PER_SECOND
 # Refresh the token if it's within this buffer of expiry to avoid 401s
 TOKEN_TTL_SECONDS = 3600
 TOKEN_REFRESH_BUFFER_SECONDS = 300  # refresh 5 minutes before expiry
+
+# Global hook for safe_get to refresh tokens when a 401 is encountered.
+# In `main()` we set `REFRESH_TOKEN` to a function that returns a fresh token
+# and updates `TOKEN_ACQUIRED_AT` so the main loop knows when token was refreshed.
+REFRESH_TOKEN: Optional[Callable[[], str]] = None
+TOKEN_ACQUIRED_AT: Optional[float] = None
 # Output directory
 OUTPUT_DIR = Path("moata_output")
 
@@ -178,18 +184,42 @@ def safe_get(
     """
     time.sleep(sleep)  # Rate limiting: stay under 800 requests / 5 minutes
     logging.debug(f"GET {url} params={params}")
+
+    # Perform request
     resp = requests.get(url, headers=headers, params=params, timeout=60, verify=False)
-    
+
     # Handle 404 gracefully if allowed (e.g., trace has no alarms)
     if resp.status_code == 404 and allow_404:
         logging.debug(f"404 for {url} - resource not found (this is OK)")
         return None
-    
+
     # Handle 403 Forbidden gracefully if allowed (e.g., endpoint not accessible)
     if resp.status_code == 403 and allow_404:
         logging.debug(f"403 Forbidden for {url} - endpoint not accessible (this is OK)")
         return None
-    
+
+    # If unauthorized and we have a refresh hook, try to refresh token and retry once
+    if resp.status_code == 401 and REFRESH_TOKEN is not None:
+        logging.warning("401 Unauthorized for %s - attempting token refresh and retry", url)
+        try:
+            new_token = REFRESH_TOKEN()
+            # update headers for retry
+            headers = dict(headers)
+            headers["Authorization"] = f"Bearer {new_token}"
+            # short sleep before retry to avoid immediate rejections
+            time.sleep(1)
+            resp = requests.get(url, headers=headers, params=params, timeout=60, verify=False)
+        except Exception as e:
+            logging.warning("Token refresh failed: %s", e)
+
+    # After potential retry, handle 404/403 again
+    if resp.status_code == 404 and allow_404:
+        logging.debug(f"404 for {url} - resource not found (this is OK)")
+        return None
+    if resp.status_code == 403 and allow_404:
+        logging.debug(f"403 Forbidden for {url} - endpoint not accessible (this is OK)")
+        return None
+
     resp.raise_for_status()
     return resp.json()
 
@@ -389,6 +419,24 @@ def main():
     token_acquired_at = time.time()
     token_ttl = TOKEN_TTL_SECONDS
     token_refresh_buffer = TOKEN_REFRESH_BUFFER_SECONDS
+
+    # Expose a module-level refresh callback so safe_get can refresh on 401s
+    def _refresh_and_record_token() -> str:
+        nonlocal access_token, token_acquired_at
+        new_token = get_access_token(client_id, client_secret)
+        access_token = new_token
+        token_acquired_at = time.time()
+        # Also update module-level marker so other parts can observe it
+        global TOKEN_ACQUIRED_AT
+        TOKEN_ACQUIRED_AT = token_acquired_at
+        return new_token
+
+    # Set global REFRESH_TOKEN hook
+    global REFRESH_TOKEN
+    REFRESH_TOKEN = _refresh_and_record_token
+    # Record initial acquisition time at module-level too
+    global TOKEN_ACQUIRED_AT
+    TOKEN_ACQUIRED_AT = token_acquired_at
 
     # 2. Fetch rain gauges
     logging.info("\nStep 1: Fetching rain gauge assets...")
