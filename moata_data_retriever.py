@@ -55,7 +55,7 @@ TOKEN_URL = (
 )
 
 # Base API URL - updated to match Swagger documentation
-BASE_API_URL = "https://api.moata.com/v1"
+BASE_API_URL = "https://api.moata.io/ae/v1"
 
 # Project & filters
 AUCKLAND_RAINFALL_PROJECT_ID = 594  # from Sam
@@ -442,13 +442,29 @@ def main():
     logging.info("\nStep 1: Fetching rain gauge assets...")
     rain_gauges = get_rain_gauges(access_token)
     gauges_path = OUTPUT_DIR / "rain_gauges.json"
-    gauges_path.write_text(json.dumps(rain_gauges, indent=2))
+    rain_gauges_json = json.dumps(rain_gauges, indent=2)
+    gauges_path.write_text(rain_gauges_json)
     logging.info("✓ Saved %d rain gauges to %s", len(rain_gauges), gauges_path)
+    
+    # Print entire rain gauges JSON to terminal
+    logging.info("\n" + "=" * 60)
+    logging.info("FULL JSON: Rain Gauges")
+    logging.info("=" * 60)
+    print(rain_gauges_json)
+    logging.info("=" * 60 + "\n")
 
     # 2b. Fetch detailed alarms for the project (both overflow and recency)
     logging.info("\nStep 1b: Fetching detailed alarms (overflow + recency)...")
     detailed_alarms = get_detailed_alarms_by_project(access_token)
     logging.info("✓ Fetched %d detailed alarms", len(detailed_alarms))
+    
+    # Show preview of first few alarms
+    if detailed_alarms:
+        logging.info("\n--- PREVIEW: First 3 Detailed Alarms ---")
+        for i, (trace_id, alarm) in enumerate(list(detailed_alarms.items())[:3]):
+            print(f"\nTrace ID {trace_id}:")
+            print(json.dumps(alarm, indent=2))
+        logging.info("--- END PREVIEW ---\n")
 
     # 3. For each gauge, fetch traces and alarms
     logging.info("\nStep 2: Fetching traces and alarms for each gauge...")
@@ -503,6 +519,15 @@ def main():
             # Add detailed alarm info if available for this trace
             detailed_alarm = detailed_alarms.get(trace_id)
             
+            # Log if alarms found for this trace
+            if alarms or detailed_alarm:
+                logging.info(f"    Trace '{trace_name}' (id={trace_id}):")
+                if alarms:
+                    logging.info(f"      - Found {len(alarms)} overflow alarm(s)")
+                if detailed_alarm:
+                    alarm_type = detailed_alarm.get("alarmType", "Unknown")
+                    logging.info(f"      - Has detailed alarm: type={alarm_type}")
+            
             trace_entry = {
                 "trace": trace,
                 "overflow_alarms": alarms,  # Renamed for clarity
@@ -515,12 +540,27 @@ def main():
             "traces": traces_with_alarms,
         }
         all_data.append(asset_entry)
+        
+        # Print this gauge's data immediately (real-time output)
+        logging.info("\n" + "-" * 60)
+        logging.info(f"GAUGE {idx}/{total_gauges} DATA: {gauge_name}")
+        logging.info("-" * 60)
+        print(json.dumps(asset_entry, indent=2))
+        logging.info("-" * 60 + "\n")
 
     # 4. Save combined structure
     logging.info("\n" + "=" * 60)
     all_path = OUTPUT_DIR / "rain_gauges_traces_alarms.json"
-    all_path.write_text(json.dumps(all_data, indent=2))
+    all_data_json = json.dumps(all_data, indent=2)
+    all_path.write_text(all_data_json)
     logging.info("✓ Saved complete data to %s", all_path)
+    
+    # Print entire combined JSON to terminal
+    logging.info("\n" + "=" * 60)
+    logging.info("FULL JSON: Rain Gauges + Traces + Alarms")
+    logging.info("=" * 60)
+    print(all_data_json)
+    logging.info("=" * 60 + "\n")
     
     # Summary
     total_traces = sum(len(g["traces"]) for g in all_data)
