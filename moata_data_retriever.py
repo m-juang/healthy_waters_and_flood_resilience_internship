@@ -333,6 +333,45 @@ def get_alarms_for_trace(
     return alarms
 
 
+# NEW: get thresholds for a trace using /traces/{traceId}/thresholds
+def get_thresholds_for_trace(
+    access_token: str,
+    trace_id: Any,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch threshold configurations for a given trace.
+
+    Uses endpoint:
+        GET /v1/traces/{traceId}/thresholds
+
+    This returns threshold values such as:
+    - 2.5 mm in 30 seconds
+    - 1 hour accumulated 15 mm
+    - ARI Max Threshold = 5, etc.
+    """
+    url = f"{BASE_API_URL}/traces/{trace_id}/thresholds"
+    headers = auth_headers(access_token)
+
+    logging.debug("Fetching thresholds for trace_id=%s...", trace_id)
+    data = safe_get(url, headers=headers, allow_404=True)
+
+    # If no thresholds configured or 404, return empty list
+    if data is None:
+        logging.debug("Trace %s has no thresholds configured.", trace_id)
+        return []
+
+    # API returns {"thresholds": [...]} – fall back to list if shape differs
+    if isinstance(data, dict) and "thresholds" in data:
+        thresholds = data["thresholds"]
+    else:
+        thresholds = data if isinstance(data, list) else []
+
+    if thresholds:
+        logging.info("Trace %s has %d threshold(s).", trace_id, len(thresholds))
+
+    return thresholds
+
+
 def get_detailed_alarms_by_project(
     access_token: str,
     project_id: int = AUCKLAND_RAINFALL_PROJECT_ID,
@@ -504,7 +543,13 @@ def main():
         traces_with_alarms = []
         for trace in traces:
             trace_id = trace.get("id") or trace.get("traceId")
-            trace_name = trace.get("name", "Unknown")
+            trace_name = (
+                trace.get("name")
+                or trace.get("description")
+                or (trace.get("dataVariableType") or {}).get("name")
+                or "Unknown"
+)
+
             
             if trace_id is None:
                 logging.warning("Trace without id encountered: %s", trace)
@@ -516,22 +561,28 @@ def main():
 
             alarms = get_alarms_for_trace(access_token, trace_id)
             
+            # NEW: fetch threshold configurations for this trace
+            thresholds = get_thresholds_for_trace(access_token, trace_id)
+
             # Add detailed alarm info if available for this trace
             detailed_alarm = detailed_alarms.get(trace_id)
             
-            # Log if alarms found for this trace
-            if alarms or detailed_alarm:
+            # Log if alarms / thresholds found for this trace
+            if alarms or detailed_alarm or thresholds:
                 logging.info(f"    Trace '{trace_name}' (id={trace_id}):")
                 if alarms:
                     logging.info(f"      - Found {len(alarms)} overflow alarm(s)")
+                if thresholds:
+                    logging.info(f"      - Found {len(thresholds)} threshold(s)")
                 if detailed_alarm:
                     alarm_type = detailed_alarm.get("alarmType", "Unknown")
                     logging.info(f"      - Has detailed alarm: type={alarm_type}")
             
             trace_entry = {
                 "trace": trace,
-                "overflow_alarms": alarms,  # Renamed for clarity
-                "detailed_alarm": detailed_alarm,  # NEW: includes recency alarm details
+                "overflow_alarms": alarms,   # existing field
+                "detailed_alarm": detailed_alarm,  # existing field
+                "thresholds": thresholds,     # NEW field
             }
             traces_with_alarms.append(trace_entry)
 
@@ -574,6 +625,12 @@ def main():
         for t in g["traces"] 
         if t.get("detailed_alarm") is not None
     )
+    # NEW: total thresholds
+    total_thresholds = sum(
+        len(t.get("thresholds") or [])
+        for g in all_data
+        for t in g["traces"]
+    )
     
     logging.info("\n" + "=" * 60)
     logging.info("Summary:")
@@ -581,6 +638,7 @@ def main():
     logging.info("  Total traces: %d", total_traces)
     logging.info("  Total overflow alarms: %d", total_alarms)
     logging.info("  Total traces with detailed alarms: %d", total_detailed)
+    logging.info("  Total thresholds: %d", total_thresholds)
     logging.info("=" * 60)
     logging.info("Done! Check the '%s' directory for output files.", OUTPUT_DIR)
 

@@ -8,6 +8,8 @@ Based on Sam's email guidance:
 3. Use alternative endpoint to get primary 'Rainfall' traces efficiently
 4. Generate summary of active gauges with their alarm configurations
 
+UPDATED: Now handles thresholds field added in moata_rain_alerts.py
+
 Requirements:
 - Run moata_rain_alerts.py first to generate input files
 - Input files expected:
@@ -16,7 +18,7 @@ Requirements:
 
 Output:
 - Filtered list of active Auckland rain gauges
-- Summary of traces with alarms
+- Summary of traces with alarms and thresholds
 - Alarm threshold configurations
 """
 
@@ -44,8 +46,8 @@ except ImportError:
 
 BASE_API_URL = "https://api.moata.io/ae/v1"
 AUCKLAND_RAINFALL_PROJECT_ID = 594
-RAINFALL_DATA_VARIABLE_TYPE_ID = 10  # From Sam's email
-RAINFALL_DESCRIPTION = "Rainfall"    # From Sam's email
+RAINFALL_DATA_VARIABLE_TYPE_ID = 10
+RAINFALL_DESCRIPTION = "Rainfall"
 
 # Inactive threshold: gauges with no data in last 3 months
 INACTIVE_THRESHOLD_MONTHS = 3
@@ -120,14 +122,12 @@ def get_rainfall_trace(traces_data: List[Dict]) -> Optional[Dict]:
         description = trace.get("description", "")
         
         # Check if this is the main Rainfall trace
-        # Based on the data structure, it seems the description field is what we need
         if description == "Rainfall":
             return trace_data
         
         # Also check dataVariableType
         data_var_type = trace.get("dataVariableType", {})
         if data_var_type.get("name") == "Rainfall" or data_var_type.get("type") == "Rain":
-            # Additional check: prefer traces with "Rainfall" in description
             if "rainfall" in description.lower() and "filtered" not in description.lower():
                 return trace_data
     
@@ -280,7 +280,7 @@ def filter_existing_data(all_data: List[Dict]) -> Dict[str, Any]:
         if is_gauge_active(telemetered_time):
             gauge_data["last_data_time"] = telemetered_time.isoformat()
             gauge_data["last_data_time_dt"] = telemetered_time
-            gauge_data["rainfall_trace"] = rainfall_trace  # Store for easy access
+            gauge_data["rainfall_trace"] = rainfall_trace
             active_gauges.append(gauge_data)
             logging.info(
                 f"✓ Active: {gauge_name[:60]} (last: {telemetered_time.strftime('%Y-%m-%d')})"
@@ -321,11 +321,14 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
     Create a summary table showing:
     - Gauge name
     - Traces with alarms
-    - Alarm thresholds (from both overflow and detailed/recency alarms)
+    - Alarm thresholds (from overflow_alarms, detailed_alarm, and thresholds)
     
-    Now extracts threshold/severity/enabled from:
+    UPDATED: Now processes the 'thresholds' field added by moata_rain_alerts.py
+    
+    Extracts data from:
     - overflow_alarms: Traditional overflow/threshold alarms
-    - detailed_alarm: Comprehensive alarm data including recency alarms with thresholds
+    - detailed_alarm: Comprehensive alarm data including recency alarms
+    - thresholds: Threshold configurations from /traces/{traceId}/thresholds endpoint
     """
     records = []
     
@@ -343,11 +346,14 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
             trace_id = trace.get("id")
             has_alarms = trace.get("hasAlarms", False)
             
-            # Get overflow alarms (traditional method)
+            # Get overflow alarms
             alarms = trace_data.get("overflow_alarms", [])
             
-            # Get detailed alarm info (includes both overflow and recency alarms)
+            # Get detailed alarm info
             detailed_alarm = trace_data.get("detailed_alarm")
+            
+            # NEW: Get thresholds from the thresholds endpoint
+            thresholds = trace_data.get("thresholds", [])
             
             # Extract threshold info from detailed_alarm if available
             detailed_threshold = None
@@ -361,14 +367,12 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                 # Get alarm thresholds array
                 alarm_thresholds = detailed_alarm.get("alarmThresholds", [])
                 if alarm_thresholds:
-                    # Use first threshold
                     first_threshold = alarm_thresholds[0]
                     detailed_threshold = first_threshold.get("thresholdValue")
                     detailed_severity = first_threshold.get("alarmSeverity")
                 
                 # For recency alarms, get configuration from other fields
                 if alarm_type == "DataRecency":
-                    # Recency alarms use maxLookbackOverride for staleness threshold
                     detailed_threshold = detailed_alarm.get("maxLookbackOverride", detailed_threshold)
                     detailed_enabled = detailed_alarm.get("alarmState") == "Enabled"
             
@@ -387,10 +391,33 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "threshold": alarm.get("threshold", detailed_threshold),
                         "severity": alarm.get("severity", detailed_severity),
                         "enabled": alarm.get("enabled", detailed_enabled if detailed_enabled is not None else True),
+                        "source": "overflow_alarm"
                     })
-            elif has_alarms:
-                # Trace has alarms flag (might be recency alarms)
-                # Use detailed_alarm data if available
+            
+            # NEW: Process thresholds from /traces/{traceId}/thresholds endpoint
+            if thresholds:
+                for threshold in thresholds:
+                    threshold_name = threshold.get("name", "Unknown Threshold")
+                    threshold_value = threshold.get("value") or threshold.get("thresholdValue")
+                    threshold_type = threshold.get("type", "Threshold")
+                    
+                    records.append({
+                        "gauge_id": gauge_id,
+                        "gauge_name": gauge_name,
+                        "last_data": last_data.strftime('%Y-%m-%d') if last_data else None,
+                        "trace_id": trace_id,
+                        "trace_name": trace_name,
+                        "alarm_id": threshold.get("id"),
+                        "alarm_name": threshold_name,
+                        "alarm_type": threshold_type,
+                        "threshold": threshold_value,
+                        "severity": threshold.get("severity"),
+                        "enabled": threshold.get("enabled"),
+                        "source": "threshold_config"
+                    })
+            
+            # Process detailed alarm if no overflow alarms
+            if not alarms and has_alarms:
                 if detailed_alarm:
                     records.append({
                         "gauge_id": gauge_id,
@@ -404,9 +431,10 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "threshold": detailed_threshold,
                         "severity": detailed_severity,
                         "enabled": detailed_enabled,
+                        "source": "detailed_alarm"
                     })
                 else:
-                    # Has alarms flag but no detailed data (recency alarms)
+                    # Has alarms flag but no detailed data
                     records.append({
                         "gauge_id": gauge_id,
                         "gauge_name": gauge_name,
@@ -419,6 +447,7 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "threshold": None,
                         "severity": None,
                         "enabled": None,
+                        "source": "has_alarms_flag"
                     })
     
     df = pd.DataFrame(records)
@@ -426,7 +455,7 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
 
 
 def create_summary_report(filtered_data: Dict, alarms_df: pd.DataFrame) -> str:
-    """Create a text summary report."""
+    """Create a text summary report with threshold information."""
     stats = filtered_data["stats"]
     active_gauges = filtered_data["active_gauges"]
     
@@ -464,64 +493,86 @@ def create_summary_report(filtered_data: Dict, alarms_df: pd.DataFrame) -> str:
         
         traces = gauge_data.get("traces", [])
         traces_with_alarms = sum(
-            1 for t in traces if t.get("overflow_alarms") or t.get("trace", {}).get("hasAlarms")
+            1 for t in traces 
+            if t.get("overflow_alarms") or t.get("trace", {}).get("hasAlarms") or t.get("thresholds")
         )
-        total_alarms = sum(
-            len(t.get("overflow_alarms", [])) for t in traces
-        )
+        total_overflow_alarms = sum(len(t.get("overflow_alarms", [])) for t in traces)
+        total_thresholds = sum(len(t.get("thresholds", [])) for t in traces)
         
         report_lines.append(f"• {gauge_name}")
         report_lines.append(f"  ID: {gauge_id}")
         report_lines.append(f"  Last data: {last_data.strftime('%Y-%m-%d %H:%M:%S')}")
-        report_lines.append(f"  Traces: {len(traces)} total, {traces_with_alarms} with alarms configured")
-        report_lines.append(f"  Overflow alarms: {total_alarms}")
+        report_lines.append(f"  Traces: {len(traces)} total, {traces_with_alarms} with alarms/thresholds")
+        report_lines.append(f"  Overflow alarms: {total_overflow_alarms}")
+        report_lines.append(f"  Threshold configs: {total_thresholds}")
         report_lines.append("")
     
     report_lines.extend([
         "=" * 80,
-        "ALARM CONFIGURATION SUMMARY:",
+        "ALARM & THRESHOLD CONFIGURATION SUMMARY:",
         "=" * 80,
         "",
     ])
     
     if not alarms_df.empty:
-        # Count alarms by trace type
-        alarms_only = alarms_df[alarms_df["alarm_id"].notna()]
-        if not alarms_only.empty:
-            report_lines.append(f"Total overflow alarms configured: {len(alarms_only)}")
+        # Count by source
+        if "source" in alarms_df.columns:
+            report_lines.append("Configuration sources:")
+            source_counts = alarms_df["source"].value_counts()
+            for source, count in source_counts.items():
+                source_label = {
+                    "overflow_alarm": "Overflow alarms",
+                    "threshold_config": "Threshold configs",
+                    "detailed_alarm": "Detailed alarms",
+                    "has_alarms_flag": "Has alarms flag"
+                }.get(source, source)
+                report_lines.append(f"  {source_label}: {count}")
             report_lines.append("")
-            
-            by_trace = alarms_only.groupby("trace_name").size().sort_values(ascending=False)
-            report_lines.append("Alarms by trace type:")
-            for trace_name, count in by_trace.items():
-                report_lines.append(f"  {trace_name}: {count} alarms")
-            report_lines.append("")
-            
-            # Show threshold ranges
-            if "threshold" in alarms_only.columns:
-                report_lines.append("Threshold ranges by trace type:")
-                for trace_name in alarms_only["trace_name"].unique():
-                    trace_alarms = alarms_only[alarms_only["trace_name"] == trace_name]
-                    thresholds = trace_alarms["threshold"].dropna()
-                    if not thresholds.empty:
-                        report_lines.append(
-                            f"  {trace_name}: "
-                            f"{thresholds.min():.1f} - {thresholds.max():.1f} mm"
-                        )
         
-        # Count traces with hasAlarms flag but no overflow alarms
+        # Count alarms by trace type
+        alarms_with_id = alarms_df[alarms_df["alarm_id"].notna()]
+        if not alarms_with_id.empty:
+            report_lines.append(f"Total configured alarms/thresholds: {len(alarms_with_id)}")
+            report_lines.append("")
+            
+            by_trace = alarms_with_id.groupby("trace_name").size().sort_values(ascending=False)
+            report_lines.append("Alarms/thresholds by trace type:")
+            for trace_name, count in by_trace.items():
+                report_lines.append(f"  {trace_name}: {count}")
+            report_lines.append("")
+            
+            # Show threshold ranges by trace type
+            if "threshold" in alarms_with_id.columns:
+                report_lines.append("Threshold ranges by trace type:")
+                for trace_name in alarms_with_id["trace_name"].unique():
+                    trace_configs = alarms_with_id[alarms_with_id["trace_name"] == trace_name]
+                    thresholds = trace_configs["threshold"].dropna()
+                    if not thresholds.empty:
+                        try:
+                            # Try to convert to numeric
+                            numeric_thresholds = pd.to_numeric(thresholds, errors='coerce').dropna()
+                            if not numeric_thresholds.empty:
+                                report_lines.append(
+                                    f"  {trace_name}: "
+                                    f"{numeric_thresholds.min():.1f} - {numeric_thresholds.max():.1f}"
+                                )
+                            else:
+                                report_lines.append(f"  {trace_name}: (non-numeric thresholds)")
+                        except:
+                            report_lines.append(f"  {trace_name}: (mixed threshold types)")
+        
+        # Count traces with hasAlarms flag
         has_alarms_flag = alarms_df[
             (alarms_df["alarm_id"].isna()) & 
-            (alarms_df["alarm_name"] == "Has alarms (not overflow)")
+            (alarms_df["alarm_name"] == "Has alarms (recency)")
         ]
         if not has_alarms_flag.empty:
             report_lines.append("")
             report_lines.append(
-                f"Traces with alarms (likely recency alarms): "
-                f"{len(has_alarms_flag)}"
+                f"Traces with alarms flag (likely recency): {len(has_alarms_flag)}"
             )
     else:
-        report_lines.append("No overflow alarms found on active gauges.")
+        report_lines.append("No alarm/threshold configurations found on active gauges.")
     
     report_lines.append("")
     report_lines.append("=" * 80)
@@ -538,7 +589,7 @@ def main():
     Main workflow:
     1. Load data from moata_rain_alerts.py output
     2. Filter out Northland and inactive gauges
-    3. Analyze alarm configurations
+    3. Analyze alarm configurations (including new thresholds field)
     4. Generate summary reports
     """
     logging.info("=" * 80)
@@ -583,21 +634,35 @@ def main():
     
     logging.info(f"\n✓ Saved {len(filtered_data['active_gauges'])} active gauges to {active_path}")
     
-    # 3. Analyze alarms
-    logging.info("\nStep 3: Analyzing alarm configurations...")
+    # 3. Analyze alarms (including new thresholds field)
+    logging.info("\nStep 3: Analyzing alarm & threshold configurations...")
     
     alarms_df = analyze_alarms(filtered_data["active_gauges"])
     
     # Save alarm summary
     if not alarms_df.empty:
+        # Save CSV with error handling for file locks
         alarms_csv_path = OUTPUT_DIR / "alarm_summary.csv"
-        alarms_df.to_csv(alarms_csv_path, index=False)
-        logging.info(f"✓ Saved alarm summary to {alarms_csv_path}")
+        try:
+            alarms_df.to_csv(alarms_csv_path, index=False)
+            logging.info(f"✓ Saved alarm summary to {alarms_csv_path}")
+        except PermissionError:
+            logging.error(f"✗ Could not save CSV - file is open in another program: {alarms_csv_path}")
+            logging.info("  Please close the file and run the script again, or use the JSON output instead.")
         
         # Also save as JSON for easier inspection
         alarms_json_path = OUTPUT_DIR / "alarm_summary.json"
-        alarms_df.to_json(alarms_json_path, orient="records", indent=2)
-        logging.info(f"✓ Saved alarm summary to {alarms_json_path}")
+        try:
+            alarms_df.to_json(alarms_json_path, orient="records", indent=2)
+            logging.info(f"✓ Saved alarm summary to {alarms_json_path}")
+        except PermissionError:
+            logging.error(f"✗ Could not save JSON - file is open in another program: {alarms_json_path}")
+        
+        # Log summary by source
+        if "source" in alarms_df.columns:
+            logging.info("\nConfiguration breakdown by source:")
+            for source, count in alarms_df["source"].value_counts().items():
+                logging.info(f"  {source}: {count}")
     else:
         logging.warning("No alarm data to save")
     
@@ -607,10 +672,13 @@ def main():
     report = create_summary_report(filtered_data, alarms_df)
     
     report_path = OUTPUT_DIR / "analysis_report.txt"
-    # Write report using UTF-8 to avoid Windows encoding errors for special characters
-    with open(report_path, 'w', encoding='utf-8') as f:
-        f.write(report)
-    logging.info(f"✓ Saved report to {report_path}")
+    try:
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(report)
+        logging.info(f"✓ Saved report to {report_path}")
+    except PermissionError:
+        logging.error(f"✗ Could not save report - file is open in another program: {report_path}")
+        logging.info("  Please close the file and run the script again.")
     
     # Print report to console
     print("\n" + report)
@@ -623,7 +691,6 @@ def main():
         access_token = get_fresh_token()
         rainfall_traces = get_rainfall_traces_info(access_token)
         
-        # Create DataFrame for comparison
         if rainfall_traces:
             traces_df = pd.DataFrame(rainfall_traces)
             
