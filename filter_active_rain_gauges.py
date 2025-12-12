@@ -5,10 +5,11 @@ Script to filter and analyze rain gauge data collected by moata_rain_alerts.py
 Based on Sam's email guidance:
 1. Filter out Northland gauges (keep only Auckland)
 2. Filter out inactive gauges (check telemeteredMaximumTime on 'Rainfall' trace)
-3. Use alternative endpoint to get primary 'Rainfall' traces efficiently
-4. Generate summary of active gauges with their alarm configurations
+3. Generate summary of active gauges with their alarm configurations
 
-UPDATED: Now handles thresholds field added in moata_rain_alerts.py
+UPDATED: 
+- Now handles thresholds field added in moata_rain_alerts.py
+- 100% OFFLINE - Pure file-based analysis (no API calls)
 
 Requirements:
 - Run moata_rain_alerts.py first to generate input files
@@ -27,10 +28,6 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-import requests
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 try:
     import pandas as pd
@@ -44,20 +41,12 @@ except ImportError:
 # CONFIGURATION
 # =========================
 
-BASE_API_URL = "https://api.moata.io/ae/v1"
-AUCKLAND_RAINFALL_PROJECT_ID = 594
-RAINFALL_DATA_VARIABLE_TYPE_ID = 10
-RAINFALL_DESCRIPTION = "Rainfall"
-
 # Inactive threshold: gauges with no data in last 3 months
 INACTIVE_THRESHOLD_MONTHS = 3
 
 # Input/output directories
 INPUT_DIR = Path("moata_output")
 OUTPUT_DIR = Path("moata_filtered")
-
-# Rate limiting
-REQUEST_SLEEP = 0.5
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,82 +128,6 @@ def get_rainfall_trace(traces_data: List[Dict]) -> Optional[Dict]:
             return trace_data
     
     return None
-
-
-# =========================
-# API CALLS
-# =========================
-
-def get_fresh_token() -> str:
-    """Get a fresh access token using client credentials."""
-    import os
-    
-    TOKEN_URL = (
-        "https://moata.b2clogin.com/"
-        "moata.onmicrosoft.com/B2C_1A_CLIENTCREDENTIALSFLOW/oauth2/v2.0/token"
-    )
-    
-    client_id = os.getenv("MOATA_CLIENT_ID")
-    client_secret = os.getenv("MOATA_CLIENT_SECRET")
-    
-    if not client_id or not client_secret:
-        raise RuntimeError(
-            "MOATA_CLIENT_ID and MOATA_CLIENT_SECRET must be set as environment "
-            "variables or placed in a local .env file."
-        )
-    
-    data = {
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "grant_type": "client_credentials",
-    }
-    params = {
-        "scope": "https://moata.onmicrosoft.com/moata.io/.default"
-    }
-    
-    resp = requests.post(TOKEN_URL, data=data, params=params, timeout=30, verify=False)
-    resp.raise_for_status()
-    token_data = resp.json()
-    
-    return token_data.get("access_token")
-
-
-def get_rainfall_traces_info(access_token: str, 
-                             project_id: int = AUCKLAND_RAINFALL_PROJECT_ID) -> List[Dict]:
-    """
-    Use Sam's suggested endpoint to get all 'Rainfall' traces efficiently.
-    
-    Endpoint: GET /v1/projects/{projectId}/traces_info
-    Params: dataVariableTypeId=10, description=Rainfall
-    
-    This is more efficient than fetching traces for each asset individually.
-    """
-    url = f"{BASE_API_URL}/projects/{project_id}/traces_info"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/json",
-    }
-    params = {
-        "dataVariableTypeId": RAINFALL_DATA_VARIABLE_TYPE_ID,
-        "description": RAINFALL_DESCRIPTION,
-    }
-    
-    logging.info("Fetching all 'Rainfall' traces using efficient endpoint...")
-    
-    import time
-    time.sleep(REQUEST_SLEEP)
-    
-    resp = requests.get(url, headers=headers, params=params, timeout=60, verify=False)
-    resp.raise_for_status()
-    data = resp.json()
-    
-    if isinstance(data, dict) and "items" in data:
-        traces = data["items"]
-    else:
-        traces = data if isinstance(data, list) else []
-    
-    logging.info(f"Found {len(traces)} 'Rainfall' traces")
-    return traces
 
 
 # =========================
@@ -390,7 +303,6 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "alarm_type": "OverflowMonitoring",
                         "threshold": alarm.get("threshold", detailed_threshold),
                         "severity": alarm.get("severity", detailed_severity),
-                        "enabled": alarm.get("enabled", detailed_enabled if detailed_enabled is not None else True),
                         "source": "overflow_alarm"
                     })
             
@@ -399,7 +311,7 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                 for threshold in thresholds:
                     threshold_name = threshold.get("name", "Unknown Threshold")
                     threshold_value = threshold.get("value") or threshold.get("thresholdValue")
-                    threshold_type = threshold.get("type", "Threshold")
+                    threshold_type = threshold.get("type", threshold.get("category", "Threshold"))
                     
                     records.append({
                         "gauge_id": gauge_id,
@@ -412,7 +324,7 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "alarm_type": threshold_type,
                         "threshold": threshold_value,
                         "severity": threshold.get("severity"),
-                        "enabled": threshold.get("enabled"),
+                        "is_critical": threshold.get("isCritical"),
                         "source": "threshold_config"
                     })
             
@@ -430,7 +342,6 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "alarm_type": alarm_type,
                         "threshold": detailed_threshold,
                         "severity": detailed_severity,
-                        "enabled": detailed_enabled,
                         "source": "detailed_alarm"
                     })
                 else:
@@ -446,7 +357,6 @@ def analyze_alarms(active_gauges: List[Dict]) -> pd.DataFrame:
                         "alarm_type": "DataRecency",
                         "threshold": None,
                         "severity": None,
-                        "enabled": None,
                         "source": "has_alarms_flag"
                     })
     
@@ -683,55 +593,6 @@ def main():
     # Print report to console
     print("\n" + report)
     
-    # 5. Optional: Use Sam's suggested endpoint for comparison
-    logging.info("\nStep 5 (Optional): Fetching Rainfall traces using efficient endpoint...")
-    logging.info("This validates our filtering against the API's direct query...")
-    
-    try:
-        access_token = get_fresh_token()
-        rainfall_traces = get_rainfall_traces_info(access_token)
-        
-        if rainfall_traces:
-            traces_df = pd.DataFrame(rainfall_traces)
-            
-            if not traces_df.empty:
-                # Get active asset IDs from our filtered data
-                active_asset_ids = set(
-                    g["gauge"].get("id") 
-                    for g in filtered_data["active_gauges"]
-                )
-                
-                # Check which rainfall traces belong to our active gauges
-                if "assetId" in traces_df.columns:
-                    traces_df["in_active_set"] = traces_df["assetId"].isin(active_asset_ids)
-                
-                # Parse telemetered times
-                if "telemeteredMaximumTime" in traces_df.columns:
-                    traces_df["telemetered_dt"] = traces_df["telemeteredMaximumTime"].apply(
-                        parse_telemetered_time
-                    )
-                    traces_df["is_active"] = traces_df["telemetered_dt"].apply(
-                        lambda x: is_gauge_active(x) if x else False
-                    )
-                
-                validation_path = OUTPUT_DIR / "rainfall_traces_validation.csv"
-                traces_df.to_csv(validation_path, index=False)
-                logging.info(f"✓ Saved validation data to {validation_path}")
-                
-                # Quick stats
-                if "is_active" in traces_df.columns:
-                    api_active = traces_df["is_active"].sum()
-                    our_active = len(active_asset_ids)
-                    logging.info(f"\nValidation results:")
-                    logging.info(f"  API shows {api_active} active Rainfall traces")
-                    logging.info(f"  Our filtering found {our_active} active gauges")
-        else:
-            logging.info("No rainfall traces returned from API")
-            
-    except Exception as e:
-        logging.warning(f"Could not fetch validation data from API: {e}")
-        logging.warning("Skipping validation step (main analysis is complete)")
-    
     # Final summary
     logging.info("\n" + "=" * 80)
     logging.info("COMPLETE!")
@@ -741,7 +602,6 @@ def main():
     logging.info("  - alarm_summary.csv (alarm configurations)")
     logging.info("  - alarm_summary.json (alarm configurations)")
     logging.info("  - analysis_report.txt (summary report)")
-    logging.info("  - rainfall_traces_validation.csv (API validation, if successful)")
     logging.info("=" * 80)
 
 
