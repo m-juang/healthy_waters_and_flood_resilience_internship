@@ -91,3 +91,37 @@ def build_charts(df: pd.DataFrame, out_dir: Path, max_gauges_for_bars: int = 25)
         plt.xlabel("Threshold value (numeric)")
         plt.ylabel("Trace")
         save_fig(out_dir / f"06_ladder_gauge_{i}.png")
+
+def build_risk_chart(df: pd.DataFrame, out_dir: Path, top_n: int = 15) -> None:
+    # Define components
+    is_crit = df["is_critical_bool"] == True
+    is_threshold = df["row_category"] == "Threshold alarm (overflow)"
+    is_recency = df["row_category"] == "Data freshness (recency)"
+
+    # Score per row
+    # You can tune weights later without touching report/page code
+    score = (
+        is_crit.astype(int) * 3
+        + is_threshold.astype(int) * 2
+        + is_recency.astype(int) * 1
+    )
+
+    tmp = df.copy()
+    tmp["risk_points"] = score
+
+    by_gauge = tmp.groupby("gauge_name")["risk_points"].sum().sort_values(ascending=False)
+    top = by_gauge.head(top_n)
+
+    if top.empty:
+        return
+
+    plt.figure(figsize=(12, 6))
+    top.plot(kind="bar")
+    plt.title(f"Top {len(top)} gauges by risk score (critical + thresholds + recency)")
+    plt.xlabel("Gauge")
+    plt.ylabel("Risk score (weighted)")
+    plt.xticks(rotation=75, ha="right")
+    save_fig(out_dir / "08_top_risky_gauges.png")
+
+    # 8) Risk chart
+    build_risk_chart(df, out_dir, top_n=15)

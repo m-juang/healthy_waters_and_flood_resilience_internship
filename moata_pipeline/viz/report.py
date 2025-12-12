@@ -28,6 +28,29 @@ def img_block(img_name: str, caption: str) -> str:
     </div>
     """
 
+def build_risk_table(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
+    is_threshold = df["row_category"] == "Threshold alarm (overflow)"
+    is_recency = df["row_category"] == "Data freshness (recency)"
+    is_crit = df["is_critical_bool"] == True
+
+    agg = df.groupby("gauge_name").agg(
+        total_records=("gauge_name", "size"),
+        thresholds=("row_category", lambda s: (s == "Threshold alarm (overflow)").sum()),
+        recency=("row_category", lambda s: (s == "Data freshness (recency)").sum()),
+        critical=("is_critical_bool", "sum"),
+        latest_data=("last_data_dt", "max"),
+    )
+
+    # Risk score (same weights as chart)
+    agg["risk_score"] = agg["critical"] * 3 + agg["thresholds"] * 2 + agg["recency"] * 1
+
+    agg = agg.sort_values(by=["risk_score", "critical", "thresholds"], ascending=[False, False, False]).head(top_n)
+
+    # Nice formatting
+    agg = agg.reset_index().rename(columns={"gauge_name": "Gauge"})
+    agg["latest_data"] = agg["latest_data"].dt.strftime("%Y-%m-%d")
+    return agg[["Gauge", "risk_score", "critical", "thresholds", "recency", "total_records", "latest_data"]]
+
 
 def build_report(df: pd.DataFrame, out_dir: Path) -> None:
     total_rows = len(df)
@@ -128,6 +151,27 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
         if (out_dir / img).exists():
             html_parts.append(img_block(img, cap))
     html_parts.append("</div>")
+
+        # --- Top Risky Gauges (Actionable shortlist) ---
+    risk_df = build_risk_table(df, top_n=20)
+
+    html_parts += [
+        "<h2>Top Risky Gauges (Actionable shortlist)</h2>",
+        "<p class='muted'>This is a simple weighted score: "
+        "<code>critical×3 + thresholds×2 + recency×1</code>. "
+        "Use it to prioritize which gauges to check first.</p>",
+    ]
+
+    # Include risk chart if exists
+    if (out_dir / "08_top_risky_gauges.png").exists():
+        html_parts += [
+            "<div class='grid'>",
+            img_block("08_top_risky_gauges.png", "Top gauges by risk score"),
+            "</div>",
+        ]
+
+    html_parts.append(risk_df.to_html(index=False, escape=True))
+
 
     html_parts += [
         "<h2>Threshold ladders (most intuitive)</h2>",

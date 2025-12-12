@@ -84,6 +84,11 @@ def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
           code { background: #f5f5f5; padding: 1px 5px; border-radius: 6px; }
         </style>
         """
+        total_records = len(gdf)
+        total_crit = int(gdf["is_critical_bool"].sum())
+        total_threshold = int((gdf["row_category"] == "Threshold alarm (overflow)").sum())
+        total_recency = int((gdf["row_category"] == "Data freshness (recency)").sum())
+
 
         parts = [
             "<html><head><meta charset='utf-8'/>",
@@ -98,6 +103,12 @@ def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
             "• <b>Data freshness (recency)</b> = monitoring if the sensor stops updating / data goes stale.<br/>"
             "• <b>Critical</b> = flagged critical in the dataset (higher attention)."
             "</div><br/>",
+            "<p class='muted'><b>Quick summary:</b> "
+            f"{total_records} records · "
+            f"{total_crit} critical · "
+            f"{total_threshold} threshold · "
+            f"{total_recency} recency</p>",
+
             df_to_html_table(crit_table, "Critical records", max_rows=200),
             df_to_html_table(overflow_table, "Overflow threshold configurations", max_rows=500),
             df_to_html_table(recency_table, "Recency monitoring flags", max_rows=500),
