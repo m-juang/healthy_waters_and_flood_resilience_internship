@@ -1,6 +1,6 @@
 ================================================================================
 AUCKLAND RAIN GAUGE ANALYSIS REPORT
-Generated: 2025-12-13 14:15:15
+Generated: 2025-12-13 18:37:27
 ================================================================================
 
 FILTERING RESULTS:
@@ -14,667 +14,667 @@ FILTERING RESULTS:
 ACTIVE GAUGE DETAILS:
 ================================================================================
 
+• ACC - Rain - Mangemangeroa @ Reserve
+  ID: 11271878
+  Last data: 2025-12-13 17:29:30
+  Traces: 12 total, 4 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 4
+
 • ACC - Rain - Karaka @ Walters Road
   ID: 11271880
-  Last data: 2025-12-12 12:49:30
+  Last data: 2025-12-13 17:29:30
   Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 4
 
 • ACC - Rain - Mauku RAWS @ Mauku
   ID: 11271881
-  Last data: 2025-12-12 12:49:30
-  Traces: 12 total, 4 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 4
-
-• ACC - Rain - Tomarata @ Briens Farm
-  ID: 11271876
-  Last data: 2025-12-12 12:44:30
-  Traces: 12 total, 4 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 4
-
-• ACC - Rain - Mangemangeroa @ Reserve
-  ID: 11271878
-  Last data: 2025-12-12 12:44:30
+  Last data: 2025-12-13 17:29:30
   Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 4
 
 • ACC - Rain - Nihotupu @ Arataki Visitors Centre
   ID: 7828282
-  Last data: 2025-12-12 12:39:30
+  Last data: 2025-12-13 17:19:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Clevedon Coast RAWS @ Forest
   ID: 7828286
-  Last data: 2025-12-12 12:39:30
+  Last data: 2025-12-13 17:19:30
   Traces: 22 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
-• ACC - Rain - Mangere Rainfall
-  ID: 9599440
-  Last data: 2025-12-12 12:33:30
-  Traces: 23 total, 11 with alarms/thresholds
+• ACC - Rain - Tomarata @ Briens Farm
+  ID: 11271876
+  Last data: 2025-12-13 17:14:30
+  Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain - Whangaparaoa Rainfall
-  ID: 9599441
-  Last data: 2025-12-12 12:33:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
+  Threshold configs: 4
 
 • ACC - Rain - Churchill Park Rainfall
   ID: 7828280
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Waituna @ Huia Filter Station
   ID: 7828283
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Manukau @ Sports Bowl
   ID: 7828285
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Drury @ Turner Road
   ID: 7828287
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Piha Rangers Shed Rainfall
   ID: 9601912
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain - Piha Wetlands
   ID: 11271877
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 4
 
 • ACC - Rain - Puhinui @ Botanical Gardens
   ID: 11271879
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 4
 
 • ACC - Rain - Clarks Beach @ Golf Course
   ID: 21526520
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 12 total, 4 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 4
 
 • ACC - Rain - Pakuranga @ College
   ID: 33236625
-  Last data: 2025-12-12 11:59:30
+  Last data: 2025-12-13 16:59:30
   Traces: 20 total, 8 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 8
 
-• Mangere @ Greenwood Road
-  ID: 34966199
-  Last data: 2025-12-12 11:59:30
-  Traces: 14 total, 0 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
 • ACC - Rain - Oteha @ WWTP (Watercare)
   ID: 35643683
-  Last data: 2025-12-11 23:59:30
+  Last data: 2025-12-13 04:59:30
   Traces: 3 total, 0 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 0
 
 • ACC - Rain - RAWS @ GBI
   ID: 3758512
-  Last data: 2025-12-12 11:39:30
+  Last data: 2025-12-13 16:39:30
   Traces: 21 total, 10 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 9
 
-• ACC - Rain - Takapuna Rain @ Library
-  ID: 11315277
-  Last data: 2025-12-12 11:29:30
-  Traces: 12 total, 4 with alarms/thresholds
+• ACC - Rain - Mangere Rainfall
+  ID: 9599440
+  Last data: 2025-12-13 16:33:30
+  Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
-  Threshold configs: 4
+  Threshold configs: 10
+
+• ACC - Rain - Whangaparaoa Rainfall
+  ID: 9599441
+  Last data: 2025-12-13 16:33:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
 
 • Waikato - Rain - Inferno Crater Weather Station
   ID: 7787223
-  Last data: 2025-12-12 11:19:30
+  Last data: 2025-12-13 16:19:30
   Traces: 17 total, 1 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 0
-
-• ACC - Rain -Orewa @ Treatment Ponds
-  ID: 3161018
-  Last data: 2025-12-12 10:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Mahurangi @ Warkworth Sewage Treatment Plant
-  ID: 3161035
-  Last data: 2025-12-12 10:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain - Omaha Rain @ Golf Course
-  ID: 3758511
-  Last data: 2025-12-12 10:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• Waikato - Rain - Wairamarama
-  ID: 7787209
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Waitanguru Rainfall
-  ID: 7787210
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Hodder East Rd Castle Rock Rainfall
-  ID: 7787211
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Matamata Aerodrome (#1).
-  ID: 7787212
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Pinnacles Rainfall
-  ID: 7787213
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Queens Head
-  ID: 7787214
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Bartons Corner Rd Br
-  ID: 7787215
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Kaimai Summit Rainfall
-  ID: 7787216
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Control Structure U/S
-  ID: 7787217
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Ruakiwi Rd Off SH22
-  ID: 7787218
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Maungakawa Rainfall
-  ID: 7787219
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Golden Cross Rainfall
-  ID: 7787221
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Karamu Walkway (Old Mountain Road)
-  ID: 7787222
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Hauturu Trig Raingauge
-  ID: 7787226
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Wharekiri Rainfall
-  ID: 7787227
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Maukoro Landing Rd
-  ID: 7787228
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Ngaroma Rainfall
-  ID: 7787229
-  Last data: 2025-12-12 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• ACC - Rain -Birkdale (Inwards Res.) NSCC03
-  ID: 3160986
-  Last data: 2025-12-12 10:44:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Awhitu @ Brook Road
-  ID: 3160989
-  Last data: 2025-12-12 10:44:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Ararimu @ Zanders
-  ID: 3160992
-  Last data: 2025-12-12 10:44:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Harmel Road Waitakere City Council Pump Stn
-  ID: 3160979
-  Last data: 2025-12-12 10:34:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
 
 • ACC - Rain -Kumeu @ Maddrens
   ID: 3160974
-  Last data: 2025-12-12 10:29:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Kaipara Heads @ Wallers
-  ID: 3160977
-  Last data: 2025-12-12 10:29:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Hoteo at Oldfields
-  ID: 3160978
-  Last data: 2025-12-12 10:29:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Makarau @ Folded Hills Farm
-  ID: 3160969
-  Last data: 2025-12-12 10:24:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Papakura Rain @ Kaipara Rd
-  ID: 3160958
-  Last data: 2025-12-12 10:14:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Mt Albert Grammer rainfall
-  ID: 3160966
-  Last data: 2025-12-12 10:14:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Reservoir Bush Road
-  ID: 3160954
-  Last data: 2025-12-12 10:09:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Rangitopuni @ Walkers
-  ID: 3160955
-  Last data: 2025-12-12 10:09:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Swanson @ Waitakere Filter Station
-  ID: 3160950
-  Last data: 2025-12-12 10:04:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Wairau at Testing Station  NSCC07
-  ID: 3160943
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Waihihi @ Waharau Regional Park
-  ID: 3160944
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Torbay @ Glamorgan Schl  NSCC04
-  ID: 3160945
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Te Pai Park Henderson WCC
-  ID: 3160946
-  Last data: 2025-12-12 09:59:30
-  Traces: 24 total, 12 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 11
-
-• ACC - Rain -Te Muri Rainfall
-  ID: 3160947
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Tamahunga @ Quintals Rd
-  ID: 3160949
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Substation @ Lincoln Park Ave
-  ID: 3160951
-  Last data: 2025-12-12 09:59:30
-  Traces: 24 total, 12 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 11
-
-• ACC - Rain -School @ Mairangi Bay  NSCC02
-  ID: 3160953
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Oteha @ Rosedale Ponds
-  ID: 3160960
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Oratia Cemetery Oratia
-  ID: 3160961
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Opanuku @ Candia Road
-  ID: 3160962
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Okahu Bay Bowling Club Rainfall
-  ID: 3160963
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Ngakoroa @ Donovans
-  ID: 3160964
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 10 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Muriwai rainfall at golf course
-  ID: 3160965
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Matiatia Bay rainfall
-  ID: 3160967
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Mahurangi @ Satellite Dish
-  ID: 3160970
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Longford Park Rainfall
-  ID: 3160971
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Leigh Rainfall
-  ID: 3160972
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Kumeu @ Waitakere Domain
-  ID: 3160973
-  Last data: 2025-12-12 09:59:30
-  Traces: 23 total, 11 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 10
-
-• ACC - Rain -Keeling Road @ Utilitech Training Centre
-  ID: 3160975
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Karaka rainfall
   ID: 3160976
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Kaipara Heads @ Wallers
+  ID: 3160977
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Hoteo at Oldfields
+  ID: 3160978
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Harmel Road Waitakere City Council Pump Stn
+  ID: 3160979
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Forrest Hill Road Waiatarua (No#247)
   ID: 3160980
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Cutler Park New Lynn
   ID: 3160982
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Cox's Bay Park Rainfall
   ID: 3160983
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 25 total, 12 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 11
 
 • ACC - Rain -Constable Ln Waitakere City Council Pump Stn
   ID: 3160984
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 24 total, 12 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 11
 
 • ACC - Rain -Clevedon rainfall @ showgrounds
   ID: 3160985
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Birkdale (Inwards Res.) NSCC03
+  ID: 3160986
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Bayswater @ Plymouth Res. NSCC01
   ID: 3160987
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Awhitu @ Brook Road
+  ID: 3160989
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Awanohi Rainfall @ Okura
   ID: 3160990
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Avondale Racecourse
+  ID: 3160991
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Ararimu @ Zanders
+  ID: 3160992
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Alexandra Park Rway rainfall
   ID: 3160994
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Albert Park Acc rainfall
   ID: 3160995
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
   Traces: 24 total, 12 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 11
 
 • ACC - Rain -Albany @ Hts Rd NSCC06
   ID: 3160996
-  Last data: 2025-12-12 09:59:30
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Orewa @ Treatment Ponds
+  ID: 3161018
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Mahurangi @ Warkworth Sewage Treatment Plant
+  ID: 3161035
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain - Takapuna Rain @ Library
+  ID: 11315277
+  Last data: 2025-12-13 15:59:30
+  Traces: 12 total, 4 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 4
+
+• ACC - Rain - Omaha Rain @ Golf Course
+  ID: 3758511
+  Last data: 2025-12-13 15:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• Waikato - Rain - Wairamarama
+  ID: 7787209
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Waitanguru Rainfall
+  ID: 7787210
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Hodder East Rd Castle Rock Rainfall
+  ID: 7787211
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Matamata Aerodrome (#1).
+  ID: 7787212
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Pinnacles Rainfall
+  ID: 7787213
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Queens Head
+  ID: 7787214
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Bartons Corner Rd Br
+  ID: 7787215
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Kaimai Summit Rainfall
+  ID: 7787216
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Control Structure U/S
+  ID: 7787217
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Ruakiwi Rd Off SH22
+  ID: 7787218
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Maungakawa Rainfall
+  ID: 7787219
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Golden Cross Rainfall
+  ID: 7787221
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Karamu Walkway (Old Mountain Road)
+  ID: 7787222
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Te Kuiti EWS
+  ID: 7787225
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Hauturu Trig Raingauge
+  ID: 7787226
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Wharekiri Rainfall
+  ID: 7787227
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Maukoro Landing Rd
+  ID: 7787228
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Waikato - Rain - Ngaroma Rainfall
+  ID: 7787229
+  Last data: 2025-12-13 15:59:30
+  Traces: 17 total, 1 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• Mangere @ Greenwood Road
+  ID: 34966199
+  Last data: 2025-12-13 15:59:30
+  Traces: 14 total, 0 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 0
+
+• ACC - Rain -Makarau @ Folded Hills Farm
+  ID: 3160969
+  Last data: 2025-12-13 15:54:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Papakura Rain @ Kaipara Rd
+  ID: 3160958
+  Last data: 2025-12-13 15:49:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Tamahunga @ Quintals Rd
+  ID: 3160949
+  Last data: 2025-12-13 15:44:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Swanson @ Waitakere Filter Station
+  ID: 3160950
+  Last data: 2025-12-13 15:44:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Rangitopuni @ Walkers
+  ID: 3160955
+  Last data: 2025-12-13 15:44:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Mt Albert Grammer rainfall
+  ID: 3160966
+  Last data: 2025-12-13 15:44:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Reservoir Bush Road
+  ID: 3160954
+  Last data: 2025-12-13 15:39:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Whau @ Mt Roskill Substn Rainfall
   ID: 3160937
-  Last data: 2025-12-12 09:54:30
+  Last data: 2025-12-13 15:29:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Whangamaire @ Culvert
   ID: 3160938
-  Last data: 2025-12-12 09:44:30
+  Last data: 2025-12-13 15:29:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Waitangi @ Diver Road
   ID: 3160941
-  Last data: 2025-12-12 09:44:30
+  Last data: 2025-12-13 15:29:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Waiatarua Rainfall
   ID: 3160935
-  Last data: 2025-12-12 08:59:30
+  Last data: 2025-12-13 14:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Whenuapai @ Airbase
   ID: 3160936
-  Last data: 2025-12-12 08:59:30
+  Last data: 2025-12-13 14:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Waiuku Rain @ Waiuku-Otaua Rd
   ID: 3160939
-  Last data: 2025-12-12 08:59:30
+  Last data: 2025-12-13 14:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
 • ACC - Rain -Wairoa @ Hunua Nursery/Bowling Club
   ID: 3160942
-  Last data: 2025-12-12 08:59:30
+  Last data: 2025-12-13 14:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
 
-• Waikato - Rain - Te Kuiti EWS
-  ID: 7787225
-  Last data: 2025-12-12 08:59:30
-  Traces: 17 total, 1 with alarms/thresholds
+• ACC - Rain -Wairau at Testing Station  NSCC07
+  ID: 3160943
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
-  Threshold configs: 0
+  Threshold configs: 10
 
-• ACC - Rain -Avondale Racecourse
-  ID: 3160991
-  Last data: 2025-12-12 04:59:30
+• ACC - Rain -Waihihi @ Waharau Regional Park
+  ID: 3160944
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Torbay @ Glamorgan Schl  NSCC04
+  ID: 3160945
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Te Pai Park Henderson WCC
+  ID: 3160946
+  Last data: 2025-12-13 14:59:30
+  Traces: 24 total, 12 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 11
+
+• ACC - Rain -Te Muri Rainfall
+  ID: 3160947
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Substation @ Lincoln Park Ave
+  ID: 3160951
+  Last data: 2025-12-13 14:59:30
+  Traces: 24 total, 12 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 11
+
+• ACC - Rain -School @ Mairangi Bay  NSCC02
+  ID: 3160953
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Oteha @ Rosedale Ponds
+  ID: 3160960
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Oratia Cemetery Oratia
+  ID: 3160961
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Opanuku @ Candia Road
+  ID: 3160962
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Okahu Bay Bowling Club Rainfall
+  ID: 3160963
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Ngakoroa @ Donovans
+  ID: 3160964
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 10 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Muriwai rainfall at golf course
+  ID: 3160965
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Matiatia Bay rainfall
+  ID: 3160967
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Mahurangi @ Satellite Dish
+  ID: 3160970
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Longford Park Rainfall
+  ID: 3160971
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Leigh Rainfall
+  ID: 3160972
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Kumeu @ Waitakere Domain
+  ID: 3160973
+  Last data: 2025-12-13 14:59:30
+  Traces: 23 total, 11 with alarms/thresholds
+  Overflow alarms: 0
+  Threshold configs: 10
+
+• ACC - Rain -Keeling Road @ Utilitech Training Centre
+  ID: 3160975
+  Last data: 2025-12-13 14:59:30
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10

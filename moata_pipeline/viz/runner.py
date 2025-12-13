@@ -33,8 +33,8 @@ def run_visual_report(csv_path: Path | None = None, out_dir: Path | None = None)
     logger.info("Building charts...")
     build_charts(df, out_dir)
 
-    logger.info("Building threshold ladders...")
-    plot_threshold_ladders(df, out_dir, top_gauges=8)
+    # logger.info("Building threshold ladders...")
+    # plot_threshold_ladders(df, out_dir, top_gauges=8)
 
     logger.info("Building per-gauge pages...")
     build_gauge_pages(df, out_dir)
