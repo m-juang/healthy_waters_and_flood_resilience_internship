@@ -1,7 +1,5 @@
 .env
 /.venv
-moata_output/
-moata_filtered/
 __pycache__/
 *.py[cod]
 *.pyo
