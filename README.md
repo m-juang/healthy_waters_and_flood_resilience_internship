@@ -463,7 +463,7 @@ python visualizer.py
 * ✅ **Improved maintainability:** DRY principle applied throughout
 * ✅ **Enhanced documentation:** Comprehensive README and inline comments
 
-### v1.1.0 – Pipeline Refactor (Dec 2024)
+### v1.1.0 – Pipeline Refactor (Dec 2025)
 * Modular pipeline architecture
 * Separated auth / HTTP / domain logic
 * Added HTML visual reporting
