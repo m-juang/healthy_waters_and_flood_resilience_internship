@@ -451,7 +451,7 @@ python visualizer.py
 
 ## Changelog
 
-### v2.0.0 – Code Quality Refactor (Dec 2024)
+### v2.0.0 – Code Quality Refactor (Dec 2025)
 * ✅ **Fixed critical bug:** Added missing functions to `dataframe_utils.py`
 * ✅ **Eliminated code duplication:** 
   * Created `common/file_utils.py` for `ensure_dir()`
@@ -511,5 +511,5 @@ For questions or issues:
 
 ---
 
-**Last updated:** December 2024  
+**Last updated:** December 2025  
 **Version:** 2.0.0

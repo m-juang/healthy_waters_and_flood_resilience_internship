@@ -51,3 +51,21 @@ class MoataClient:
                 out[int(tid)] = a
         return out
     
+def get_trace_data(
+    self, 
+    trace_id: Any, 
+    params: Dict[str, Any]
+    ) -> Any:
+        """
+        Fetch time series data for a trace.
+        
+        Args:
+            trace_id: Trace ID
+            params: Query parameters (from, to, dataType, dataInterval)
+        
+        Returns:
+            Time series data
+        """
+        path = f"traces/{trace_id}/data"
+        return self._http.get(path, params=params)
+    
