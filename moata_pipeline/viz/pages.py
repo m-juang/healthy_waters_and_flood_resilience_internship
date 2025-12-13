@@ -7,21 +7,14 @@ from typing import Optional
 import pandas as pd
 
 from moata_pipeline.common.text_utils import safe_filename
+from moata_pipeline.common.file_utils import ensure_dir
+from moata_pipeline.common.html_utils import df_to_html_table
+# ✅ FIXED: Import dari common/time_utils.py (tidak duplikasi lagi!)
+from moata_pipeline.common.time_utils import format_date_for_display
 
 
-def ensure_dir(p: Path) -> None:
-    p.mkdir(parents=True, exist_ok=True)
-
-
-def df_to_html_table(df: pd.DataFrame, title: str, max_rows: int = 50) -> str:
-    if df.empty:
-        return f"<h3>{html.escape(title)}</h3><p><em>No rows.</em></p>"
-    view = df.head(max_rows).copy()
-    return (
-        f"<h3>{html.escape(title)}</h3>"
-        f"<p><em>Showing first {min(len(view), max_rows)} rows.</em></p>"
-        + view.to_html(index=False, escape=True)
-    )
+# ❌ REMOVED: def ensure_dir() - sudah diimport dari common
+# ❌ REMOVED: def df_to_html_table() - sudah diimport dari common
 
 
 def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
@@ -67,10 +60,7 @@ def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
             .sort_values(by=["severity", "trace_name"], ascending=[False, True], na_position="last")
         )
 
-        def dt_fmt(x: Optional[pd.Timestamp]) -> str:
-            if pd.isna(x) or x is None:
-                return "Unknown"
-            return x.strftime("%Y-%m-%d")
+        # ❌ REMOVED: def dt_fmt() - sekarang menggunakan format_date_for_display dari common
 
         css = """
         <style>
@@ -96,7 +86,7 @@ def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
             css,
             "</head><body>",
             f"<h1>{html.escape(gname)}</h1>",
-            f"<p class='muted'>Date range in file for this gauge: <b>{dt_fmt(oldest)}</b> to <b>{dt_fmt(latest)}</b></p>",
+            f"<p class='muted'>Date range in file for this gauge: <b>{format_date_for_display(oldest)}</b> to <b>{format_date_for_display(latest)}</b></p>",
             "<div class='note'>"
             "<b>Interpretation:</b><br/>"
             "• <b>Threshold alarm (overflow)</b> = trigger levels for rainfall windows (e.g., 15mm in 30min).<br/>"

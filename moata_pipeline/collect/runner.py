@@ -3,11 +3,23 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from pathlib import Path
+
+# ✅ FIXED: Removed duplicate "from pathlib import Path"
 
 # Load from project root (same folder as moata_data_retriever.py)
 load_dotenv(dotenv_path=Path.cwd() / ".env")
 
+# ✅ FIXED: Import konstanta dari constants.py (tidak duplikasi lagi!)
+from moata_pipeline.common.constants import (
+    TOKEN_URL,
+    BASE_API_URL,
+    OAUTH_SCOPE,
+    DEFAULT_PROJECT_ID,
+    DEFAULT_RAIN_GAUGE_ASSET_TYPE_ID,
+    TOKEN_TTL_SECONDS,
+    TOKEN_REFRESH_BUFFER_SECONDS,
+    DEFAULT_REQUESTS_PER_SECOND,
+)
 
 from moata_pipeline.moata.auth import MoataAuth
 from moata_pipeline.moata.http import MoataHttp
@@ -16,8 +28,8 @@ from moata_pipeline.collect.collector import RainGaugeCollector
 
 
 def run_collect_rain_gauges(
-    project_id: int = 594,
-    asset_type_id: int = 100,
+    project_id: int = DEFAULT_PROJECT_ID,
+    asset_type_id: int = DEFAULT_RAIN_GAUGE_ASSET_TYPE_ID,
     out_dir: Path = Path("moata_output"),
 ) -> None:
     client_id = os.getenv("MOATA_CLIENT_ID")
@@ -25,27 +37,21 @@ def run_collect_rain_gauges(
     if not client_id or not client_secret:
         raise RuntimeError("MOATA_CLIENT_ID and MOATA_CLIENT_SECRET must be set")
 
-    TOKEN_URL = (
-        "https://moata.b2clogin.com/"
-        "moata.onmicrosoft.com/B2C_1A_CLIENTCREDENTIALSFLOW/oauth2/v2.0/token"
-    )
-    BASE_API_URL = "https://api.moata.io/ae/v1"
-    SCOPE = "https://moata.onmicrosoft.com/moata.io/.default"
-
+    # ✅ FIXED: Gunakan konstanta dari constants.py
     auth = MoataAuth(
         token_url=TOKEN_URL,
-        scope=SCOPE,
+        scope=OAUTH_SCOPE,  # ✅ nama yang benar: OAUTH_SCOPE (bukan SCOPE)
         client_id=client_id,
         client_secret=client_secret,
         verify_ssl=False,
-        ttl_seconds=3600,
-        refresh_buffer_seconds=300,
+        ttl_seconds=TOKEN_TTL_SECONDS,
+        refresh_buffer_seconds=TOKEN_REFRESH_BUFFER_SECONDS,
     )
 
     http = MoataHttp(
         get_token_fn=auth.get_token,
         base_url=BASE_API_URL,
-        requests_per_second=2.0,
+        requests_per_second=DEFAULT_REQUESTS_PER_SECOND,
         verify_ssl=False,
     )
 

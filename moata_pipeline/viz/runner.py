@@ -4,12 +4,10 @@ import logging
 from pathlib import Path
 
 from moata_pipeline.common.paths import PipelinePaths
-
 from .cleaning import load_and_clean
-from .charts import ensure_dir, build_charts
+from .charts import ensure_dir, build_charts, plot_threshold_ladders
 from .pages import build_gauge_pages
 from .report import build_report
-
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +32,9 @@ def run_visual_report(csv_path: Path | None = None, out_dir: Path | None = None)
 
     logger.info("Building charts...")
     build_charts(df, out_dir)
+
+    logger.info("Building threshold ladders...")
+    plot_threshold_ladders(df, out_dir, top_gauges=8)
 
     logger.info("Building per-gauge pages...")
     build_gauge_pages(df, out_dir)

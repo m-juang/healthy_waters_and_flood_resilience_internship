@@ -7,17 +7,12 @@ from typing import Optional
 import pandas as pd
 
 from moata_pipeline.common.text_utils import safe_filename
+from moata_pipeline.common.html_utils import df_to_html_table
+# ✅ FIXED: Import dari common/time_utils.py (tidak duplikasi lagi!)
+from moata_pipeline.common.time_utils import format_date_for_display
 
 
-def df_to_html_table(df: pd.DataFrame, title: str, max_rows: int = 50) -> str:
-    if df.empty:
-        return f"<h3>{html.escape(title)}</h3><p><em>No rows.</em></p>"
-    view = df.head(max_rows).copy()
-    return (
-        f"<h3>{html.escape(title)}</h3>"
-        f"<p><em>Showing first {min(len(view), max_rows)} rows.</em></p>"
-        + view.to_html(index=False, escape=True)
-    )
+# ❌ REMOVED: def df_to_html_table() - sudah diimport dari common
 
 
 def img_block(img_name: str, caption: str) -> str:
@@ -108,10 +103,7 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
     </style>
     """
 
-    def dt_fmt(x: Optional[pd.Timestamp]) -> str:
-        if pd.isna(x) or x is None:
-            return "Unknown"
-        return x.strftime("%Y-%m-%d")
+    # ❌ REMOVED: def dt_fmt() - sekarang menggunakan format_date_for_display dari common
 
     html_parts = [
         "<html><head><meta charset='utf-8'/>",
@@ -121,7 +113,7 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
         "<h1>Alarm Summary Report (Non-technical view)</h1>",
         f"<p class='muted'>Generated from <code>alarm_summary.csv</code>. "
         f"Rows: <b>{total_rows}</b> · Gauges: <b>{gauges}</b> · Traces: <b>{traces}</b> · "
-        f"Date range in file: <b>{dt_fmt(oldest)}</b> to <b>{dt_fmt(latest)}</b></p>",
+        f"Date range in file: <b>{format_date_for_display(oldest)}</b> to <b>{format_date_for_display(latest)}</b></p>",
 
         "<div class='note'>"
         "<b>How to read this report:</b><br/>"

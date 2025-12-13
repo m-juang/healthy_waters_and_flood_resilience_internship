@@ -1,15 +1,29 @@
 from __future__ import annotations
-
+from dataclasses import dataclass
 from pathlib import Path
 
-# Project root (assumes moata_pipeline/ is inside the project folder)
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+@dataclass(frozen=True)
+class PipelinePaths:
+    root: Path = Path(".")
+    output_dir: Path = Path("moata_output")
+    filtered_dir: Path = Path("moata_filtered")
+    viz_dir: Path = Path("moata_filtered") / "viz"
 
-# Default data folders
-OUTPUT_DIR = PROJECT_ROOT / "moata_output"
-FILTERED_DIR = PROJECT_ROOT / "moata_filtered"
-VIZ_DIR = FILTERED_DIR / "viz"
+    # --- canonical paths ---
+    @property
+    def rain_gauges_traces_alarms_json(self) -> Path:
+        return self.output_dir / "rain_gauges_traces_alarms.json"
 
-def ensure_dir(p: Path) -> Path:
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    @property
+    def rain_gauges_json(self) -> Path:
+        return self.output_dir / "rain_gauges.json"
+
+    # --- backward-compat aliases (so older runner code still works) ---
+    @property
+    def all_data_json(self) -> Path:
+        # what analyze/runner.py expects
+        return self.rain_gauges_traces_alarms_json
+
+    @property
+    def alarm_summary_csv(self) -> Path:
+        return self.filtered_dir / "alarm_summary.csv"

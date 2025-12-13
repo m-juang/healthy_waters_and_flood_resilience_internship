@@ -62,7 +62,7 @@ def is_gauge_active(telemetered_time: Optional[datetime], inactive_months: int) 
     """
     if telemetered_time is None:
         return False
-    cutoff = months_ago(now_like(telemetered_time), inactive_months)
+    cutoff = months_ago(telemetered_time, inactive_months)
     return telemetered_time >= cutoff
 
 

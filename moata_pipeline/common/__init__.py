@@ -10,3 +10,5 @@ from .json_io import *
 from .text_utils import *
 from .time_utils import *
 from .typing_utils import *
+from .file_utils import *
+from .html_utils import *  # ✅ ADDED: Export html_utils
