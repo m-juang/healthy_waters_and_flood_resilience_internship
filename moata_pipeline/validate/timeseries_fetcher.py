@@ -16,6 +16,50 @@ class TimeSeriesFetcher:
     def __init__(self, client: MoataClient) -> None:
         self._client = client
     
+    def fetch_ari_data(
+        self,
+        trace_id: int,
+        from_time: datetime,
+        to_time: datetime,
+        ari_type: str = "Tp108"  # ✅ ADDED
+    ) -> pd.DataFrame:
+        """
+        Fetch ARI (Annual Recurrence Interval) data for a trace.
+        
+        Uses the specialized /traces/{traceId}/ari endpoint for ARI traces.
+        
+        Args:
+            trace_id: ARI trace ID
+            from_time: Start datetime
+            to_time: End datetime
+            ari_type: ARI calculation type ("Tp108", "HirdsV4", or "Hirds")
+        
+        Returns:
+            DataFrame with columns: timestamp, value (ARI value)
+        """
+        # Validate 32-day limit for virtual traces (ARI traces)
+        if (to_time - from_time).days > 32:
+            raise ValueError(
+                f"Time range exceeds 32-day limit for ARI traces. "
+                f"Requested: {(to_time - from_time).days} days"
+            )
+        
+        # ✅ FIXED: Format timestamps properly - remove microseconds, add 'Z' suffix
+        # API expects: "2025-05-08T05:05:00Z" not "2025-05-08T05:05:00.575000"
+        from_str = from_time.replace(microsecond=0).isoformat() + 'Z'
+        to_str = to_time.replace(microsecond=0).isoformat() + 'Z'
+        
+        # Call ARI-specific endpoint
+        data = self._client.get_ari_data(
+            trace_id=trace_id,
+            from_time=from_str,
+            to_time=to_str,
+            ari_type=ari_type  # ✅ PASS type parameter
+        )
+        
+        # Convert to DataFrame (different structure than regular traces)
+        return self._parse_ari_response(data)
+    
     def fetch_trace_data(
         self,
         trace_id: int,
@@ -99,6 +143,51 @@ class TimeSeriesFetcher:
         # Sort by timestamp
         if not df.empty:
             df = df.sort_values("timestamp").reset_index(drop=True)
+        
+        return df
+    
+    def _parse_ari_response(self, data: Any) -> pd.DataFrame:
+        """
+        Convert ARI API response to pandas DataFrame.
+        
+        ARI response format:
+        [
+          {
+            "duration": 1800,
+            "ari": 5.2,
+            "depth": 15.5,
+            "traceAriType": "Tp108",
+            "ariByYears": {"2": 2.1, "5": 5.2, "10": 8.3, ...}
+          }
+        ]
+        
+        Args:
+            data: ARI API response
+        
+        Returns:
+            DataFrame with columns: duration, ari, depth, type
+        """
+        # Handle empty response
+        if not data or not isinstance(data, list):
+            return pd.DataFrame(columns=["duration", "ari", "depth", "type"])
+        
+        # Parse ARI records
+        records = []
+        for item in data:
+            if isinstance(item, dict):
+                records.append({
+                    "duration": item.get("duration"),
+                    "ari": item.get("ari"),
+                    "depth": item.get("depth"),
+                    "type": item.get("traceAriType"),
+                    # Note: ariByYears not included for simplicity
+                })
+        
+        df = pd.DataFrame(records)
+        
+        # Sort by duration (rainfall window duration)
+        if not df.empty and "duration" in df.columns:
+            df = df.sort_values("duration").reset_index(drop=True)
         
         return df
     
