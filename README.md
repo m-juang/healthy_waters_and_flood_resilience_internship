@@ -1,7 +1,3 @@
-Siap — ini versi **README yang sama persis strukturnya**, tapi sudah **disisipkan bagian “ARI Alarm Validation”** (tanpa membuat README terpisah). Kamu tinggal copy–paste dan replace `README.md`.
-
----
-
 # Healthy Waters & Flood Resilience Internship
 
 **Moata Rain Gauge Data Pipeline**
