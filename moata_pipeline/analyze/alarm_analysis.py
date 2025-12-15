@@ -22,7 +22,7 @@ def analyze_alarms(active_gauges: List[Dict[str, Any]]) -> pd.DataFrame:
         for trace_data in traces:
             trace = trace_data.get("trace", {}) or {}
             trace_name = trace.get("description", "Unknown")
-            trace_id = trace.get("id")
+            trace_id = trace.get("id") or trace.get("traceId")
             has_alarms_flag = bool(trace.get("hasAlarms", False))
 
             overflow_alarms = trace_data.get("overflow_alarms", []) or []

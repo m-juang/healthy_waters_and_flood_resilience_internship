@@ -27,8 +27,8 @@ def parse_date_series(s: pd.Series) -> pd.Series:
 
 
 def classify_row(r: pd.Series) -> str:
-    src = (r.get("source") or "").lower()
-    at = (r.get("alarm_type") or "").lower()
+    src = str(r.get("source") or "").strip().lower()
+    at = str(r.get("alarm_type") or "").strip().lower()
     alarm_id = r.get("alarm_id")
     has_alarm_id = pd.notna(alarm_id) and str(alarm_id).strip() != ""
 
@@ -39,6 +39,7 @@ def classify_row(r: pd.Series) -> str:
     if has_alarm_id:
         return "Alarm record"
     return "Other"
+
 
 
 def load_and_clean(csv_path: Path) -> pd.DataFrame:

@@ -56,7 +56,12 @@ def run_collect_rain_gauges(
     )
 
     client = MoataClient(http=http)
-    collector = RainGaugeCollector(client=client, out_dir=out_dir)
+    from moata_pipeline.common.output_writer import JsonOutputWriter
 
-    logging.info("Starting collection: project=%s assetTypeId=%s", project_id, asset_type_id)
-    collector.collect(project_id=project_id, asset_type_id=asset_type_id)
+    collector = RainGaugeCollector(client=client)
+    writer = JsonOutputWriter(out_dir=out_dir)
+
+    all_data = collector.collect(project_id=project_id, asset_type_id=asset_type_id)
+
+    writer.write_combined(all_data)
+    logging.info("✓ Saved combined structure: %s", out_dir / "rain_gauges_traces_alarms.json")

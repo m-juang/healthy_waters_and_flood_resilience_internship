@@ -1,22 +1,16 @@
 from __future__ import annotations
-import json
 import logging
-from pathlib import Path
 from typing import Any, Dict, List
 from moata_pipeline.moata.client import MoataClient
 
 
 class RainGaugeCollector:
-    def __init__(self, client: MoataClient, out_dir: Path) -> None:
+    def __init__(self, client: MoataClient) -> None:
         self._client = client
-        self._out_dir = out_dir
 
-    def collect(self, project_id: int, asset_type_id: int = 100) -> List[Dict[str, Any]]:
-        self._out_dir.mkdir(parents=True, exist_ok=True)
-
+    def collect(self, project_id: int, asset_type_id: int) -> List[Dict[str, Any]]:
         gauges = self._client.get_rain_gauges(project_id=project_id, asset_type_id=asset_type_id)
-        (self._out_dir / "rain_gauges.json").write_text(json.dumps(gauges, indent=2), encoding="utf-8")
-        logging.info("✓ Saved %d rain gauges", len(gauges))
+        logging.info("✓ Fetched %d rain gauges", len(gauges))
 
         detailed = self._client.get_detailed_alarms_by_project(project_id=project_id)
         logging.info("✓ Fetched %d detailed alarms", len(detailed))
@@ -53,9 +47,4 @@ class RainGaugeCollector:
 
             all_data.append({"gauge": g, "traces": traces_out})
 
-        (self._out_dir / "rain_gauges_traces_alarms.json").write_text(
-            json.dumps(all_data, indent=2),
-            encoding="utf-8",
-        )
-        logging.info("✓ Saved combined structure: %s", self._out_dir / "rain_gauges_traces_alarms.json")
         return all_data

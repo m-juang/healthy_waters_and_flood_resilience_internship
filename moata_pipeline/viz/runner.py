@@ -4,8 +4,9 @@ import logging
 from pathlib import Path
 
 from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.file_utils import ensure_dir
 from .cleaning import load_and_clean
-from .charts import ensure_dir, build_charts, plot_threshold_ladders
+from .charts import build_charts
 from .pages import build_gauge_pages
 from .report import build_report
 
@@ -27,14 +28,11 @@ def run_visual_report(csv_path: Path | None = None, out_dir: Path | None = None)
 
     # Save cleaned copy
     cleaned_path = out_dir / "cleaned_alarm_summary.csv"
-    df.drop(columns=["last_data_dt", "threshold_num"], errors="ignore").to_csv(cleaned_path, index=False)
+    df.drop(columns=["last_data_dt"], errors="ignore").to_csv(cleaned_path, index=False)
     logger.info("Saved cleaned CSV: %s", cleaned_path)
 
     logger.info("Building charts...")
     build_charts(df, out_dir)
-
-    # logger.info("Building threshold ladders...")
-    # plot_threshold_ladders(df, out_dir, top_gauges=8)
 
     logger.info("Building per-gauge pages...")
     build_gauge_pages(df, out_dir)

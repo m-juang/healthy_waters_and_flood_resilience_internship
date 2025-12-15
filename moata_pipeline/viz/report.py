@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import html
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
 from moata_pipeline.common.text_utils import safe_filename
 from moata_pipeline.common.html_utils import df_to_html_table
-# ✅ FIXED: Import dari common/time_utils.py (tidak duplikasi lagi!)
 from moata_pipeline.common.time_utils import format_date_for_display
-
-
-# ❌ REMOVED: def df_to_html_table() - sudah diimport dari common
 
 
 def img_block(img_name: str, caption: str) -> str:
@@ -24,11 +19,10 @@ def img_block(img_name: str, caption: str) -> str:
     """
 
 def build_risk_table(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    is_threshold = df["row_category"] == "Threshold alarm (overflow)"
-    is_recency = df["row_category"] == "Data freshness (recency)"
-    is_crit = df["is_critical_bool"] == True
+    tmp = df.copy()
+    tmp["is_critical_bool"] = tmp["is_critical_bool"].fillna(False)
 
-    agg = df.groupby("gauge_name").agg(
+    agg = tmp.groupby("gauge_name").agg(
         total_records=("gauge_name", "size"),
         thresholds=("row_category", lambda s: (s == "Threshold alarm (overflow)").sum()),
         recency=("row_category", lambda s: (s == "Data freshness (recency)").sum()),
@@ -36,15 +30,14 @@ def build_risk_table(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
         latest_data=("last_data_dt", "max"),
     )
 
-    # Risk score (same weights as chart)
     agg["risk_score"] = agg["critical"] * 3 + agg["thresholds"] * 2 + agg["recency"] * 1
 
     agg = agg.sort_values(by=["risk_score", "critical", "thresholds"], ascending=[False, False, False]).head(top_n)
 
-    # Nice formatting
     agg = agg.reset_index().rename(columns={"gauge_name": "Gauge"})
     agg["latest_data"] = agg["latest_data"].dt.strftime("%Y-%m-%d")
     return agg[["Gauge", "risk_score", "critical", "thresholds", "recency", "total_records", "latest_data"]]
+
 
 
 def build_report(df: pd.DataFrame, out_dir: Path) -> None:
@@ -56,7 +49,7 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
     oldest = df["last_data_dt"].min()
 
     # Tables
-    crit = df[df["is_critical_bool"]].copy()
+    crit = df[df["is_critical_bool"].fillna(False)].copy()
     crit_table = crit[
         ["gauge_name", "trace_name", "alarm_type", "alarm_name", "threshold", "severity", "source", "last_data"]
     ].sort_values(by=["severity", "gauge_name", "trace_name"], ascending=[False, True, True], na_position="last")
@@ -144,7 +137,7 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
             html_parts.append(img_block(img, cap))
     html_parts.append("</div>")
 
-        # --- Top Risky Gauges (Actionable shortlist) ---
+    # --- Top Risky Gauges (Actionable shortlist) ---
     risk_df = build_risk_table(df, top_n=20)
 
     html_parts += [

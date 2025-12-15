@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -30,7 +29,7 @@ def build_gauge_pages(df: pd.DataFrame, out_dir: Path) -> None:
 
         overflow = gdf[gdf["row_category"] == "Threshold alarm (overflow)"].copy()
         recency = gdf[gdf["row_category"] == "Data freshness (recency)"].copy()
-        crit = gdf[gdf["is_critical_bool"]].copy()
+        crit = gdf[gdf["is_critical_bool"].fillna(False)].copy()
 
         overflow_table = (
             overflow[

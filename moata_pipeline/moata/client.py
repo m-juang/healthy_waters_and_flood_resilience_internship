@@ -8,7 +8,7 @@ class MoataClient:
     def __init__(self, http: MoataHttp) -> None:
         self._http = http
 
-    def get_rain_gauges(self, project_id: int, asset_type_id: int = 100) -> List[Dict[str, Any]]:
+    def get_rain_gauges(self, project_id: int, asset_type_id: int) -> List[Dict[str, Any]]:
         path = ep.PROJECT_ASSETS.format(project_id=project_id)
         data = self._http.get(path, params={"assetTypeId": asset_type_id})
         if isinstance(data, dict) and "items" in data:
@@ -70,7 +70,8 @@ class MoataClient:
         Returns:
             ARI data
         """
-        path = f"traces/{trace_id}/ari"
+        path = ep.TRACE_ARI.format(trace_id=trace_id)
+
         params = {
             "from": from_time,
             "to": to_time,

@@ -48,21 +48,6 @@ def parse_threshold_num(x: object) -> Optional[float]:
         return None
 
 
-def normalize_is_critical(series: pd.Series) -> pd.Series:
-    """
-    Converts is_critical column to boolean (tolerant to:
-    True/False, "True"/"False", 1/0, NaN).
-    """
-    s = series.copy()
-    # handle already-bool
-    if s.dtype == bool:
-        return s.fillna(False)
-
-    # convert string-ish
-    s = s.astype(str).str.strip().str.lower()
-    return s.isin(["true", "1", "yes", "y"])
-
-
 # -------------------------
 # Public entry
 # -------------------------
@@ -77,8 +62,11 @@ def build_charts(df: pd.DataFrame, out_dir: Path, max_gauges_for_bars: int = 25,
 
     # Add threshold_num safely (does NOT modify original df outside)
     tmp = df.copy()
-    tmp["alarm_type_norm"] = tmp["alarm_type"].astype(str).str.strip()
-    tmp["threshold_num"] = tmp["threshold"].map(parse_threshold_num)
+
+    # Use threshold_num from cleaning if available
+    if "threshold_num" not in tmp.columns:
+        tmp["threshold_num"] = tmp["threshold"].map(parse_threshold_num)
+
 
     # -------------------------
     # 1) Records per gauge
@@ -97,7 +85,7 @@ def build_charts(df: pd.DataFrame, out_dir: Path, max_gauges_for_bars: int = 25,
     # -------------------------
     # 2) Alarm type distribution (replaces row_category)
     # -------------------------
-    cat_counts = tmp["alarm_type_norm"].value_counts()
+    cat_counts = tmp["row_category"].value_counts()
 
     fig, ax = plt.subplots(figsize=(9, 5))
     cat_counts.plot(kind="bar", ax=ax)
@@ -126,8 +114,9 @@ def build_charts(df: pd.DataFrame, out_dir: Path, max_gauges_for_bars: int = 25,
     # -------------------------
     # 4) Threshold histogram (Overflow only)
     # -------------------------
-    overflow = tmp[tmp["alarm_type_norm"].str.contains("overflow", case=False, na=False)].copy()
+    overflow = tmp[tmp["row_category"] == "Threshold alarm (overflow)"].copy()
     th = overflow["threshold_num"].dropna()
+
     if not th.empty:
         fig, ax = plt.subplots(figsize=(9, 5))
         ax.hist(th.values, bins=30)
@@ -139,9 +128,8 @@ def build_charts(df: pd.DataFrame, out_dir: Path, max_gauges_for_bars: int = 25,
     # -------------------------
     # 5) Critical flag (if present)
     # -------------------------
-    if "is_critical" in tmp.columns:
-        crit_bool = normalize_is_critical(tmp["is_critical"])
-        crit_counts = crit_bool.value_counts().sort_index()
+    if "is_critical_bool" in tmp.columns:
+        crit_counts = tmp["is_critical_bool"].fillna(False).value_counts().sort_index()
 
         fig, ax = plt.subplots(figsize=(6, 5))
         crit_counts.plot(kind="bar", ax=ax)
@@ -168,14 +156,14 @@ def plot_threshold_ladders(df: pd.DataFrame, out_dir: Path, top_gauges: int = 8)
     ensure_dir(out_dir)
 
     # Use Overflow rows only
-    ladd = df[df["alarm_type_norm"].str.contains("overflow", case=False, na=False)].copy()
+    ladd = df[df["row_category"] == "Threshold alarm (overflow)"].copy()
     ladd = ladd.dropna(subset=["gauge_name", "trace_name"])
 
     # ✅ OPTIMIZED: Reuse threshold_num if it exists (already parsed in build_charts)
     # Only parse if missing (defensive programming)
     if "threshold_num" not in ladd.columns:
-        logger.warning("threshold_num column missing, parsing from threshold column")
-        ladd["threshold_num"] = ladd["threshold"].map(parse_threshold_num)
+        raise ValueError("threshold_num missing — cleaning step must run before charts")
+
     
     # Ensure it's numeric (in case it came from outside build_charts)
     ladd["threshold_num"] = pd.to_numeric(ladd["threshold_num"], errors="coerce")
