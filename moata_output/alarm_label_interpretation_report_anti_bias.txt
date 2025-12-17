@@ -1,0 +1,86 @@
+MOATA ALARM LABEL ANALYSIS REPORT (ANTI-BIAS)
+================================================
+
+This report presents evidence AND multiple plausible interpretations.
+It avoids assuming a single intent behind labels without outcome data.
+
+STEP 0 — DATA COVERAGE
+----------------------
+Total threshold rows analysed       : 926
+Unique threshold IDs               : 926
+Unique gauges with thresholds      : 151
+Total gauges in asset inventory     : 264
+Gauges without thresholds (inferred): 113 (42.8%)
+
+STEP 1 — OBSERVED LABEL PATTERNS (FACTS)
+-------------------------------------
+severity×isCritical counts:
+isCritical     False  True 
+severity_norm              
+High             149      0
+Low              140      0
+Medium           490    147
+
+High severity AND Critical simultaneously: 0 rows.
+
+STEP 2 — OPTIONAL CONSISTENCY CHECK (thresholds_test_results.json)
+---------------------------------------------------------------
+thresholds_test_results.json not found — skipped.
+
+STEP 3 — MULTIPLE INTERPRETATIONS (ANTI-BIAS ASSESSMENT)
+----------------------------------------------------------
+Legend:
+  SUPPORTED        : Strongly consistent with observed statistics
+  WEAKLY SUPPORTED : Some support, but plausible counter-explanations remain
+  INCONCLUSIVE     : Not enough information to decide
+  NOT SUPPORTED    : Contradicted or not aligned with observed statistics
+
+H1 (Primary): Severity ≈ event magnitude/rarity; isCritical ≈ operational urgency/fast-response
+Status: SUPPORTED
+Evidence:
+  - severity×isCritical table:
+    isCritical     False  True 
+    severity_norm              
+    High             149      0
+    Low              140      0
+    Medium           490    147
+  - High & Critical rows: 0 out of 926 thresholds.
+  - Share of High severity thresholds that are ARI-related: 1.000 (100.0%).
+  - Top critical threshold_name: '2.5 mm' covering 0.973 (97.3%) of critical thresholds.
+  - Median window_s: critical=30s vs non-critical=6.0hr.
+  - Median resolution_s: critical=30s vs non-critical=5.0min.
+  - Critical thresholds ARI-related share: 0.020 (2.0%).
+  - Window ratio (critical/non-critical) ≈ 0.0014.
+  - Resolution ratio (critical/non-critical) ≈ 0.1000.
+  - High&Critical rate among High severity = 0.0000.
+
+H2 (Alternative): isCritical ≈ data-quality/high-frequency trustworthiness trigger
+Status: WEAKLY SUPPORTED
+Evidence:
+  - Critical median resolution is much smaller than non-critical (ratio ≈ 0.1000).
+  - Critical median window is much smaller than non-critical (ratio ≈ 0.0014).
+  - Top critical threshold_name share: 0.973 (97.3%).
+  - High concentration suggests criticality may be a specific operational policy (not a general data-quality label).
+
+H3 (Alternative): Severity labels are mostly a configuration/policy category (e.g., ARI thresholds set to High)
+Status: SUPPORTED
+Evidence:
+  - High severity most common name: 'ARI Max Threshold' share=1.000 (100.0%).
+  - High severity ARI-related share: 1.000 (100.0%).
+  - No High severity thresholds are marked critical (supports separation/policy labelling).
+
+H4 (Alternative): isCritical could reflect asset/site operational protection rather than human impact
+Status: WEAKLY SUPPORTED
+Evidence:
+  - Critical thresholds occur across 147 unique gauges.
+  - Spread ratio (critical gauges / all gauges-with-thresholds) = 0.974.
+  - However, without incident/outcome metadata, distinguishing human-impact vs asset-protection intent remains uncertain.
+
+FINAL — CAUTIOUS CONCLUSION
+--------------------------
+The dataset strongly constrains how labels are used:
+- 'High' severity is tightly associated with ARI-related thresholds in this snapshot.
+- 'Critical' is tightly associated with very short window/resolution thresholds (e.g., 30s).
+
+However, label intent (human impact vs asset protection vs policy/legacy) cannot be fully proven
+without outcome/incident metadata or official documentation of label definitions.
