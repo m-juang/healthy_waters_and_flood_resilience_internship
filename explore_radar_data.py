@@ -1,30 +1,25 @@
 """
-Radar Data Explorer and Visualizer
-Explores and visualizes downloaded radar data
+Radar Data Explorer - Interactive HTML Dashboard
+Creates comprehensive HTML report with all catchments
 """
 import json
 import pickle
 from pathlib import Path
 from typing import Dict, List
+from datetime import datetime
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 
-# Set style
-sns.set_style("whitegrid")
-plt.rcParams['figure.figsize'] = (15, 10)
-
-class RadarDataExplorer:
-    """Explore and visualize radar data"""
+class RadarDashboardGenerator:
+    """Generate interactive HTML dashboard for all radar data"""
     
     def __init__(self, data_dir: str = "radar_data_output"):
         self.data_dir = Path(data_dir)
         self.catchments_dir = self.data_dir / "catchments"
         self.mappings_dir = self.data_dir / "pixel_mappings"
         self.radar_dir = self.data_dir / "radar_data"
-        self.output_dir = self.data_dir / "visualizations"
+        self.output_dir = self.data_dir / "dashboard"
         self.output_dir.mkdir(exist_ok=True)
         
     def load_catchments(self) -> pd.DataFrame:
@@ -50,8 +45,7 @@ class RadarDataExplorer:
         def safe_parse(values_str):
             try:
                 values = json.loads(values_str)
-                # Filter out None values
-                valid_values = [v for v in values if v is not None]
+                valid_values = [v for v in values if v is not None and isinstance(v, (int, float))]
                 return {
                     'total_rainfall': sum(valid_values) if valid_values else 0,
                     'max_rainfall': max(valid_values) if valid_values else 0,
@@ -71,319 +65,592 @@ class RadarDataExplorer:
         parsed = df['values'].apply(safe_parse)
         return pd.concat([df, pd.DataFrame(list(parsed))], axis=1)
     
-    def create_overview_report(self):
-        """Create overview statistics report"""
+    def analyze_all_catchments(self, catchments: pd.DataFrame, 
+                              pixel_mappings: Dict[int, List[int]]) -> pd.DataFrame:
+        """Analyze all catchments and return comprehensive statistics"""
+        print(f"\n🌧️ Analyzing ALL {len(pixel_mappings)} catchments...")
+        
+        all_stats = []
+        total = len(pixel_mappings)
+        
+        for idx, catchment_id in enumerate(pixel_mappings.keys(), 1):
+            # Get catchment info
+            catchment_row = catchments[catchments['id'] == catchment_id]
+            catchment_name = catchment_row['name'].values[0] if len(catchment_row) > 0 else f"ID {catchment_id}"
+            
+            # Get pixel count
+            pixel_count = len(pixel_mappings[catchment_id])
+            
+            # Load and parse radar data
+            df = self.load_radar_data(catchment_id)
+            
+            if df.empty:
+                stats = {
+                    'catchment_id': catchment_id,
+                    'catchment_name': catchment_name,
+                    'pixel_count': pixel_count,
+                    'has_data': False,
+                    'total_rainfall': 0,
+                    'avg_rainfall_per_pixel': 0,
+                    'max_intensity': 0,
+                    'pixels_with_rain': 0,
+                    'rain_coverage_pct': 0,
+                    'data_quality_pct': 0
+                }
+            else:
+                df_parsed = self.parse_rainfall_values(df)
+                
+                # Normalize data quality to max 100%
+                # API returns 1441 points (inclusive boundaries) vs expected 1440
+                avg_data_points = df_parsed['data_points'].mean()
+                data_quality_pct = min(100.0, (avg_data_points / 1440) * 100)
+                
+                stats = {
+                    'catchment_id': catchment_id,
+                    'catchment_name': catchment_name,
+                    'pixel_count': pixel_count,
+                    'has_data': True,
+                    'total_rainfall': df_parsed['total_rainfall'].sum(),
+                    'avg_rainfall_per_pixel': df_parsed['total_rainfall'].mean(),
+                    'max_intensity': df_parsed['max_rainfall'].max(),
+                    'pixels_with_rain': (df_parsed['total_rainfall'] > 0).sum(),
+                    'rain_coverage_pct': (df_parsed['total_rainfall'] > 0).sum() / len(df_parsed) * 100 if len(df_parsed) > 0 else 0,
+                    'data_quality_pct': data_quality_pct
+                }
+            
+            all_stats.append(stats)
+            
+            if idx % 20 == 0:
+                print(f"  Progress: {idx}/{total} ({idx/total*100:.1f}%)")
+        
+        print(f"  ✅ Completed: {total} catchments analyzed")
+        
+        return pd.DataFrame(all_stats)
+    
+    def generate_html_dashboard(self, stats_df: pd.DataFrame, 
+                                pixel_mappings: Dict[int, List[int]]):
+        """Generate comprehensive HTML dashboard"""
+        print(f"\n📊 Generating HTML dashboard...")
+        
+        # Calculate summary statistics
+        total_catchments = len(stats_df)
+        catchments_with_data = stats_df['has_data'].sum()
+        catchments_with_rain = (stats_df['total_rainfall'] > 0).sum()
+        total_pixels = sum(len(pixels) for pixels in pixel_mappings.values())
+        total_rainfall = stats_df['total_rainfall'].sum()
+        
+        # Sort dataframes for rankings
+        by_rainfall = stats_df.nlargest(20, 'total_rainfall')
+        by_intensity = stats_df.nlargest(20, 'max_intensity')
+        by_coverage = stats_df.nlargest(20, 'rain_coverage_pct')
+        
+        # Generate HTML
+        html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar Data Dashboard - Auckland Council</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }}
+        
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }}
+        
+        .header {{
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }}
+        
+        .header h1 {{
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }}
+        
+        .header .subtitle {{
+            font-size: 1.2em;
+            opacity: 0.9;
+        }}
+        
+        .header .timestamp {{
+            margin-top: 15px;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }}
+        
+        .content {{
+            padding: 40px;
+        }}
+        
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }}
+        
+        .stat-card {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }}
+        
+        .stat-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }}
+        
+        .stat-card .value {{
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 10px 0;
+        }}
+        
+        .stat-card .label {{
+            font-size: 0.9em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }}
+        
+        .section {{
+            margin-bottom: 40px;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+        }}
+        
+        .section h2 {{
+            color: #1e3c72;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }}
+        
+        .table-container {{
+            overflow-x: auto;
+            margin-top: 20px;
+        }}
+        
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        
+        th {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }}
+        
+        td {{
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }}
+        
+        tr:hover {{
+            background: #f5f5f5;
+        }}
+        
+        .rank {{
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 50%;
+            font-weight: bold;
+            display: inline-block;
+            min-width: 30px;
+            text-align: center;
+        }}
+        
+        .rank.gold {{ background: #ffd700; color: #333; }}
+        .rank.silver {{ background: #c0c0c0; color: #333; }}
+        .rank.bronze {{ background: #cd7f32; color: white; }}
+        
+        .progress-bar {{
+            background: #e0e0e0;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }}
+        
+        .progress-fill {{
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.3s;
+        }}
+        
+        .search-box {{
+            width: 100%;
+            padding: 15px;
+            font-size: 1em;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }}
+        
+        .search-box:focus {{
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }}
+        
+        .no-data {{
+            color: #999;
+            font-style: italic;
+        }}
+        
+        .has-rain {{
+            color: #28a745;
+            font-weight: bold;
+        }}
+        
+        .no-rain {{
+            color: #dc3545;
+        }}
+        
+        .footer {{
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }}
+        
+        @media (max-width: 768px) {{
+            .stats-grid {{
+                grid-template-columns: 1fr;
+            }}
+            
+            .header h1 {{
+                font-size: 1.8em;
+            }}
+            
+            table {{
+                font-size: 0.85em;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌧️ Rain Radar Data Dashboard</h1>
+            <div class="subtitle">Auckland Council - Stormwater Catchments QPE Analysis</div>
+            <div class="timestamp">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+        </div>
+        
+        <div class="content">
+            <!-- Summary Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Total Catchments</div>
+                    <div class="value">{total_catchments}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">With Radar Data</div>
+                    <div class="value">{catchments_with_data}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">With Rainfall</div>
+                    <div class="value">{catchments_with_rain}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Pixels</div>
+                    <div class="value">{total_pixels:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Rainfall</div>
+                    <div class="value">{total_rainfall:.1f}</div>
+                    <div class="label">mm</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Avg per Catchment</div>
+                    <div class="value">{total_rainfall/catchments_with_rain:.2f}</div>
+                    <div class="label">mm</div>
+                </div>
+            </div>
+            
+            <!-- Top 20 by Total Rainfall -->
+            <div class="section">
+                <h2>🏆 Top 20 Catchments by Total Rainfall</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Catchment Name</th>
+                                <th>Total Rainfall (mm)</th>
+                                <th>Pixels</th>
+                                <th>Avg per Pixel (mm)</th>
+                                <th>Coverage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+"""
+        
+        # Add top 20 by rainfall
+        for idx, row in by_rainfall.iterrows():
+            rank_class = 'gold' if idx == 0 else ('silver' if idx == 1 else ('bronze' if idx == 2 else ''))
+            html += f"""
+                            <tr>
+                                <td><span class="rank {rank_class}">{by_rainfall.index.get_loc(idx) + 1}</span></td>
+                                <td><strong>{row['catchment_name']}</strong></td>
+                                <td>{row['total_rainfall']:.2f}</td>
+                                <td>{row['pixel_count']}</td>
+                                <td>{row['avg_rainfall_per_pixel']:.3f}</td>
+                                <td>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {row['rain_coverage_pct']:.1f}%"></div>
+                                    </div>
+                                    {row['rain_coverage_pct']:.1f}%
+                                </td>
+                            </tr>
+"""
+        
+        html += """
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Top 20 by Peak Intensity -->
+            <div class="section">
+                <h2>⚡ Top 20 Catchments by Peak Intensity</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Catchment Name</th>
+                                <th>Max Intensity (mm/min)</th>
+                                <th>Total Rainfall (mm)</th>
+                                <th>Pixels</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+"""
+        
+        # Add top 20 by intensity
+        for idx, row in by_intensity.iterrows():
+            rank_class = 'gold' if idx == 0 else ('silver' if idx == 1 else ('bronze' if idx == 2 else ''))
+            html += f"""
+                            <tr>
+                                <td><span class="rank {rank_class}">{by_intensity.index.get_loc(idx) + 1}</span></td>
+                                <td><strong>{row['catchment_name']}</strong></td>
+                                <td>{row['max_intensity']:.3f}</td>
+                                <td>{row['total_rainfall']:.2f}</td>
+                                <td>{row['pixel_count']}</td>
+                            </tr>
+"""
+        
+        html += """
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Top 20 by Coverage -->
+            <div class="section">
+                <h2>📊 Top 20 Catchments by Rain Coverage</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Catchment Name</th>
+                                <th>Coverage</th>
+                                <th>Pixels with Rain</th>
+                                <th>Total Pixels</th>
+                                <th>Total Rainfall (mm)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+"""
+        
+        # Add top 20 by coverage
+        for idx, row in by_coverage[by_coverage['rain_coverage_pct'] > 0].head(20).iterrows():
+            rank_class = 'gold' if idx == 0 else ('silver' if idx == 1 else ('bronze' if idx == 2 else ''))
+            html += f"""
+                            <tr>
+                                <td><span class="rank {rank_class}">{by_coverage[by_coverage['rain_coverage_pct'] > 0].index.get_loc(idx) + 1}</span></td>
+                                <td><strong>{row['catchment_name']}</strong></td>
+                                <td>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {row['rain_coverage_pct']:.1f}%"></div>
+                                    </div>
+                                    {row['rain_coverage_pct']:.1f}%
+                                </td>
+                                <td>{row['pixels_with_rain']:.0f}</td>
+                                <td>{row['pixel_count']}</td>
+                                <td>{row['total_rainfall']:.2f}</td>
+                            </tr>
+"""
+        
+        html += """
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- All Catchments Table -->
+            <div class="section">
+                <h2>📋 All Catchments - Complete Data</h2>
+                <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search by catchment name or ID...">
+                <div class="table-container">
+                    <table id="allCatchmentsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Catchment Name</th>
+                                <th>Pixels</th>
+                                <th>Total Rainfall (mm)</th>
+                                <th>Avg/Pixel (mm)</th>
+                                <th>Max Intensity (mm/min)</th>
+                                <th>Coverage (%)</th>
+                                <th>Data Quality (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+"""
+        
+        # Add all catchments
+        for _, row in stats_df.sort_values('total_rainfall', ascending=False).iterrows():
+            rain_class = 'has-rain' if row['total_rainfall'] > 0 else 'no-rain'
+            data_status = '✅' if row['has_data'] else '❌'
+            
+            html += f"""
+                            <tr class="catchment-row">
+                                <td>{row['catchment_id']}</td>
+                                <td><strong>{row['catchment_name']}</strong></td>
+                                <td>{row['pixel_count']}</td>
+                                <td class="{rain_class}">{row['total_rainfall']:.2f}</td>
+                                <td>{row['avg_rainfall_per_pixel']:.3f}</td>
+                                <td>{row['max_intensity']:.3f}</td>
+                                <td>{row['rain_coverage_pct']:.1f}%</td>
+                                <td>{data_status} {row['data_quality_pct']:.1f}%</td>
+                            </tr>
+"""
+        
+        html += f"""
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Rain Radar Data Dashboard | Auckland Council Stormwater Monitoring</p>
+            <p>Data Period: Last 24 hours | QPE (Quantitative Precipitation Estimation)</p>
+            <p>Total Catchments: {total_catchments} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+    </div>
+    
+    <script>
+        // Search functionality
+        document.getElementById('searchBox').addEventListener('keyup', function() {{
+            const searchValue = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.catchment-row');
+            
+            rows.forEach(row => {{
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchValue) ? '' : 'none';
+            }});
+        }});
+        
+        // Animate progress bars on load
+        window.addEventListener('load', function() {{
+            const fills = document.querySelectorAll('.progress-fill');
+            fills.forEach(fill => {{
+                const width = fill.style.width;
+                fill.style.width = '0%';
+                setTimeout(() => {{
+                    fill.style.width = width;
+                }}, 100);
+            }});
+        }});
+    </script>
+</body>
+</html>
+"""
+        
+        # Save HTML file
+        output_file = self.output_dir / 'radar_dashboard.html'
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html)
+        
+        print(f"✅ Dashboard saved: {output_file}")
+        
+        # Also save CSV for Excel analysis
+        csv_file = self.output_dir / 'all_catchments_data.csv'
+        stats_df.to_csv(csv_file, index=False)
+        print(f"✅ CSV saved: {csv_file}")
+        
+        return output_file
+    
+    def run(self):
+        """Run full dashboard generation"""
         print("="*80)
-        print("RADAR DATA EXPLORER - OVERVIEW REPORT")
+        print("RADAR DATA DASHBOARD GENERATOR")
         print("="*80)
         
         # Load data
+        print("\n📂 Loading data...")
         catchments = self.load_catchments()
         pixel_mappings = self.load_pixel_mappings()
+        print(f"  ✅ Loaded {len(catchments)} catchments, {len(pixel_mappings)} with pixel mappings")
         
-        # Get all radar data files
-        radar_files = list(self.radar_dir.glob("catchment_*.csv"))
+        # Analyze all catchments
+        stats_df = self.analyze_all_catchments(catchments, pixel_mappings)
         
-        print(f"\n📊 DATA SUMMARY")
-        print(f"{'='*80}")
-        print(f"Total catchments in database: {len(catchments)}")
-        print(f"Catchments with radar data: {len(radar_files)}")
-        print(f"Total pixels mapped: {sum(len(pixels) for pixels in pixel_mappings.values())}")
-        
-        # Analyze pixel distribution
-        pixel_counts = [len(pixels) for pixels in pixel_mappings.values()]
-        print(f"\n📍 PIXEL DISTRIBUTION")
-        print(f"{'='*80}")
-        print(f"Average pixels per catchment: {np.mean(pixel_counts):.1f}")
-        print(f"Min pixels: {min(pixel_counts)}")
-        print(f"Max pixels: {max(pixel_counts)}")
-        print(f"Median pixels: {np.median(pixel_counts):.1f}")
-        
-        # Analyze rainfall data
-        print(f"\n🌧️ RAINFALL ANALYSIS")
-        print(f"{'='*80}")
-        
-        all_totals = []
-        all_maxes = []
-        catchments_with_rain = 0
-        
-        for catchment_id in list(pixel_mappings.keys())[:20]:  # Sample first 20
-            df = self.load_radar_data(catchment_id)
-            if df.empty:
-                continue
-            
-            df_parsed = self.parse_rainfall_values(df)
-            all_totals.extend(df_parsed['total_rainfall'].tolist())
-            all_maxes.extend(df_parsed['max_rainfall'].tolist())
-            
-            if df_parsed['total_rainfall'].sum() > 0:
-                catchments_with_rain += 1
-        
-        if all_totals:
-            print(f"Catchments analyzed: 20")
-            print(f"Catchments with rainfall: {catchments_with_rain}")
-            print(f"Average total rainfall per pixel: {np.mean(all_totals):.2f} mm")
-            print(f"Max rainfall intensity (1-min): {max(all_maxes):.2f} mm")
-            print(f"Total rainfall across all pixels: {sum(all_totals):.2f} mm")
-        
-        return catchments, pixel_mappings
-    
-    def plot_pixel_distribution(self, pixel_mappings: Dict[int, List[int]]):
-        """Plot pixel distribution across catchments"""
-        print(f"\n📊 Creating pixel distribution plot...")
-        
-        pixel_counts = [len(pixels) for pixels in pixel_mappings.values()]
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Pixel Distribution Across Catchments', fontsize=16, fontweight='bold')
-        
-        # Histogram
-        ax1 = axes[0, 0]
-        ax1.hist(pixel_counts, bins=30, edgecolor='black', alpha=0.7, color='skyblue')
-        ax1.set_xlabel('Number of Pixels')
-        ax1.set_ylabel('Number of Catchments')
-        ax1.set_title('Distribution of Pixels per Catchment')
-        ax1.axvline(np.mean(pixel_counts), color='red', linestyle='--', 
-                    label=f'Mean: {np.mean(pixel_counts):.1f}')
-        ax1.legend()
-        
-        # Box plot
-        ax2 = axes[0, 1]
-        ax2.boxplot(pixel_counts, vert=True)
-        ax2.set_ylabel('Number of Pixels')
-        ax2.set_title('Pixel Count Distribution (Box Plot)')
-        ax2.grid(True, alpha=0.3)
-        
-        # Top 20 catchments
-        ax3 = axes[1, 0]
-        top_20 = sorted(pixel_mappings.items(), key=lambda x: len(x[1]), reverse=True)[:20]
-        catchment_ids = [str(c[0]) for c in top_20]
-        counts = [len(c[1]) for c in top_20]
-        ax3.barh(range(len(counts)), counts, color='coral')
-        ax3.set_yticks(range(len(catchment_ids)))
-        ax3.set_yticklabels(catchment_ids, fontsize=8)
-        ax3.set_xlabel('Number of Pixels')
-        ax3.set_title('Top 20 Catchments by Pixel Count')
-        ax3.invert_yaxis()
-        
-        # Cumulative distribution
-        ax4 = axes[1, 1]
-        sorted_counts = sorted(pixel_counts)
-        cumulative = np.arange(1, len(sorted_counts) + 1) / len(sorted_counts) * 100
-        ax4.plot(sorted_counts, cumulative, linewidth=2, color='green')
-        ax4.set_xlabel('Number of Pixels')
-        ax4.set_ylabel('Cumulative Percentage (%)')
-        ax4.set_title('Cumulative Distribution')
-        ax4.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        output_file = self.output_dir / 'pixel_distribution.png'
-        plt.savefig(output_file, dpi=150, bbox_inches='tight')
-        print(f"✅ Saved: {output_file}")
-        plt.close()
-    
-    def plot_rainfall_analysis(self, pixel_mappings: Dict[int, List[int]], 
-                               catchments: pd.DataFrame, sample_size: int = 30):
-        """Analyze and plot rainfall data"""
-        print(f"\n🌧️ Analyzing rainfall data (sampling {sample_size} catchments)...")
-        
-        catchment_stats = []
-        
-        for idx, catchment_id in enumerate(list(pixel_mappings.keys())[:sample_size]):
-            df = self.load_radar_data(catchment_id)
-            if df.empty:
-                continue
-            
-            df_parsed = self.parse_rainfall_values(df)
-            
-            catchment_name = catchments[catchments['id'] == catchment_id]['name'].values
-            catchment_name = catchment_name[0] if len(catchment_name) > 0 else f"ID {catchment_id}"
-            
-            catchment_stats.append({
-                'catchment_id': catchment_id,
-                'catchment_name': catchment_name,
-                'total_rainfall': df_parsed['total_rainfall'].sum(),
-                'avg_rainfall': df_parsed['total_rainfall'].mean(),
-                'max_intensity': df_parsed['max_rainfall'].max(),
-                'pixels_with_rain': (df_parsed['total_rainfall'] > 0).sum(),
-                'total_pixels': len(df_parsed)
-            })
-            
-            if (idx + 1) % 10 == 0:
-                print(f"  Processed {idx + 1}/{sample_size} catchments...")
-        
-        if not catchment_stats:
-            print("❌ No rainfall data found!")
-            return
-        
-        stats_df = pd.DataFrame(catchment_stats)
-        
-        # Create plots
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Rainfall Analysis Across Catchments', fontsize=16, fontweight='bold')
-        
-        # Total rainfall bar chart
-        ax1 = axes[0, 0]
-        top_10 = stats_df.nlargest(10, 'total_rainfall')
-        ax1.barh(range(len(top_10)), top_10['total_rainfall'], color='steelblue')
-        ax1.set_yticks(range(len(top_10)))
-        ax1.set_yticklabels([name[:30] for name in top_10['catchment_name']], fontsize=8)
-        ax1.set_xlabel('Total Rainfall (mm)')
-        ax1.set_title('Top 10 Catchments by Total Rainfall')
-        ax1.invert_yaxis()
-        
-        # Max intensity
-        ax2 = axes[0, 1]
-        top_10_intensity = stats_df.nlargest(10, 'max_intensity')
-        ax2.barh(range(len(top_10_intensity)), top_10_intensity['max_intensity'], color='coral')
-        ax2.set_yticks(range(len(top_10_intensity)))
-        ax2.set_yticklabels([name[:30] for name in top_10_intensity['catchment_name']], fontsize=8)
-        ax2.set_xlabel('Max 1-min Intensity (mm)')
-        ax2.set_title('Top 10 Catchments by Peak Intensity')
-        ax2.invert_yaxis()
-        
-        # Scatter: total vs coverage
-        ax3 = axes[1, 0]
-        stats_df['rain_coverage'] = stats_df['pixels_with_rain'] / stats_df['total_pixels'] * 100
-        ax3.scatter(stats_df['rain_coverage'], stats_df['total_rainfall'], 
-                   alpha=0.6, s=100, color='green')
-        ax3.set_xlabel('Rain Coverage (%)')
-        ax3.set_ylabel('Total Rainfall (mm)')
-        ax3.set_title('Rainfall vs Coverage')
-        ax3.grid(True, alpha=0.3)
-        
-        # Distribution
-        ax4 = axes[1, 1]
-        ax4.hist(stats_df['total_rainfall'], bins=20, edgecolor='black', 
-                alpha=0.7, color='purple')
-        ax4.set_xlabel('Total Rainfall (mm)')
-        ax4.set_ylabel('Number of Catchments')
-        ax4.set_title('Distribution of Total Rainfall')
-        ax4.axvline(stats_df['total_rainfall'].mean(), color='red', 
-                   linestyle='--', label=f'Mean: {stats_df["total_rainfall"].mean():.2f} mm')
-        ax4.legend()
-        
-        plt.tight_layout()
-        output_file = self.output_dir / 'rainfall_analysis.png'
-        plt.savefig(output_file, dpi=150, bbox_inches='tight')
-        print(f"✅ Saved: {output_file}")
-        plt.close()
-        
-        # Save stats
-        csv_file = self.output_dir / 'rainfall_statistics.csv'
-        stats_df.to_csv(csv_file, index=False)
-        print(f"✅ Saved statistics: {csv_file}")
-    
-    def plot_catchment_detail(self, catchment_id: int, catchments: pd.DataFrame):
-        """Detailed analysis of a single catchment"""
-        print(f"\n🔍 Analyzing catchment {catchment_id} in detail...")
-        
-        df = self.load_radar_data(catchment_id)
-        if df.empty:
-            print(f"❌ No data for catchment {catchment_id}")
-            return
-        
-        df_parsed = self.parse_rainfall_values(df)
-        
-        catchment_name = catchments[catchments['id'] == catchment_id]['name'].values
-        catchment_name = catchment_name[0] if len(catchment_name) > 0 else f"ID {catchment_id}"
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle(f'Detailed Analysis: {catchment_name}', fontsize=16, fontweight='bold')
-        
-        # Rainfall per pixel
-        ax1 = axes[0, 0]
-        ax1.bar(range(len(df_parsed)), df_parsed['total_rainfall'], 
-               color='skyblue', edgecolor='black', alpha=0.7)
-        ax1.set_xlabel('Pixel Index')
-        ax1.set_ylabel('Total Rainfall (mm)')
-        ax1.set_title(f'Rainfall by Pixel ({len(df_parsed)} pixels)')
-        ax1.grid(True, alpha=0.3, axis='y')
-        
-        # Max intensity per pixel
-        ax2 = axes[0, 1]
-        ax2.bar(range(len(df_parsed)), df_parsed['max_rainfall'], 
-               color='coral', edgecolor='black', alpha=0.7)
-        ax2.set_xlabel('Pixel Index')
-        ax2.set_ylabel('Max 1-min Intensity (mm)')
-        ax2.set_title('Peak Intensity by Pixel')
-        ax2.grid(True, alpha=0.3, axis='y')
-        
-        # Distribution of totals
-        ax3 = axes[1, 0]
-        ax3.hist(df_parsed['total_rainfall'], bins=20, edgecolor='black', 
-                alpha=0.7, color='green')
-        ax3.set_xlabel('Total Rainfall (mm)')
-        ax3.set_ylabel('Number of Pixels')
-        ax3.set_title('Distribution of Rainfall Totals')
-        ax3.axvline(df_parsed['total_rainfall'].mean(), color='red', 
-                   linestyle='--', label=f'Mean: {df_parsed["total_rainfall"].mean():.2f} mm')
-        ax3.legend()
-        
-        # Stats table
-        ax4 = axes[1, 1]
-        ax4.axis('off')
-        stats_text = f"""
-        CATCHMENT STATISTICS
-        {'='*40}
-        
-        Total Pixels: {len(df_parsed)}
-        Pixels with Rain: {(df_parsed['total_rainfall'] > 0).sum()}
-        Rain Coverage: {(df_parsed['total_rainfall'] > 0).sum() / len(df_parsed) * 100:.1f}%
-        
-        RAINFALL TOTALS:
-        Total: {df_parsed['total_rainfall'].sum():.2f} mm
-        Average: {df_parsed['total_rainfall'].mean():.2f} mm
-        Max: {df_parsed['total_rainfall'].max():.2f} mm
-        Std Dev: {df_parsed['total_rainfall'].std():.2f} mm
-        
-        PEAK INTENSITIES:
-        Max: {df_parsed['max_rainfall'].max():.2f} mm/min
-        Average: {df_parsed['max_rainfall'].mean():.2f} mm/min
-        
-        DATA QUALITY:
-        Avg Data Points/Pixel: {df_parsed['data_points'].mean():.0f}
-        Non-zero Minutes: {df_parsed['non_zero_count'].sum()}
-        """
-        ax4.text(0.1, 0.5, stats_text, fontsize=10, family='monospace',
-                verticalalignment='center')
-        
-        plt.tight_layout()
-        output_file = self.output_dir / f'catchment_{catchment_id}_detail.png'
-        plt.savefig(output_file, dpi=150, bbox_inches='tight')
-        print(f"✅ Saved: {output_file}")
-        plt.close()
-    
-    def run_full_exploration(self):
-        """Run complete exploration and visualization"""
-        print("\n" + "="*80)
-        print("STARTING RADAR DATA EXPLORATION")
-        print("="*80)
-        
-        # Load data
-        catchments, pixel_mappings = self.create_overview_report()
-        
-        # Create visualizations
-        self.plot_pixel_distribution(pixel_mappings)
-        self.plot_rainfall_analysis(pixel_mappings, catchments, sample_size=50)
-        
-        # Detailed analysis of top catchments by rainfall
-        print(f"\n🔍 Creating detailed catchment analyses...")
-        sample_catchments = list(pixel_mappings.keys())[:5]
-        for catchment_id in sample_catchments:
-            self.plot_catchment_detail(catchment_id, catchments)
+        # Generate HTML dashboard
+        output_file = self.generate_html_dashboard(stats_df, pixel_mappings)
         
         print("\n" + "="*80)
-        print("EXPLORATION COMPLETE!")
+        print("DASHBOARD GENERATION COMPLETE!")
         print("="*80)
-        print(f"\n📁 All visualizations saved to: {self.output_dir}")
-        print(f"\nGenerated files:")
-        for file in sorted(self.output_dir.glob("*.png")):
-            print(f"  - {file.name}")
-        for file in sorted(self.output_dir.glob("*.csv")):
-            print(f"  - {file.name}")
+        print(f"\n📊 Open in browser: {output_file.absolute()}")
+        print(f"\n📁 Files created:")
+        print(f"  - {output_file.name}")
+        print(f"  - all_catchments_data.csv")
+        print("\n💡 Tip: Use the search box in the dashboard to filter catchments!")
 
 
 if __name__ == "__main__":
-    explorer = RadarDataExplorer()
-    explorer.run_full_exploration()
+    generator = RadarDashboardGenerator()
+    generator.run()
