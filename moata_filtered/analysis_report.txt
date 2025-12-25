@@ -1,13 +1,13 @@
 ================================================================================
 AUCKLAND RAIN GAUGE ANALYSIS REPORT
-Generated: 2025-12-25 13:36:29
+Generated: 2025-12-25 14:01:40
 ================================================================================
 
 FILTERING RESULTS:
   Total gauges in dataset: 264
-  ✓ Active Auckland gauges: 97
-  ✗ Inactive gauges (>threshold): 79
-  ✗ Excluded gauges: 44
+  ✓ Active Auckland gauges: 76
+  ✗ Inactive gauges (>threshold): 77
+  ✗ Excluded gauges: 67
   ✗ No Rainfall trace: 44
 
 ================================================================================
@@ -216,13 +216,6 @@ ACTIVE GAUGE DETAILS:
   Traces: 23 total, 11 with alarms/thresholds
   Overflow alarms: 0
   Threshold configs: 10
-
-• Waikato - Rain - Inferno Crater Weather Station
-  ID: 7787223
-  Last data: 2025-12-15 11:19:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
 
 • ACC - Rain -Reservoir Bush Road
   ID: 3160954
@@ -546,132 +539,6 @@ ACTIVE GAUGE DETAILS:
   Overflow alarms: 0
   Threshold configs: 10
 
-• Waikato - Rain - Wairamarama
-  ID: 7787209
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Waitanguru Rainfall
-  ID: 7787210
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Hodder East Rd Castle Rock Rainfall
-  ID: 7787211
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Matamata Aerodrome (#1).
-  ID: 7787212
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Pinnacles Rainfall
-  ID: 7787213
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Queens Head
-  ID: 7787214
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Bartons Corner Rd Br
-  ID: 7787215
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Kaimai Summit Rainfall
-  ID: 7787216
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Control Structure U/S
-  ID: 7787217
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Ruakiwi Rd Off SH22
-  ID: 7787218
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Maungakawa Rainfall
-  ID: 7787219
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Golden Cross Rainfall
-  ID: 7787221
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Karamu Walkway (Old Mountain Road)
-  ID: 7787222
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Te Kuiti EWS
-  ID: 7787225
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Hauturu Trig Raingauge
-  ID: 7787226
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Wharekiri Rainfall
-  ID: 7787227
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Maukoro Landing Rd
-  ID: 7787228
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Ngaroma Rainfall
-  ID: 7787229
-  Last data: 2025-12-15 10:59:30
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
 • ACC - Rain -Avondale Racecourse
   ID: 3160991
   Last data: 2025-12-15 04:59:30
@@ -679,26 +546,12 @@ ACTIVE GAUGE DETAILS:
   Overflow alarms: 0
   Threshold configs: 10
 
-• Waikato - Rain - Te Aroha Racecourse
-  ID: 7787224
-  Last data: 2025-11-09 21:00:00
-  Traces: 17 total, 0 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
-• Waikato - Rain - Otewa
-  ID: 7787220
-  Last data: 2025-10-28 10:00:00
-  Traces: 17 total, 1 with alarms/thresholds
-  Overflow alarms: 0
-  Threshold configs: 0
-
 ================================================================================
 ALARM & THRESHOLD CONFIGURATION SUMMARY:
 ================================================================================
 
 Configuration sources:
-  Has alarms flag: 778
+  Has alarms flag: 758
   Threshold configs: 694
 
 Total configured alarms/thresholds: 694

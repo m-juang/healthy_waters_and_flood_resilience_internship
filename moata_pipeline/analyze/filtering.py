@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -18,7 +19,9 @@ class FilterConfig:
 
 
 def is_auckland_gauge(gauge_name: str, exclude_keyword: str = "northland") -> bool:
-    return exclude_keyword.lower() not in (gauge_name or "").lower()
+    name = gauge_name or ""
+    # exclude_keyword supports regex like "northland|waikato"
+    return re.search(exclude_keyword, name, flags=re.IGNORECASE) is None
 
 
 def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

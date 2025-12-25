@@ -12,6 +12,8 @@ from moata_pipeline.common.paths import PipelinePaths
 from .filtering import FilterConfig, filter_gauges
 from .alarm_analysis import analyze_alarms
 from .reporting import create_summary_report
+from moata_pipeline.common.constants import INACTIVE_THRESHOLD_MONTHS, DEFAULT_EXCLUDE_KEYWORD
+
 
 
 logger = logging.getLogger(__name__)
@@ -20,8 +22,8 @@ logger = logging.getLogger(__name__)
 def run_filter_active_gauges(
     input_json: Optional[Path] = None,
     out_dir: Optional[Path] = None,
-    inactive_months: int = 3,
-    exclude_keyword: str = "northland",
+    inactive_months: int = INACTIVE_THRESHOLD_MONTHS,
+    exclude_keyword: str = DEFAULT_EXCLUDE_KEYWORD,
 ) -> Dict[str, Any]:
     """
     Offline pipeline:
@@ -63,6 +65,7 @@ def run_filter_active_gauges(
     (output_dir / "analysis_report.txt").write_text(report, encoding="utf-8")
 
     return {
+        "output_dir": output_dir,
         "filtered_data": filtered,
         "alarms_df": alarms_df,
         "report": report,
