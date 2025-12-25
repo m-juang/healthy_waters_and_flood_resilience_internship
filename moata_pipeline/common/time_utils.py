@@ -53,9 +53,20 @@ def months_ago(like: Any, months: int) -> datetime:
     return base - timedelta(days=30 * months)
 
 
-# ============================================================================
-# NEW FUNCTION (untuk viz/pages.py dan viz/report.py)
-# ============================================================================
+def iso_z(dt: datetime) -> str:
+    """
+    Convert datetime to ISO format string with Z suffix (UTC).
+    
+    Args:
+        dt: datetime object (naive assumed UTC, or timezone-aware)
+        
+    Returns:
+        ISO format string like "2025-05-01T00:00:00Z"
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 def format_date_for_display(x: Any) -> str:
     """
@@ -88,3 +99,17 @@ def format_date_for_display(x: Any) -> str:
         pass
     
     return "Unknown"
+
+def iso_z(dt: datetime) -> str:
+    """
+    Convert datetime to ISO format string with Z suffix (UTC).
+    
+    Args:
+        dt: datetime object (naive assumed UTC, or timezone-aware)
+        
+    Returns:
+        ISO format string like "2025-05-01T00:00:00Z"
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
