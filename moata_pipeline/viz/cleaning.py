@@ -1,45 +1,26 @@
 from __future__ import annotations
-
 from pathlib import Path
 import pandas as pd
-
-from moata_pipeline.common.dataframe_utils import ensure_columns, to_bool_series, to_numeric_series, clean_text_series
-
+from moata_pipeline.common.dataframe_utils import ensure_columns, to_numeric_series, clean_text_series
 
 EXPECTED_COLUMNS = [
-    "gauge_id",
-    "gauge_name",
-    "last_data",
-    "trace_id",
-    "trace_name",
-    "alarm_id",
-    "alarm_name",
-    "alarm_type",
-    "threshold",
-    "severity",
-    "is_critical",
-    "source",
+    "Gauge",
+    "Trace",
+    "Alarm Name",
+    "Type",
+    "Threshold",
 ]
 
 
-def parse_date_series(s: pd.Series) -> pd.Series:
-    return pd.to_datetime(s, errors="coerce")
-
-
 def classify_row(r: pd.Series) -> str:
-    src = str(r.get("source") or "").strip().lower()
-    at = str(r.get("alarm_type") or "").strip().lower()
-    alarm_id = r.get("alarm_id")
-    has_alarm_id = pd.notna(alarm_id) and str(alarm_id).strip() != ""
-
-    if "has_alarms" in src or at == "datarecency":
+    """Classify row based on Type column."""
+    alarm_type = str(r.get("Type") or "").strip().lower()
+    
+    if alarm_type == "recency":
         return "Data freshness (recency)"
-    if "threshold" in src or at == "overflow":
+    if "overflow" in alarm_type:
         return "Threshold alarm (overflow)"
-    if has_alarm_id:
-        return "Alarm record"
     return "Other"
-
 
 
 def load_and_clean(csv_path: Path) -> pd.DataFrame:
@@ -47,25 +28,22 @@ def load_and_clean(csv_path: Path) -> pd.DataFrame:
     df.columns = [c.strip() for c in df.columns]
     df = ensure_columns(df, EXPECTED_COLUMNS)
 
-    # Types
-    df["gauge_id"] = pd.to_numeric(df["gauge_id"], errors="coerce").astype("Int64")
-    df["trace_id"] = pd.to_numeric(df["trace_id"], errors="coerce").astype("Int64")
-
-    df["last_data_dt"] = parse_date_series(df["last_data"])
-    df["threshold_num"] = to_numeric_series(df["threshold"])
-    df["is_critical_bool"] = to_bool_series(df["is_critical"])
+    # Parse threshold as numeric
+    df["threshold_num"] = to_numeric_series(df["Threshold"])
 
     # Normalize text fields
-    for col in ["gauge_name", "trace_name", "alarm_name", "alarm_type", "severity", "source"]:
-        df[col] = clean_text_series(df[col])
+    for col in ["Gauge", "Trace", "Alarm Name", "Type"]:
+        if col in df.columns:
+            df[col] = clean_text_series(df[col])
 
     # Categorize
     df["row_category"] = df.apply(classify_row, axis=1)
 
-    # Nice sort
+    # Sort
     df = df.sort_values(
-        by=["gauge_name", "trace_name", "row_category", "threshold_num"],
+        by=["Gauge", "Trace", "row_category", "threshold_num"],
         ascending=[True, True, True, True],
         na_position="last",
     )
+
     return df

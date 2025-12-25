@@ -1,6 +1,7 @@
-PROJECT_ASSETS = "projects/{project_id}/assets"
+﻿PROJECT_ASSETS = "projects/{project_id}/assets"
 ASSET_TRACES = "assets/traces"
 ALARMS_OVERFLOW_BY_TRACE = "alarms/overflow-detailed-info-by-trace"
 TRACE_THRESHOLDS = "traces/{trace_id}/thresholds"
 ALARMS_DETAILED_BY_PROJECT = "alarms/detailed-alarms"
 TRACE_ARI = "traces/{trace_id}/ari"
+TRACE_DATA_UTC = "traces/{trace_id}/data/utc"

@@ -8,51 +8,76 @@ from typing import Any, Dict, List, Optional
 
 from moata_pipeline.common.time_utils import months_ago, now_like, parse_datetime
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class FilterConfig:
     inactive_threshold_months: int = 3
-    exclude_keyword: str = "northland"  # default logic from your script
+    # supports regex like "northland|waikato"
+    exclude_keyword: str = "northland|waikato"
 
 
-def is_auckland_gauge(gauge_name: str, exclude_keyword: str = "northland") -> bool:
+def is_auckland_gauge(gauge_name: str, exclude_keyword: str) -> bool:
     name = gauge_name or ""
-    # exclude_keyword supports regex like "northland|waikato"
     return re.search(exclude_keyword, name, flags=re.IGNORECASE) is None
+
+
+def _is_bad_primary_rain_trace(description: str) -> bool:
+    """
+    Exclude non-primary rainfall traces that can make inactive gauges appear active.
+    """
+    d = (description or "").lower()
+    bad_tokens = ("forecast", "nowcast", "merged", "anomaly", "filtered", "mirror")
+    return any(t in d for t in bad_tokens)
 
 
 def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """
-    Return the trace_data entry (not just trace) that represents the primary Rainfall trace.
-    Input expected shape: trace_data = {"trace": {...}, "overflow_alarms": [...], ...}
+    Return the trace_data entry that represents the PRIMARY measured Rainfall trace.
+
+    Input expected shape:
+      trace_data = {"trace": {...}, "overflow_alarms": [...], ...}
     """
-    # 1) Exact match on description == "Rainfall"
+
+    # 1) Exact match on description == "Rainfall" (best signal)
     for trace_data in traces_data:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
-        if description == "Rainfall":
+        if description == "Rainfall" and not _is_bad_primary_rain_trace(description):
             return trace_data
 
-    # 2) dataVariableType name/type heuristics
+    # 2) Strong heuristic: dataVariableType name Rain/Rainfall AND description looks like measured rainfall
     for trace_data in traces_data:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
+        if _is_bad_primary_rain_trace(description):
+            continue
+
         dvt = trace.get("dataVariableType", {}) or {}
-        dvt_name = (dvt.get("name") or "").strip()
-        dvt_type = (dvt.get("type") or "").strip()
+        dvt_name = (dvt.get("name") or "").strip().lower()
+        dvt_type = (dvt.get("type") or "").strip().lower()
 
-        if dvt_name == "Rainfall" or dvt_type == "Rain":
-            if "rainfall" in description.lower() and "filtered" not in description.lower():
-                return trace_data
+        # Prefer true measured rainfall traces, not generic "Rain" series
+        if dvt_type == "rain" and (dvt_name in {"rain", "rainfall"}):
+            # Many primary traces are literally "Rainfall" / "Rain"
+            return trace_data
 
-    # 3) Fallback: any rainfall-like trace excluding mirrors
+        # Some datasets mark primary as type Rain and description contains rainfall
+        if dvt_type == "rain" and "rainfall" in description.lower():
+            return trace_data
+
+    # 3) Fallback: any visible rain trace that isn't forecast/nowcast etc.
     for trace_data in traces_data:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
-        if "rainfall" in description.lower() and "mirror" not in description.lower():
+        if _is_bad_primary_rain_trace(description):
+            continue
+
+        dvt = trace.get("dataVariableType", {}) or {}
+        dvt_type = (dvt.get("type") or "").strip().lower()
+
+        if dvt_type == "rain" and (trace.get("isVisible") is True):
             return trace_data
 
     return None
@@ -60,26 +85,17 @@ def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, 
 
 def is_gauge_active(telemetered_time: Optional[datetime], inactive_months: int) -> bool:
     """
-    Active = telemeteredMaximumTime within last inactive_months months.
-    Uses 30-day month approximation (consistent with your original script).
+    Active = telemeteredMaximumTime within last inactive_months months (relative to NOW).
     """
     if telemetered_time is None:
         return False
-    cutoff = months_ago(telemetered_time, inactive_months)
+
+    now_dt = now_like(telemetered_time)
+    cutoff = months_ago(now_dt, inactive_months)
     return telemetered_time >= cutoff
 
 
 def filter_gauges(all_data: List[Dict[str, Any]], cfg: FilterConfig) -> Dict[str, Any]:
-    """
-    Returns:
-      {
-        "active_gauges": [...],
-        "inactive_gauges": [...],
-        "excluded_gauges": [...],   # Northland (or other exclude keyword)
-        "no_rainfall_trace": [...],
-        "stats": {...}
-      }
-    """
     active_gauges: List[Dict[str, Any]] = []
     inactive_gauges: List[Dict[str, Any]] = []
     excluded_gauges: List[Dict[str, Any]] = []
@@ -93,25 +109,23 @@ def filter_gauges(all_data: List[Dict[str, Any]], cfg: FilterConfig) -> Dict[str
         gauge_name = gauge.get("name", "Unknown")
         gauge_id = gauge.get("id")
 
-        # Exclude non-Auckland (Northland)
+        # Exclude non-Auckland regions by keyword/regex
         if not is_auckland_gauge(gauge_name, exclude_keyword=cfg.exclude_keyword):
             excluded_gauges.append(gauge_data)
             continue
 
         rainfall_trace_data = get_rainfall_trace(gauge_data.get("traces", []) or [])
         if not rainfall_trace_data:
-            logger.warning("No 'Rainfall' trace found for gauge: %s (id=%s)", gauge_name, gauge_id)
+            logger.warning("No primary Rainfall trace found for gauge: %s (id=%s)", gauge_name, gauge_id)
             no_rainfall_trace.append(gauge_data)
             continue
 
         rainfall_trace = rainfall_trace_data.get("trace", {}) or {}
-        telem_str = rainfall_trace.get("telemeteredMaximumTime")
-        telem_dt = parse_datetime(telem_str)
+        telem_dt = parse_datetime(rainfall_trace.get("telemeteredMaximumTime"))
 
         if telem_dt is None:
-            # Missing or unparsable => treat inactive (consistent with your original script)
             logger.warning(
-                "No/invalid telemeteredMaximumTime for gauge: %s (id=%s) - trace description: %s",
+                "No/invalid telemeteredMaximumTime for gauge: %s (id=%s) - chosen trace: %s",
                 gauge_name,
                 gauge_id,
                 rainfall_trace.get("description"),
@@ -120,7 +134,6 @@ def filter_gauges(all_data: List[Dict[str, Any]], cfg: FilterConfig) -> Dict[str
             continue
 
         if is_gauge_active(telem_dt, cfg.inactive_threshold_months):
-            # Attach enrichment fields (same as your script)
             gauge_data["last_data_time"] = telem_dt.isoformat()
             gauge_data["last_data_time_dt"] = telem_dt
             gauge_data["rainfall_trace"] = rainfall_trace

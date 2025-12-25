@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 # =====================
 # CONFIG
 # =====================
-INPUT_CSV = Path("outputs/ari_alarm_validation_by_ari_trace.csv")
-OUT_DIR = Path("outputs/figures")
-
+INPUT_CSV = Path("outputs/ari_alarm_validation.csv")
+OUT_DIR = Path("outputs/rain_gauges/visualizations")
 
 def main() -> None:
     if not INPUT_CSV.exists():

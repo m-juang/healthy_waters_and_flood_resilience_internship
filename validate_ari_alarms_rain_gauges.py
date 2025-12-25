@@ -7,10 +7,10 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parent 
+PROJECT_ROOT = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
-from moata_pipeline.common.constants import (  
+from moata_pipeline.common.constants import (
     TOKEN_URL,
     BASE_API_URL,
     OAUTH_SCOPE,
@@ -18,91 +18,52 @@ from moata_pipeline.common.constants import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     DEFAULT_REQUESTS_PER_SECOND,
 )
-from moata_pipeline.moata.auth import MoataAuth  
-from moata_pipeline.moata.http import MoataHttp 
-from moata_pipeline.moata.client import MoataClient  
+from moata_pipeline.moata.auth import MoataAuth
+from moata_pipeline.moata.http import MoataHttp
+from moata_pipeline.moata.client import MoataClient
 
 # =====================
 # SETTINGS
 # =====================
-INPUT_CSV = "data/inputs/raingauge_ari_alarms.csv"
-OUTPUT_CSV = "outputs/ari_alarm_validation_by_ari_trace.csv"
+INPUT_CSV = Path("data/inputs/raingauge_ari_alarms.csv")
+TRACE_MAPPING_CSV = Path("outputs/rain_gauges/analyze/alarm_summary_full.csv")
+OUTPUT_CSV = Path("outputs/ari_alarm_validation.csv")
 
 # What we are validating
 ARI_TRACE_DESC = "Max TP108 ARI"
 ARI_THRESHOLD = 5.0
 
 # Data window around the alarm time
-WINDOW_HOURS_BEFORE = 24
-WINDOW_HOURS_AFTER = 24
+WINDOW_HOURS_BEFORE = 1
+WINDOW_HOURS_AFTER = 1
 
 # Trace data call
 DATA_INTERVAL_SECONDS = 300  # 5 minutes
-DATA_TYPE = "Maximum"        # as per your comment
+DATA_TYPE = "None"  # Raw data
 
 
 def iso_z(dt: pd.Timestamp) -> str:
     """Convert pandas Timestamp (UTC) -> ISO string with Z."""
-    # Ensure timezone aware
     if dt.tzinfo is None:
         dt = dt.tz_localize("UTC")
-    return dt.to_pydatetime().isoformat().replace("+00:00", "Z")
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def pick_trace(traces: list[dict], desc_key: str) -> dict | None:
+def build_trace_mapping(csv_path: Path) -> dict[int, int]:
     """
-    Find a trace by description. First try exact match, then substring match.
+    Build mapping: asset_id -> trace_id for Max TP108 ARI traces.
     """
-    target = desc_key.strip().lower()
-
-    # 1) exact match
-    for t in traces:
-        if (t.get("description") or "").strip().lower() == target:
-            return t
-
-    # 2) contains
-    for t in traces:
-        if target in ((t.get("description") or "").strip().lower()):
-            return t
-
-    return None
-
-
-def extract_gauge_name_from_traces(traces: list[dict]) -> str:
-    """Try to get asset.name from any trace payload."""
-    for t in traces:
-        asset = t.get("asset") or {}
-        name = asset.get("name")
-        if name:
-            return str(name)
-    return "Unknown"
-
-
-def extract_values(data) -> list[float]:
-    """
-    Expected swagger shape: {"items":[{"value":...}, ...], ...}
-    Also tolerate a plain list.
-    """
-    if data is None:
-        return []
-
-    if isinstance(data, list):
-        items = data
-    elif isinstance(data, dict):
-        items = data.get("items", [])
-    else:
-        return []
-
-    vals: list[float] = []
-    for it in items:
-        v = it.get("value") if isinstance(it, dict) else None
-        if v is None:
-            continue
-        try:
-            vals.append(float(v))
-        except Exception:
-            continue
-    return vals
+    df = pd.read_csv(csv_path)
+    ari = df[df["trace_description"] == ARI_TRACE_DESC].copy()
+    ari = ari.dropna(subset=["gauge_id", "trace_id"])
+    
+    mapping = {}
+    for _, row in ari.iterrows():
+        asset_id = int(row["gauge_id"])
+        trace_id = int(row["trace_id"])
+        mapping[asset_id] = trace_id
+    
+    return mapping
 
 
 def main() -> None:
@@ -131,149 +92,120 @@ def main() -> None:
     )
 
     client = MoataClient(http=http)
-    print("Client ready")
+    print("✓ Client ready")
 
-    # --- load input ---
-    df = pd.read_csv(INPUT_CSV)
+    # --- build trace mapping from our analyzed data ---
+    print(f"Loading trace mapping from {TRACE_MAPPING_CSV}...")
+    asset_to_trace = build_trace_mapping(TRACE_MAPPING_CSV)
+    print(f"✓ Found {len(asset_to_trace)} gauges with {ARI_TRACE_DESC} traces")
 
-    # Normalize column mapping (case-insensitive)
-    required_cols = {"assetid", "name", "description", "createdtimeutc"}
-    col_map = {c.lower(): c for c in df.columns}
-
-    missing = sorted([c for c in required_cols if c not in col_map])
-    if missing:
-        raise RuntimeError(f"Missing column(s) in CSV: {missing}")
-
-    asset_col = col_map["assetid"]
-    name_col = col_map["name"]
-    desc_col = col_map["description"]
-    time_col = col_map["createdtimeutc"]
-
-    # Filter only ARI alarms by description (case-insensitive)
-    df = df[df[desc_col].astype(str).str.strip().str.lower() == ARI_TRACE_DESC.strip().lower()].copy()
+    # --- load input alarms ---
+    print(f"Loading alarm events from {INPUT_CSV}...")
+    alarms_df = pd.read_csv(INPUT_CSV)
+    print(f"✓ Loaded {len(alarms_df)} alarm events")
 
     results: list[dict] = []
 
-    for _, row in df.iterrows():
-        # 0) row inputs
-        asset_id = int(row[asset_col])
-        gauge_name_csv = str(row[name_col]) if pd.notna(row[name_col]) else "Unknown"
-        alarm_time = pd.to_datetime(row[time_col], utc=True)
+    for idx, row in alarms_df.iterrows():
+        asset_id = int(row["assetid"])
+        gauge_name = str(row["name"])
+        alarm_time = pd.to_datetime(row["createdtimeutc"], utc=True)
 
-        print(f"\nProcessing asset {asset_id} @ {alarm_time} ({gauge_name_csv})")
+        print(f"\n[{idx+1}/{len(alarms_df)}] {gauge_name}")
+        print(f"  Alarm time: {alarm_time}")
 
-        # 1) get traces for the asset
-        try:
-            traces = client.get_traces_for_asset(asset_id)
-        except Exception as e:
-            results.append(
-                {
-                    "assetid": asset_id,
-                    "gauge_name": gauge_name_csv,
-                    "alarm_time": alarm_time,
-                    "status": "UNVERIFIABLE",
-                    "reason": f"Failed to fetch traces: {e}",
-                    "ari_trace_id": None,
-                    "max_ari_value": None,
-                    "threshold": ARI_THRESHOLD,
-                }
-            )
+        # Get trace_id from our mapping
+        trace_id = asset_to_trace.get(asset_id)
+        if not trace_id:
+            print(f"  ⚠ No trace mapping found for asset {asset_id}")
+            results.append({
+                "assetid": asset_id,
+                "gauge_name": gauge_name,
+                "alarm_time_utc": alarm_time,
+                "trace_id": None,
+                "status": "UNVERIFIABLE",
+                "reason": "No trace mapping found",
+                "max_ari_value": None,
+                "threshold": ARI_THRESHOLD,
+            })
             continue
 
-        # Prefer gauge name from traces if present
-        gauge_name = extract_gauge_name_from_traces(traces)
-        if gauge_name == "Unknown":
-            gauge_name = gauge_name_csv
-
-        # 2) pick ARI trace by description
-        ari_trace = pick_trace(traces, ARI_TRACE_DESC)
-        if not ari_trace:
-            results.append(
-                {
-                    "assetid": asset_id,
-                    "gauge_name": gauge_name,
-                    "alarm_time": alarm_time,
-                    "status": "UNVERIFIABLE",
-                    "reason": f"ARI trace '{ARI_TRACE_DESC}' not found",
-                    "ari_trace_id": None,
-                    "max_ari_value": None,
-                    "threshold": ARI_THRESHOLD,
-                }
-            )
-            continue
-
-        ari_trace_id = ari_trace.get("id")
-
-        # 3) fetch ARI data around alarm time
+        # Fetch data around alarm time
         from_time = iso_z(alarm_time - timedelta(hours=WINDOW_HOURS_BEFORE))
         to_time = iso_z(alarm_time + timedelta(hours=WINDOW_HOURS_AFTER))
 
         try:
-            data = http.get(
-                f"traces/{ari_trace_id}/data/utc",
-                params={
-                    "from": from_time,
-                    "to": to_time,
-                    "dataType": DATA_TYPE,  # "Maximum"
-                    "dataInterval": DATA_INTERVAL_SECONDS,
-                    "padWithZeroes": False,
-                },
-                allow_404=True,
+            data = client.get_trace_data(
+                trace_id=trace_id,
+                from_time=from_time,
+                to_time=to_time,
+                data_type=DATA_TYPE,
+                data_interval=DATA_INTERVAL_SECONDS,
             )
         except Exception as e:
-            results.append(
-                {
-                    "assetid": asset_id,
-                    "gauge_name": gauge_name,
-                    "alarm_time": alarm_time,
-                    "status": "UNVERIFIABLE",
-                    "reason": f"Failed to fetch ARI data: {e}",
-                    "ari_trace_id": ari_trace_id,
-                    "max_ari_value": None,
-                    "threshold": ARI_THRESHOLD,
-                }
-            )
-            continue
-
-        values = extract_values(data)
-        if not values:
-            results.append(
-                {
-                    "assetid": asset_id,
-                    "gauge_name": gauge_name,
-                    "alarm_time": alarm_time,
-                    "status": "UNVERIFIABLE",
-                    "reason": "No ARI data returned for window",
-                    "ari_trace_id": ari_trace_id,
-                    "max_ari_value": None,
-                    "threshold": ARI_THRESHOLD,
-                }
-            )
-            continue
-
-        max_ari = max(values)
-        status = "SUPPORTED" if max_ari >= ARI_THRESHOLD else "NOT_SUPPORTED"
-
-        results.append(
-            {
+            print(f"  ⚠ Failed to fetch data: {e}")
+            results.append({
                 "assetid": asset_id,
                 "gauge_name": gauge_name,
-                "alarm_time": alarm_time,
-                "status": status,
-                "reason": "",
-                "ari_trace_id": ari_trace_id,
-                "max_ari_value": round(float(max_ari), 6),
+                "alarm_time_utc": alarm_time,
+                "trace_id": trace_id,
+                "status": "UNVERIFIABLE",
+                "reason": f"API error: {e}",
+                "max_ari_value": None,
                 "threshold": ARI_THRESHOLD,
-            }
-        )
+            })
+            continue
 
+        items = data.get("items", [])
+        if not items:
+            print(f"  ⚠ No data returned")
+            results.append({
+                "assetid": asset_id,
+                "gauge_name": gauge_name,
+                "alarm_time_utc": alarm_time,
+                "trace_id": trace_id,
+                "status": "UNVERIFIABLE",
+                "reason": "No data in window",
+                "max_ari_value": None,
+                "threshold": ARI_THRESHOLD,
+            })
+            continue
+
+        # Find max value
+        values = [item.get("value", 0) for item in items]
+        max_value = max(values) if values else 0
+
+        # Check if threshold was exceeded
+        exceeded = max_value >= ARI_THRESHOLD
+        status = "VERIFIED" if exceeded else "NOT_VERIFIED"
+
+        print(f"  Trace ID: {trace_id}")
+        print(f"  Max ARI value: {max_value:.2f}")
+        print(f"  Threshold: {ARI_THRESHOLD}")
+        print(f"  Status: {status}")
+
+        results.append({
+            "assetid": asset_id,
+            "gauge_name": gauge_name,
+            "alarm_time_utc": alarm_time,
+            "trace_id": trace_id,
+            "status": status,
+            "reason": "",
+            "max_ari_value": round(max_value, 2),
+            "threshold": ARI_THRESHOLD,
+        })
+
+    # Save results
     out_df = pd.DataFrame(results)
+    OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(OUTPUT_CSV, index=False)
 
-    out_path = Path(OUTPUT_CSV)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_df.to_csv(out_path, index=False)
-
-    print(f"\nDONE. Results saved to {out_path}")
+    # Summary
+    print("\n" + "=" * 60)
+    print("VALIDATION SUMMARY")
+    print("=" * 60)
+    print(out_df["status"].value_counts().to_string())
+    print(f"\nResults saved to: {OUTPUT_CSV}")
 
 
 if __name__ == "__main__":

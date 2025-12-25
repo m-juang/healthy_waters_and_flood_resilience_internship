@@ -21,7 +21,6 @@ class MoataClient:
         path = ep.PROJECT_ASSETS.format(project_id=int(project_id))
         data = self._http.get(path, params={"assetTypeId": int(asset_type_id)})
 
-        # Swagger shows list response; keep defensive handling for possible wrappers.
         if isinstance(data, dict) and "items" in data:
             return data["items"]
         return data if isinstance(data, list) else []
@@ -35,7 +34,7 @@ class MoataClient:
         Swagger: assetId is array[integer] (query). For single asset, send assetId=[id].
         """
         asset_id_int = int(asset_id)
-        params = {"assetId": [asset_id_int]}  # IMPORTANT: Swagger expects array query param
+        params = {"assetId": [asset_id_int]}
         data = self._http.get(ep.ASSET_TRACES, params=params)
 
         if isinstance(data, dict) and "items" in data:
@@ -50,7 +49,6 @@ class MoataClient:
     ) -> List[Dict[str, Any]]:
         """
         Batch version: GET /v1/assets/traces?assetId=1&assetId=2...
-        This reduces request count and aligns with Swagger assetId array.
         """
         params: Dict[str, Any] = {"assetId": [int(x) for x in asset_ids]}
 
@@ -66,15 +64,92 @@ class MoataClient:
         return data if isinstance(data, list) else []
 
     # -----------------------------
+    # Trace Data (Time Series)
+    # -----------------------------
+    def get_trace_data(
+        self,
+        trace_id: Any,
+        from_time: str,
+        to_time: str,
+        data_type: str = "None",
+        data_interval: Optional[int] = None,
+        pad_with_zeroes: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        GET /v1/traces/{traceId}/data/utc
+        
+        Fetch time series data for a trace.
+        
+        Args:
+            trace_id: The trace ID
+            from_time: Start time (ISO format, e.g., "2025-05-01T00:00:00Z")
+            to_time: End time (ISO format, e.g., "2025-05-31T23:59:59Z")
+            data_type: Summary algorithm. Options: None, Mean, Maximum, Minimum, 
+                       Start, End, First, Last, Total. Use "None" for raw data.
+            data_interval: Period between data points in seconds (e.g., 300 for 5 min)
+            pad_with_zeroes: If True, replace missing values with zero
+            
+        Returns:
+            SummarisedPagedTraceDataCollectionDto with structure:
+            {
+                "items": [{"whenRecordedUnixSeconds": int, "qualityCodeId": int, "value": float}, ...],
+                "pageNumber": int,
+                "itemsPerPage": int,
+                "totalItems": int
+            }
+            
+        Limits:
+            - Virtual traces: max 32 days
+            - Non-virtual traces: max 46,080 data points
+              (e.g., 32 days for 1-min resolution, 160 days for 5-min resolution)
+        """
+        path = ep.TRACE_DATA_UTC.format(trace_id=int(trace_id))
+        
+        params: Dict[str, Any] = {
+            "from": from_time,
+            "to": to_time,
+            "dataType": data_type,
+            "padWithZeroes": str(pad_with_zeroes).lower(),
+        }
+        
+        if data_interval is not None:
+            params["dataInterval"] = int(data_interval)
+        
+        data = self._http.get(path, params=params, allow_404=True)
+        
+        if data is None:
+            return {"items": [], "pageNumber": 0, "itemsPerPage": 0, "totalItems": 0}
+        
+        return data if isinstance(data, dict) else {"items": data if isinstance(data, list) else []}
+
+    def get_trace_data_as_list(
+        self,
+        trace_id: Any,
+        from_time: str,
+        to_time: str,
+        data_type: str = "None",
+        data_interval: Optional[int] = None,
+        pad_with_zeroes: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Convenience wrapper that returns just the items list.
+        """
+        result = self.get_trace_data(
+            trace_id=trace_id,
+            from_time=from_time,
+            to_time=to_time,
+            data_type=data_type,
+            data_interval=data_interval,
+            pad_with_zeroes=pad_with_zeroes,
+        )
+        return result.get("items", [])
+
+    # -----------------------------
     # Alarms
     # -----------------------------
     def get_alarms_for_trace(self, trace_id: Any) -> List[Dict[str, Any]]:
         """
         GET /v1/alarms/overflow-detailed-info-by-trace?traceId=...
-        Despite the endpoint name, payload may contain alarmType values:
-          - OverflowMonitoring
-          - DataRecency
-        Returns raw list for maximum transparency.
         """
         trace_id_int = int(trace_id)
         data = self._http.get(
@@ -88,27 +163,26 @@ class MoataClient:
             return []
 
         if isinstance(data, dict) and "items" in data:
-            # Keep defensive handling just in case; Swagger shows list.
             return data["items"]
         return data if isinstance(data, list) else []
 
     def get_overflow_alarms_for_trace(self, trace_id: Any) -> List[Dict[str, Any]]:
         """
-        Backwards-compatible: returns only OverflowMonitoring alarms for the trace.
+        Returns only OverflowMonitoring alarms for the trace.
         """
         alarms = self.get_alarms_for_trace(trace_id)
         return [a for a in alarms if a.get("alarmType") == "OverflowMonitoring"]
 
     def get_recency_alarms_for_trace(self, trace_id: Any) -> List[Dict[str, Any]]:
         """
-        Convenience method: returns only DataRecency alarms for the trace.
+        Returns only DataRecency alarms for the trace.
         """
         alarms = self.get_alarms_for_trace(trace_id)
         return [a for a in alarms if a.get("alarmType") == "DataRecency"]
 
     def split_alarms_by_type(self, alarms: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Helper: split any list of AlarmDetailedInfoDto into types.
+        Split any list of AlarmDetailedInfoDto into types.
         """
         return {
             "overflow": [a for a in alarms if a.get("alarmType") == "OverflowMonitoring"],
@@ -166,15 +240,6 @@ class MoataClient:
     ) -> Any:
         """
         Get ARI (Annual Recurrence Interval) values for a trace.
-
-        Args:
-            trace_id: Trace ID
-            from_time: Start time (ISO format UTC string)
-            to_time: End time (ISO format UTC string)
-            ari_type: ARI type ("Tp108", "HirdsV4", or "Hirds")
-
-        Returns:
-            ARI data (raw JSON)
         """
         path = ep.TRACE_ARI.format(trace_id=int(trace_id))
         params = {"from": from_time, "to": to_time, "type": ari_type}
