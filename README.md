@@ -69,7 +69,7 @@ internship-project/
 │       ├── report.py                      # Rain gauge HTML report
 │       └── runner.py                      # Rain gauge visualization runner
 │
-├── outputs/
+├── outputs/                               # big file, not in repo
 │   ├── documentation/
 │   │   └── Rain_Monitoring_System_Documentation.docx
 │   │
