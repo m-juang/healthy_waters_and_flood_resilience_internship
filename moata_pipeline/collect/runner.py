@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import os
@@ -84,6 +84,7 @@ def run_collect_radar(
     end_time: Optional[datetime] = None,
     catchment_ids: Optional[List[int]] = None,
     force_refresh_pixels: bool = False,
+    output_dir: Optional[Path] = None,
 ) -> None:
     """
     Collect radar QPE data for stormwater catchments.
@@ -94,6 +95,7 @@ def run_collect_radar(
         end_time: End of time range (default: now)
         catchment_ids: Optional list of specific catchment IDs
         force_refresh_pixels: If True, rebuild pixel mappings from API
+        output_dir: Custom output directory (default: auto based on date)
     """
     logger.info("=" * 80)
     logger.info("RADAR DATA COLLECTOR")
@@ -107,11 +109,25 @@ def run_collect_radar(
     if start_time is None:
         start_time = end_time - timedelta(hours=24)
 
-    logger.info(f"Time range: {start_time} to {end_time}")
+    logger.info("Time range: %s to %s", start_time, end_time)
+
+    # Determine output directory
+    if output_dir is None:
+        # Check if this is historical data (not "last 24 hours")
+        now = datetime.now(timezone.utc)
+        is_recent = (now - end_time).total_seconds() < 86400  # within 24 hours of now
+        
+        if is_recent:
+            output_dir = Path("outputs/rain_radar/raw")
+        else:
+            # Historical data - use date-based directory
+            date_str = start_time.strftime("%Y-%m-%d")
+            output_dir = Path(f"outputs/rain_radar/historical/{date_str}/raw")
+            logger.info("Historical data - output to: %s", output_dir)
 
     collector = RadarDataCollector(
         client=client,
-        output_dir=Path("outputs/rain_radar/raw"),
+        output_dir=output_dir,
         pixel_batch_size=50,
         max_hours_per_request=24,
     )
@@ -134,9 +150,9 @@ def run_collect_radar(
     total_data_records = sum(r.get("data_records", 0) for r in results)
     errors = [r for r in results if r.get("error")]
 
-    logger.info(f"Catchments processed: {len(results)}")
-    logger.info(f"Total pixels: {total_pixels}")
-    logger.info(f"Total data records: {total_data_records}")
-    logger.info(f"Errors: {len(errors)}")
-    logger.info("Output directory: outputs/rain_radar/raw/")
+    logger.info("Catchments processed: %d", len(results))
+    logger.info("Total pixels: %d", total_pixels)
+    logger.info("Total data records: %d", total_data_records)
+    logger.info("Errors: %d", len(errors))
+    logger.info("Output directory: %s", output_dir)
     logger.info("=" * 80)

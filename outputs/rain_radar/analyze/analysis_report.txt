@@ -1,0 +1,86 @@
+======================================================================
+RAIN RADAR ARI ANALYSIS REPORT
+Generated: 2025-12-26 05:57:37 UTC
+======================================================================
+
+SUMMARY STATISTICS
+----------------------------------------------------------------------
+Total catchments analyzed: 233
+ARI threshold: 5.0 years
+
+Catchments with ARI >= 5.0: 0
+Catchments with >= 10% area exceeding: 0
+
+TOP 20 CATCHMENTS BY MAX ARI
+----------------------------------------------------------------------
+  HINGAIA_SOUTH
+    Max ARI: 0.3 years (10m, 0.67mm)
+    Area exceeding: 0.0%
+  PAHUREHURE_INLET
+    Max ARI: 0.3 years (10m, 0.67mm)
+    Area exceeding: 0.0%
+  OIRA_CREEK
+    Max ARI: 0.3 years (10m, 0.05mm)
+    Area exceeding: 0.0%
+  SLIPPERY_CREEK
+    Max ARI: 0.3 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  ALL_EASTERN_ISLAND_CATCHMENTS
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  PAPAKURA_STREAM
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  HUNUA_STREAM
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  MAENEENE
+    Max ARI: 0.2 years (10m, 0.29mm)
+    Area exceeding: 0.0%
+  WAITEITEI
+    Max ARI: 0.2 years (10m, 0.29mm)
+    Area exceeding: 0.0%
+  MAKURAU
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  TE_HANA
+    Max ARI: 0.2 years (20m, 0.28mm)
+    Area exceeding: 0.0%
+  WAIMAHIA_CREEK
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  PORT_ALBERT
+    Max ARI: 0.2 years (10m, 0.05mm)
+    Area exceeding: 0.0%
+  WELLSFORD
+    Max ARI: 0.2 years (10m, 0.05mm)
+    Area exceeding: 0.0%
+  WAYBY
+    Max ARI: 0.2 years (10m, 0.02mm)
+    Area exceeding: 0.0%
+  WHANAKI
+    Max ARI: 0.2 years (10m, 0.02mm)
+    Area exceeding: 0.0%
+  WAIRAU_VALLEY
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  OTARA_CREEK_FLAT_BUSH
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  CASTOR_BAY
+    Max ARI: 0.2 years (10m, 0.01mm)
+    Area exceeding: 0.0%
+  OKAHUKURA
+    Max ARI: 0.2 years (10m, 0.09mm)
+    Area exceeding: 0.0%
+
+PROPORTION EXCEEDING DISTRIBUTION
+----------------------------------------------------------------------
+  0-1%: 233 catchments
+  1-5%: 0 catchments
+  5-10%: 0 catchments
+  10-25%: 0 catchments
+  25-50%: 0 catchments
+  50-100%: 0 catchments
+
+======================================================================

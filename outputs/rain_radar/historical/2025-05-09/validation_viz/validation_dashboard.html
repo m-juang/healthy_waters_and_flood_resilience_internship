@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rain Radar ARI Validation Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .header h1 { font-size: 2em; margin-bottom: 5px; }
+        .header .meta { margin-top: 10px; opacity: 0.8; font-size: 0.9em; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card .value { font-size: 2em; font-weight: bold; color: #1e3c72; }
+        .stat-card .label { color: #666; font-size: 0.9em; margin-top: 5px; }
+        .stat-card.alarm .value { color: #dc3545; }
+        .stat-card.ok .value { color: #28a745; }
+        .section { background: white; padding: 25px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .section h2 { color: #333; margin-bottom: 15px; }
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .chart img { max-width: 100%; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #667eea; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        .status-alarm { color: #dc3545; font-weight: bold; }
+        .status-ok { color: #28a745; }
+        .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
+        .footer { text-align: center; color: #666; padding: 20px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌧️ Rain Radar ARI Validation Dashboard</h1>
+            <div class="meta">Data Date: 2025-05-09 | Generated: 2025-12-26 18:48:59</div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="value">233</div>
+                <div class="label">Total Catchments</div>
+            </div>
+            <div class="stat-card alarm">
+                <div class="value">4</div>
+                <div class="label">Would Alarm</div>
+            </div>
+            <div class="stat-card ok">
+                <div class="value">229</div>
+                <div class="label">OK</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">89.6</div>
+                <div class="label">Peak ARI (years)</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">2.4</div>
+                <div class="label">Avg Max ARI</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">1.0%</div>
+                <div class="label">Avg Area Exceeding</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📊 Charts</h2>
+            <div class="charts">
+                <div class="chart"><img src="ari_distribution.png" alt="ARI Distribution"></div>
+                <div class="chart"><img src="proportion_distribution.png" alt="Proportion Distribution"></div>
+                <div class="chart"><img src="top_catchments.png" alt="Top Catchments"></div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🚨 Catchments That Would Alarm (≥30% area exceeding)</h2>
+            <table>
+                <thead>
+                    <tr><th>Catchment</th><th>Max ARI</th><th>Pixels Total</th><th>Pixels Exceeding</th><th>Proportion</th><th>Peak Duration</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>WEST_KAIPARA_HARBOUR</td>
+                        <td>60.1</td>
+                        <td>370</td>
+                        <td>197</td>
+                        <td class="status-alarm">53.2%</td>
+                        <td>10m</td>
+                    </tr>
+                    <tr>
+                        <td>WEST_COAST</td>
+                        <td>89.6</td>
+                        <td>829</td>
+                        <td>403</td>
+                        <td class="status-alarm">48.6%</td>
+                        <td>10m</td>
+                    </tr>
+                    <tr>
+                        <td>WAIONUI</td>
+                        <td>36.3</td>
+                        <td>350</td>
+                        <td>152</td>
+                        <td class="status-alarm">43.4%</td>
+                        <td>10m</td>
+                    </tr>
+                    <tr>
+                        <td>KAIPARA_WEST</td>
+                        <td>28.4</td>
+                        <td>403</td>
+                        <td>141</td>
+                        <td class="status-alarm">35.0%</td>
+                        <td>10m</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>📋 All Catchments</h2>
+            <input type="text" id="search" class="search-box" placeholder="🔍 Search catchments...">
+            <table id="allTable">
+                <thead>
+                    <tr><th>Catchment</th><th>Max ARI</th><th>Pixels</th><th>Exceeding</th><th>Proportion</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr class="data-row">
+                        <td>WEST_COAST</td>
+                        <td>89.6</td>
+                        <td>829</td>
+                        <td>403</td>
+                        <td>48.6%</td>
+                        <td class="status-alarm">ALARM</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WEST_KAIPARA_HARBOUR</td>
+                        <td>60.1</td>
+                        <td>370</td>
+                        <td>197</td>
+                        <td>53.2%</td>
+                        <td class="status-alarm">ALARM</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIONUI</td>
+                        <td>36.3</td>
+                        <td>350</td>
+                        <td>152</td>
+                        <td>43.4%</td>
+                        <td class="status-alarm">ALARM</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAIPARA_WEST</td>
+                        <td>28.4</td>
+                        <td>403</td>
+                        <td>141</td>
+                        <td>35.0%</td>
+                        <td class="status-alarm">ALARM</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OKIRITOTO</td>
+                        <td>16.7</td>
+                        <td>177</td>
+                        <td>7</td>
+                        <td>4.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAPAKURA_STREAM</td>
+                        <td>10.8</td>
+                        <td>272</td>
+                        <td>18</td>
+                        <td>6.6%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUHINUI_CREEK</td>
+                        <td>10.6</td>
+                        <td>166</td>
+                        <td>16</td>
+                        <td>9.6%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OTARA_CREEK_FLAT_BUSH</td>
+                        <td>9.9</td>
+                        <td>179</td>
+                        <td>20</td>
+                        <td>11.2%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HELENSVILLE</td>
+                        <td>8.3</td>
+                        <td>30</td>
+                        <td>1</td>
+                        <td>3.3%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ELLETTS_BEACH</td>
+                        <td>6.9</td>
+                        <td>86</td>
+                        <td>6</td>
+                        <td>7.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHANGAMAIRE_STREAM</td>
+                        <td>6.9</td>
+                        <td>246</td>
+                        <td>8</td>
+                        <td>3.2%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CBD</td>
+                        <td>5.4</td>
+                        <td>53</td>
+                        <td>1</td>
+                        <td>1.9%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ONEPOTO</td>
+                        <td>4.9</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HILLCREST</td>
+                        <td>4.9</td>
+                        <td>34</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SHOAL_BAY</td>
+                        <td>4.2</td>
+                        <td>10</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HAURAKI</td>
+                        <td>4.2</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>NORTHBORO</td>
+                        <td>4.2</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BELMONT</td>
+                        <td>4.2</td>
+                        <td>18</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>GREENHITHE</td>
+                        <td>4.2</td>
+                        <td>22</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAPATOETOE-TAMAKI_RIVER</td>
+                        <td>4.2</td>
+                        <td>63</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ATTWOOD</td>
+                        <td>4.1</td>
+                        <td>54</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIURUTOA</td>
+                        <td>4.0</td>
+                        <td>28</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CASSINO</td>
+                        <td>3.9</td>
+                        <td>15</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAREMOREMO_1</td>
+                        <td>3.9</td>
+                        <td>53</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ORWELL</td>
+                        <td>3.7</td>
+                        <td>16</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAKAPUNA_BEACH</td>
+                        <td>3.4</td>
+                        <td>22</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WATERVIEW</td>
+                        <td>3.4</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LITTLE_SHOAL_BAY</td>
+                        <td>3.3</td>
+                        <td>15</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIRAU_VALLEY</td>
+                        <td>3.3</td>
+                        <td>78</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>DEVONPORT</td>
+                        <td>3.2</td>
+                        <td>16</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HINGAIA_STREAM</td>
+                        <td>3.2</td>
+                        <td>275</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>RANGITOPUNI</td>
+                        <td>3.1</td>
+                        <td>158</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KYLE</td>
+                        <td>3.0</td>
+                        <td>21</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>NGAKOROA_STREAM</td>
+                        <td>2.9</td>
+                        <td>211</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>UPPER_HARBOUR</td>
+                        <td>2.9</td>
+                        <td>14</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIROA</td>
+                        <td>2.9</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>COATESVILLE</td>
+                        <td>2.9</td>
+                        <td>58</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SLIPPERY_CREEK</td>
+                        <td>2.8</td>
+                        <td>226</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OIRA_CREEK</td>
+                        <td>2.8</td>
+                        <td>128</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HINGAIA_SOUTH</td>
+                        <td>2.7</td>
+                        <td>39</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HERALD_ISLAND</td>
+                        <td>2.6</td>
+                        <td>6</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ALBANY_WEST</td>
+                        <td>2.6</td>
+                        <td>24</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAHUREHURE_INLET</td>
+                        <td>2.5</td>
+                        <td>96</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAYSIDE</td>
+                        <td>2.5</td>
+                        <td>21</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TRAMWAY</td>
+                        <td>2.5</td>
+                        <td>11</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OTEHA_VALLEY</td>
+                        <td>2.5</td>
+                        <td>75</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LAKE_PUPUKE</td>
+                        <td>2.4</td>
+                        <td>15</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>GREY_LYNN</td>
+                        <td>2.4</td>
+                        <td>38</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CENTRAL_KAIPARA</td>
+                        <td>2.4</td>
+                        <td>473</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>DAIRY_FLAT</td>
+                        <td>2.3</td>
+                        <td>245</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIKIRI</td>
+                        <td>2.2</td>
+                        <td>178</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAITAKERE</td>
+                        <td>2.2</td>
+                        <td>313</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHANGAPOURI_CREEK</td>
+                        <td>2.1</td>
+                        <td>273</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAHIKA</td>
+                        <td>2.1</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>EPSOM_NEWMARKET</td>
+                        <td>2.0</td>
+                        <td>55</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>DUCK_CREEK_1</td>
+                        <td>2.0</td>
+                        <td>22</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LUCAS_CREEK</td>
+                        <td>2.0</td>
+                        <td>39</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ESKDALE</td>
+                        <td>2.0</td>
+                        <td>30</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>RANGATIRA</td>
+                        <td>1.9</td>
+                        <td>17</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OKURA_NORTH</td>
+                        <td>1.9</td>
+                        <td>102</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHAU</td>
+                        <td>1.8</td>
+                        <td>132</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WATER_VIEW</td>
+                        <td>1.8</td>
+                        <td>33</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAIPATIKI</td>
+                        <td>1.8</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BAYVIEW</td>
+                        <td>1.8</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHENUAPAI</td>
+                        <td>1.7</td>
+                        <td>102</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WEST_HARBOUR</td>
+                        <td>1.7</td>
+                        <td>43</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WWTP</td>
+                        <td>1.7</td>
+                        <td>52</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIMAHIA_CREEK</td>
+                        <td>1.7</td>
+                        <td>72</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAURI_POINT</td>
+                        <td>1.7</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ONEHUNGA</td>
+                        <td>1.7</td>
+                        <td>61</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ONE_TREE_HILL</td>
+                        <td>1.7</td>
+                        <td>95</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUKAKI_WAOKAURI</td>
+                        <td>1.7</td>
+                        <td>110</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TE_HIHI_CREEK</td>
+                        <td>1.6</td>
+                        <td>96</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAKURAU</td>
+                        <td>1.6</td>
+                        <td>543</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TE_ATATU_SOUTH</td>
+                        <td>1.6</td>
+                        <td>57</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LIGNITE</td>
+                        <td>1.6</td>
+                        <td>17</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OMAUMAU</td>
+                        <td>1.5</td>
+                        <td>151</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAIAOTEA</td>
+                        <td>1.5</td>
+                        <td>28</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MOTIONS</td>
+                        <td>1.5</td>
+                        <td>42</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAIORAHI</td>
+                        <td>1.4</td>
+                        <td>16</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ELLERSLIE</td>
+                        <td>1.4</td>
+                        <td>68</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MILFORD_BEACH</td>
+                        <td>1.4</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HOBSON_BAY</td>
+                        <td>1.4</td>
+                        <td>70</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>AWARUKU</td>
+                        <td>1.4</td>
+                        <td>25</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAIRANGI_BAY</td>
+                        <td>1.3</td>
+                        <td>16</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ARAPARERA</td>
+                        <td>1.3</td>
+                        <td>383</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAUKAPAKAPA</td>
+                        <td>1.3</td>
+                        <td>545</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>DEEP_CREEK</td>
+                        <td>1.3</td>
+                        <td>25</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAMAKI_NORTH</td>
+                        <td>1.3</td>
+                        <td>72</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MT_WELLINGTON_SOUTH</td>
+                        <td>1.3</td>
+                        <td>29</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SILVERDALE_SOUTH</td>
+                        <td>1.3</td>
+                        <td>40</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>GUMSTOVE</td>
+                        <td>1.3</td>
+                        <td>159</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CAMPBELLS_BAY</td>
+                        <td>1.3</td>
+                        <td>17</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LONG_BAY</td>
+                        <td>1.3</td>
+                        <td>33</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OTAHUHU_EAST</td>
+                        <td>1.2</td>
+                        <td>24</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>NARROW_NECK</td>
+                        <td>1.2</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MANGERE_INLET</td>
+                        <td>1.2</td>
+                        <td>105</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SILVERDALE_WADE</td>
+                        <td>1.2</td>
+                        <td>38</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAITANGI_STREAM</td>
+                        <td>1.2</td>
+                        <td>172</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ROTHESAY_BAY</td>
+                        <td>1.1</td>
+                        <td>10</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WEITI_SOUTH</td>
+                        <td>1.1</td>
+                        <td>32</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PINE_VALLEY</td>
+                        <td>1.1</td>
+                        <td>66</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OREWA_RIVER_WEST</td>
+                        <td>1.1</td>
+                        <td>115</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SILVERDALE_NORTH</td>
+                        <td>1.1</td>
+                        <td>31</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAREMOREMO_2</td>
+                        <td>1.1</td>
+                        <td>24</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OKURA</td>
+                        <td>1.1</td>
+                        <td>37</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAKURANGA_CREEK</td>
+                        <td>1.1</td>
+                        <td>155</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>AIRPORT</td>
+                        <td>1.1</td>
+                        <td>46</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CASTOR_BAY</td>
+                        <td>1.0</td>
+                        <td>8</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>GLENDOWIE</td>
+                        <td>1.0</td>
+                        <td>33</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAREPIRO</td>
+                        <td>1.0</td>
+                        <td>40</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MEOLA</td>
+                        <td>1.0</td>
+                        <td>91</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ORATIA</td>
+                        <td>1.0</td>
+                        <td>156</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>EASTERN_BAYS</td>
+                        <td>1.0</td>
+                        <td>41</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>POROURE</td>
+                        <td>1.0</td>
+                        <td>93</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WEITI_RIVER_NORTH</td>
+                        <td>0.9</td>
+                        <td>24</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ARKLES_BAY</td>
+                        <td>0.9</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>AWAROA</td>
+                        <td>0.9</td>
+                        <td>80</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>RED_BEACH</td>
+                        <td>0.9</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>STANMORE_BAY</td>
+                        <td>0.9</td>
+                        <td>32</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIWERA_RIVER</td>
+                        <td>0.9</td>
+                        <td>192</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BIG_LITTLE_MANLY</td>
+                        <td>0.9</td>
+                        <td>39</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAITAIA_STREAM</td>
+                        <td>0.9</td>
+                        <td>220</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>DUCK_CREEK_2</td>
+                        <td>0.8</td>
+                        <td>14</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIUKU_RIVER</td>
+                        <td>0.8</td>
+                        <td>343</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUAWAI</td>
+                        <td>0.8</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAIHIKI_RIVER</td>
+                        <td>0.8</td>
+                        <td>213</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>STILLWATER</td>
+                        <td>0.8</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OREWA_RIVER_EAST</td>
+                        <td>0.8</td>
+                        <td>23</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OAKLEY</td>
+                        <td>0.7</td>
+                        <td>80</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAUKU_STREAM</td>
+                        <td>0.7</td>
+                        <td>200</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PT_CHEVALIER</td>
+                        <td>0.7</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUHOI</td>
+                        <td>0.7</td>
+                        <td>281</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HENDERSON</td>
+                        <td>0.7</td>
+                        <td>63</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>IHUMATAO</td>
+                        <td>0.7</td>
+                        <td>51</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HOBBS_BAY</td>
+                        <td>0.7</td>
+                        <td>40</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TITIRANGI_LAINGHOLM</td>
+                        <td>0.7</td>
+                        <td>82</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAKURANGA-TAMAKI_RIVER</td>
+                        <td>0.7</td>
+                        <td>59</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>COCKLE_BAY</td>
+                        <td>0.7</td>
+                        <td>52</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PIHA-KAREKARE</td>
+                        <td>0.7</td>
+                        <td>399</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>RIVERHEAD</td>
+                        <td>0.6</td>
+                        <td>76</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HUNUA_STREAM</td>
+                        <td>0.6</td>
+                        <td>709</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HILLSBOROUGH</td>
+                        <td>0.6</td>
+                        <td>36</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KARAKA_CREEK</td>
+                        <td>0.6</td>
+                        <td>161</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MASSEY</td>
+                        <td>0.6</td>
+                        <td>55</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAUHOA</td>
+                        <td>0.6</td>
+                        <td>101</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>NUKUMEA</td>
+                        <td>0.6</td>
+                        <td>26</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OPANUKU</td>
+                        <td>0.6</td>
+                        <td>139</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUKEKOHE-TUTAENUI_STREAM</td>
+                        <td>0.5</td>
+                        <td>140</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>AWHITU-TASMAN_SEA</td>
+                        <td>0.5</td>
+                        <td>343</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HATFIELDS</td>
+                        <td>0.5</td>
+                        <td>35</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CLARKS_BEACH</td>
+                        <td>0.5</td>
+                        <td>57</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>AWHITU-MANUKAU_HARBOUR</td>
+                        <td>0.5</td>
+                        <td>434</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LOWER_HOTEO</td>
+                        <td>0.5</td>
+                        <td>620</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OKAHUKURA</td>
+                        <td>0.5</td>
+                        <td>124</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>POURAUREROA_STREAM</td>
+                        <td>0.5</td>
+                        <td>135</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OTANERUA</td>
+                        <td>0.5</td>
+                        <td>10</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>REDHILLS</td>
+                        <td>0.5</td>
+                        <td>80</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIROA_RIVER</td>
+                        <td>0.5</td>
+                        <td>460</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ORUAWHARO</td>
+                        <td>0.4</td>
+                        <td>183</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ALL_EASTERN_ISLAND_CATCHMENTS</td>
+                        <td>0.4</td>
+                        <td>329</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KUMEU_HUAPAI</td>
+                        <td>0.4</td>
+                        <td>196</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIUKU_TOWN</td>
+                        <td>0.4</td>
+                        <td>80</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PORT_ALBERT</td>
+                        <td>0.4</td>
+                        <td>157</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TURANGA_CREEK</td>
+                        <td>0.4</td>
+                        <td>156</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIKAURI_BAY</td>
+                        <td>0.4</td>
+                        <td>59</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CHRISTIAN_BAY</td>
+                        <td>0.4</td>
+                        <td>43</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ORAPIU</td>
+                        <td>0.4</td>
+                        <td>10</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OWHANAKE</td>
+                        <td>0.3</td>
+                        <td>17</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ONEROA</td>
+                        <td>0.3</td>
+                        <td>19</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OMAHA_SOUTH</td>
+                        <td>0.3</td>
+                        <td>23</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIWERA</td>
+                        <td>0.3</td>
+                        <td>10</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BEACHLANDS_MARAETAI</td>
+                        <td>0.3</td>
+                        <td>153</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SURFDALE</td>
+                        <td>0.3</td>
+                        <td>18</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIUKU_TOWN-AWAROA_RIVER</td>
+                        <td>0.3</td>
+                        <td>73</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ORERE_STREAM</td>
+                        <td>0.3</td>
+                        <td>455</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BLACKPOOL</td>
+                        <td>0.3</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHANAKI</td>
+                        <td>0.3</td>
+                        <td>149</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MATIATIA</td>
+                        <td>0.3</td>
+                        <td>17</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HEKERUA</td>
+                        <td>0.3</td>
+                        <td>6</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ENCLOSURE</td>
+                        <td>0.3</td>
+                        <td>7</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>RANGIHOUA</td>
+                        <td>0.3</td>
+                        <td>42</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CHURCH</td>
+                        <td>0.3</td>
+                        <td>29</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ONETANGI</td>
+                        <td>0.3</td>
+                        <td>28</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PALM_BEACH</td>
+                        <td>0.3</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OKOROMAI_BAY</td>
+                        <td>0.3</td>
+                        <td>23</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUTAKI</td>
+                        <td>0.3</td>
+                        <td>13</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIHEKE</td>
+                        <td>0.3</td>
+                        <td>14</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LINCOLN</td>
+                        <td>0.3</td>
+                        <td>44</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OSTEND</td>
+                        <td>0.3</td>
+                        <td>21</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WELLSFORD</td>
+                        <td>0.3</td>
+                        <td>101</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PUTIKI</td>
+                        <td>0.3</td>
+                        <td>18</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OMIHA</td>
+                        <td>0.3</td>
+                        <td>15</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BADDLEYS_BEACH</td>
+                        <td>0.3</td>
+                        <td>31</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>CAMPBELLS_BEACH</td>
+                        <td>0.3</td>
+                        <td>20</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>ANZAC</td>
+                        <td>0.3</td>
+                        <td>16</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAYBY</td>
+                        <td>0.3</td>
+                        <td>400</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HITAPA_BAY</td>
+                        <td>0.3</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHANGATEAU</td>
+                        <td>0.3</td>
+                        <td>146</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OMAHA_WEST</td>
+                        <td>0.3</td>
+                        <td>23</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SHAKESPEAR</td>
+                        <td>0.3</td>
+                        <td>31</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>POINT_WELLS</td>
+                        <td>0.3</td>
+                        <td>48</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAIPARA_FLATS</td>
+                        <td>0.3</td>
+                        <td>126</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MANGEMANGEROA_CREEK</td>
+                        <td>0.3</td>
+                        <td>60</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SWANSON</td>
+                        <td>0.3</td>
+                        <td>127</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TE_HANA</td>
+                        <td>0.3</td>
+                        <td>97</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>BUCKLETONS_BAY</td>
+                        <td>0.3</td>
+                        <td>8</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAENEENE</td>
+                        <td>0.3</td>
+                        <td>109</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIKOPUA_CREEK</td>
+                        <td>0.3</td>
+                        <td>94</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SNELLS_BEACH-ALGIES_BAY</td>
+                        <td>0.3</td>
+                        <td>50</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAITEITEI</td>
+                        <td>0.3</td>
+                        <td>271</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MATAKANA_RIVER</td>
+                        <td>0.3</td>
+                        <td>268</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TI_POINT</td>
+                        <td>0.3</td>
+                        <td>11</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TE_MURI</td>
+                        <td>0.3</td>
+                        <td>43</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>HUIA</td>
+                        <td>0.2</td>
+                        <td>335</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>OMAHA_EAST</td>
+                        <td>0.2</td>
+                        <td>14</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WARKWORTH</td>
+                        <td>0.2</td>
+                        <td>297</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MATHESON_BAY</td>
+                        <td>0.2</td>
+                        <td>33</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WELLSFORD_SOUTH</td>
+                        <td>0.2</td>
+                        <td>31</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>KAWAU_ISLAND</td>
+                        <td>0.2</td>
+                        <td>123</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TOMARATA_WAITAPU_STREAM</td>
+                        <td>0.2</td>
+                        <td>144</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAHURANGI_EAST</td>
+                        <td>0.2</td>
+                        <td>119</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MARTINS_BAY</td>
+                        <td>0.2</td>
+                        <td>8</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>SHARPS_ROAD</td>
+                        <td>0.2</td>
+                        <td>50</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>LEIGH</td>
+                        <td>0.2</td>
+                        <td>44</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>MAHURANGI_WEST</td>
+                        <td>0.2</td>
+                        <td>185</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TAUPAKI</td>
+                        <td>0.2</td>
+                        <td>192</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>PAKARI</td>
+                        <td>0.2</td>
+                        <td>172</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WHANGARIPO</td>
+                        <td>0.2</td>
+                        <td>226</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>JAMIESON_BAY</td>
+                        <td>0.2</td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>TE_ARAI</td>
+                        <td>0.2</td>
+                        <td>391</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>WAIWHIU_STREAM</td>
+                        <td>0.2</td>
+                        <td>191</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>GREAT_BARRIER_ISLAND</td>
+                        <td>0.0</td>
+                        <td>553</td>
+                        <td>0</td>
+                        <td>0.0%</td>
+                        <td class="status-ok">OK</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="footer">
+            Rain Radar ARI Validation | Auckland Council | 233 Catchments | 2025-12-26
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('search').addEventListener('keyup', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.data-row').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>

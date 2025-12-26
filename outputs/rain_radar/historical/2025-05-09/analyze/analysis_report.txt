@@ -1,0 +1,88 @@
+======================================================================
+RAIN RADAR ARI ANALYSIS REPORT
+Generated: 2025-12-26 05:22:22 UTC
+======================================================================
+
+SUMMARY STATISTICS
+----------------------------------------------------------------------
+Total catchments analyzed: 233
+ARI threshold: 5.0 years
+
+Catchments with ARI >= 5.0: 12
+Catchments with >= 10% area exceeding: 5
+Total exceedance records: 16144
+Unique pixels with exceedance: 842
+
+TOP 20 CATCHMENTS BY MAX ARI
+----------------------------------------------------------------------
+  WEST_COAST
+    Max ARI: 89.6 years (10m, 17.16mm)
+    Area exceeding: 48.6%
+  WEST_KAIPARA_HARBOUR
+    Max ARI: 60.1 years (10m, 16.45mm)
+    Area exceeding: 53.2%
+  WAIONUI
+    Max ARI: 36.3 years (10m, 15.33mm)
+    Area exceeding: 43.4%
+  KAIPARA_WEST
+    Max ARI: 28.4 years (10m, 15.47mm)
+    Area exceeding: 35.0%
+  OKIRITOTO
+    Max ARI: 16.7 years (10m, 14.27mm)
+    Area exceeding: 4.0%
+  PAPAKURA_STREAM
+    Max ARI: 10.8 years (10m, 15.98mm)
+    Area exceeding: 6.6%
+  PUHINUI_CREEK
+    Max ARI: 10.6 years (10m, 15.85mm)
+    Area exceeding: 9.6%
+  OTARA_CREEK_FLAT_BUSH
+    Max ARI: 9.9 years (10m, 15.62mm)
+    Area exceeding: 11.2%
+  HELENSVILLE
+    Max ARI: 8.3 years (10m, 12.54mm)
+    Area exceeding: 3.3%
+  ELLETTS_BEACH
+    Max ARI: 6.9 years (10m, 11.53mm)
+    Area exceeding: 7.0%
+  WHANGAMAIRE_STREAM
+    Max ARI: 6.9 years (10m, 11.53mm)
+    Area exceeding: 3.2%
+  CBD
+    Max ARI: 5.4 years (10m, 12.17mm)
+    Area exceeding: 1.9%
+  ONEPOTO
+    Max ARI: 4.9 years (10m, 12.78mm)
+    Area exceeding: 0.0%
+  HILLCREST
+    Max ARI: 4.9 years (10m, 12.78mm)
+    Area exceeding: 0.0%
+  SHOAL_BAY
+    Max ARI: 4.2 years (10m, 12.19mm)
+    Area exceeding: 0.0%
+  HAURAKI
+    Max ARI: 4.2 years (10m, 12.1mm)
+    Area exceeding: 0.0%
+  NORTHBORO
+    Max ARI: 4.2 years (10m, 11.92mm)
+    Area exceeding: 0.0%
+  BELMONT
+    Max ARI: 4.2 years (10m, 11.92mm)
+    Area exceeding: 0.0%
+  GREENHITHE
+    Max ARI: 4.2 years (10m, 12.08mm)
+    Area exceeding: 0.0%
+  PAPATOETOE-TAMAKI_RIVER
+    Max ARI: 4.2 years (10m, 12.21mm)
+    Area exceeding: 0.0%
+
+PROPORTION EXCEEDING DISTRIBUTION
+----------------------------------------------------------------------
+  0-1%: 221 catchments
+  1-5%: 4 catchments
+  5-10%: 3 catchments
+  10-25%: 1 catchments
+  25-50%: 3 catchments
+  50-100%: 1 catchments
+
+======================================================================

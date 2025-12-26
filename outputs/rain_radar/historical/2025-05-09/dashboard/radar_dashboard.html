@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rain Radar Dashboard - Auckland Council</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .header h1 { font-size: 2em; margin-bottom: 5px; }
+        .header .subtitle { opacity: 0.9; }
+        .header .meta { margin-top: 10px; opacity: 0.8; font-size: 0.9em; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card .value { font-size: 2em; font-weight: bold; color: #1e3c72; }
+        .stat-card .label { color: #666; font-size: 0.9em; margin-top: 5px; }
+        .section { background: white; padding: 25px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .section h2 { color: #1e3c72; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #667eea; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 1em; }
+        .search-box:focus { outline: none; border-color: #667eea; }
+        .has-rain { color: #28a745; font-weight: bold; }
+        .no-rain { color: #999; }
+        .footer { text-align: center; color: #666; padding: 20px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌧️ Rain Radar Dashboard</h1>
+            <div class="subtitle">Auckland Council - Stormwater Catchments QPE Analysis</div>
+            <div class="meta">Data Date: 2025-05-09 | Generated: 2025-12-26 18:41:46</div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="value">233</div>
+                <div class="label">Total Catchments</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">233</div>
+                <div class="label">With Data</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">233</div>
+                <div class="label">With Rainfall</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">25,298</div>
+                <div class="label">Total Pixels</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">252547.7</div>
+                <div class="label">Total Rainfall (mm)</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🏆 Top 20 by Total Rainfall</h2>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Catchment</th><th>Total (mm)</th><th>Pixels</th><th>Coverage</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>WEST_COAST</td>
+                        <td class="has-rain">16225.04</td>
+                        <td>829</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>MAKURAU</td>
+                        <td class="has-rain">6868.98</td>
+                        <td>543</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>WAIONUI</td>
+                        <td class="has-rain">6748.02</td>
+                        <td>350</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>WEST_KAIPARA_HARBOUR</td>
+                        <td class="has-rain">6675.20</td>
+                        <td>370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>KAIPARA_WEST</td>
+                        <td class="has-rain">6100.70</td>
+                        <td>403</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>AWHITU-TASMAN_SEA</td>
+                        <td class="has-rain">5660.78</td>
+                        <td>343</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>WAIUKU_RIVER</td>
+                        <td class="has-rain">5624.00</td>
+                        <td>343</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td>KAUKAPAKAPA</td>
+                        <td class="has-rain">5576.56</td>
+                        <td>545</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td>HUNUA_STREAM</td>
+                        <td class="has-rain">5054.63</td>
+                        <td>709</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>10</td>
+                        <td>AWHITU-MANUKAU_HARBOUR</td>
+                        <td class="has-rain">4956.51</td>
+                        <td>434</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>11</td>
+                        <td>CENTRAL_KAIPARA</td>
+                        <td class="has-rain">4379.49</td>
+                        <td>473</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>12</td>
+                        <td>PIHA-KAREKARE</td>
+                        <td class="has-rain">4281.44</td>
+                        <td>399</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>13</td>
+                        <td>ARAPARERA</td>
+                        <td class="has-rain">4119.87</td>
+                        <td>383</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>14</td>
+                        <td>TAIHIKI_RIVER</td>
+                        <td class="has-rain">3855.08</td>
+                        <td>213</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>15</td>
+                        <td>MAUKU_STREAM</td>
+                        <td class="has-rain">3781.11</td>
+                        <td>200</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>16</td>
+                        <td>DAIRY_FLAT</td>
+                        <td class="has-rain">3545.86</td>
+                        <td>245</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>17</td>
+                        <td>WHANGAMAIRE_STREAM</td>
+                        <td class="has-rain">3518.87</td>
+                        <td>246</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>18</td>
+                        <td>WAITANGI_STREAM</td>
+                        <td class="has-rain">3363.60</td>
+                        <td>172</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>19</td>
+                        <td>WHANGAPOURI_CREEK</td>
+                        <td class="has-rain">3260.27</td>
+                        <td>273</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>20</td>
+                        <td>PAPAKURA_STREAM</td>
+                        <td class="has-rain">3250.45</td>
+                        <td>272</td>
+                        <td>100.0%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>⚡ Top 20 by Peak Intensity</h2>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Catchment</th><th>Max (mm/min)</th><th>Total (mm)</th><th>Pixels</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>WEST_COAST</td>
+                        <td>4.300</td>
+                        <td>16225.04</td>
+                        <td>829</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>KAIPARA_WEST</td>
+                        <td>4.090</td>
+                        <td>6100.70</td>
+                        <td>403</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>WAIONUI</td>
+                        <td>3.950</td>
+                        <td>6748.02</td>
+                        <td>350</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>OKIRITOTO</td>
+                        <td>3.950</td>
+                        <td>2005.98</td>
+                        <td>177</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>WEST_KAIPARA_HARBOUR</td>
+                        <td>2.900</td>
+                        <td>6675.20</td>
+                        <td>370</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>CASSINO</td>
+                        <td>2.650</td>
+                        <td>292.04</td>
+                        <td>15</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>WAIROA</td>
+                        <td>2.650</td>
+                        <td>227.19</td>
+                        <td>13</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td>ELLETTS_BEACH</td>
+                        <td>2.480</td>
+                        <td>1210.12</td>
+                        <td>86</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td>HILLCREST</td>
+                        <td>2.430</td>
+                        <td>626.23</td>
+                        <td>34</td>
+                    </tr>
+                    <tr>
+                        <td>10</td>
+                        <td>WAIKIRI</td>
+                        <td>2.430</td>
+                        <td>1595.02</td>
+                        <td>178</td>
+                    </tr>
+                    <tr>
+                        <td>11</td>
+                        <td>WAIURUTOA</td>
+                        <td>2.430</td>
+                        <td>492.22</td>
+                        <td>28</td>
+                    </tr>
+                    <tr>
+                        <td>12</td>
+                        <td>ONEPOTO</td>
+                        <td>2.430</td>
+                        <td>273.73</td>
+                        <td>13</td>
+                    </tr>
+                    <tr>
+                        <td>13</td>
+                        <td>GUMSTOVE</td>
+                        <td>2.400</td>
+                        <td>1131.28</td>
+                        <td>159</td>
+                    </tr>
+                    <tr>
+                        <td>14</td>
+                        <td>WAITAKERE</td>
+                        <td>2.400</td>
+                        <td>2656.39</td>
+                        <td>313</td>
+                    </tr>
+                    <tr>
+                        <td>15</td>
+                        <td>WHANGAMAIRE_STREAM</td>
+                        <td>2.370</td>
+                        <td>3518.87</td>
+                        <td>246</td>
+                    </tr>
+                    <tr>
+                        <td>16</td>
+                        <td>BELMONT</td>
+                        <td>2.350</td>
+                        <td>364.01</td>
+                        <td>18</td>
+                    </tr>
+                    <tr>
+                        <td>17</td>
+                        <td>PUHINUI_CREEK</td>
+                        <td>2.320</td>
+                        <td>2670.28</td>
+                        <td>166</td>
+                    </tr>
+                    <tr>
+                        <td>18</td>
+                        <td>OTARA_CREEK/FLAT_BUSH</td>
+                        <td>2.320</td>
+                        <td>2626.80</td>
+                        <td>179</td>
+                    </tr>
+                    <tr>
+                        <td>19</td>
+                        <td>SHOAL_BAY</td>
+                        <td>2.320</td>
+                        <td>195.19</td>
+                        <td>10</td>
+                    </tr>
+                    <tr>
+                        <td>20</td>
+                        <td>WATERVIEW</td>
+                        <td>2.290</td>
+                        <td>249.38</td>
+                        <td>13</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>📋 All Catchments</h2>
+            <input type="text" id="search" class="search-box" placeholder="🔍 Search catchments...">
+            <table id="allTable">
+                <thead>
+                    <tr><th>ID</th><th>Catchment</th><th>Pixels</th><th>Total (mm)</th><th>Max (mm/min)</th><th>Coverage</th></tr>
+                </thead>
+                <tbody>
+                    <tr class="data-row">
+                        <td>3880854</td>
+                        <td>WEST_COAST</td>
+                        <td>829</td>
+                        <td class="has-rain">16225.04</td>
+                        <td>4.300</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880919</td>
+                        <td>MAKURAU</td>
+                        <td>543</td>
+                        <td class="has-rain">6868.98</td>
+                        <td>2.170</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880863</td>
+                        <td>WAIONUI</td>
+                        <td>350</td>
+                        <td class="has-rain">6748.02</td>
+                        <td>3.950</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880853</td>
+                        <td>WEST_KAIPARA_HARBOUR</td>
+                        <td>370</td>
+                        <td class="has-rain">6675.20</td>
+                        <td>2.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880929</td>
+                        <td>KAIPARA_WEST</td>
+                        <td>403</td>
+                        <td class="has-rain">6100.70</td>
+                        <td>4.090</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880823</td>
+                        <td>AWHITU-TASMAN_SEA</td>
+                        <td>343</td>
+                        <td class="has-rain">5660.78</td>
+                        <td>0.640</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880770</td>
+                        <td>WAIUKU_RIVER</td>
+                        <td>343</td>
+                        <td class="has-rain">5624.00</td>
+                        <td>1.800</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880927</td>
+                        <td>KAUKAPAKAPA</td>
+                        <td>545</td>
+                        <td class="has-rain">5576.56</td>
+                        <td>2.190</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880811</td>
+                        <td>HUNUA_STREAM</td>
+                        <td>709</td>
+                        <td class="has-rain">5054.63</td>
+                        <td>0.950</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880824</td>
+                        <td>AWHITU-MANUKAU_HARBOUR</td>
+                        <td>434</td>
+                        <td class="has-rain">4956.51</td>
+                        <td>1.270</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880938</td>
+                        <td>CENTRAL_KAIPARA</td>
+                        <td>473</td>
+                        <td class="has-rain">4379.49</td>
+                        <td>1.850</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880833</td>
+                        <td>PIHA-KAREKARE</td>
+                        <td>399</td>
+                        <td class="has-rain">4281.44</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880945</td>
+                        <td>ARAPARERA</td>
+                        <td>383</td>
+                        <td class="has-rain">4119.87</td>
+                        <td>2.020</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880780</td>
+                        <td>TAIHIKI_RIVER</td>
+                        <td>213</td>
+                        <td class="has-rain">3855.08</td>
+                        <td>1.160</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880792</td>
+                        <td>MAUKU_STREAM</td>
+                        <td>200</td>
+                        <td class="has-rain">3781.11</td>
+                        <td>0.860</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880935</td>
+                        <td>DAIRY_FLAT</td>
+                        <td>245</td>
+                        <td class="has-rain">3545.86</td>
+                        <td>1.730</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880766</td>
+                        <td>WHANGAMAIRE_STREAM</td>
+                        <td>246</td>
+                        <td class="has-rain">3518.87</td>
+                        <td>2.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880771</td>
+                        <td>WAITANGI_STREAM</td>
+                        <td>172</td>
+                        <td class="has-rain">3363.60</td>
+                        <td>1.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880765</td>
+                        <td>WHANGAPOURI_CREEK</td>
+                        <td>273</td>
+                        <td class="has-rain">3260.27</td>
+                        <td>2.140</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880749</td>
+                        <td>PAPAKURA_STREAM</td>
+                        <td>272</td>
+                        <td class="has-rain">3250.45</td>
+                        <td>2.240</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880923</td>
+                        <td>LOWER_HOTEO</td>
+                        <td>620</td>
+                        <td class="has-rain">3000.15</td>
+                        <td>0.930</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880812</td>
+                        <td>HINGAIA_STREAM</td>
+                        <td>275</td>
+                        <td class="has-rain">2753.51</td>
+                        <td>1.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880772</td>
+                        <td>WAIROA_RIVER</td>
+                        <td>460</td>
+                        <td class="has-rain">2722.61</td>
+                        <td>1.000</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880744</td>
+                        <td>PUHINUI_CREEK</td>
+                        <td>166</td>
+                        <td class="has-rain">2670.28</td>
+                        <td>2.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880834</td>
+                        <td>WAITAKERE</td>
+                        <td>313</td>
+                        <td class="has-rain">2656.39</td>
+                        <td>2.400</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880802</td>
+                        <td>OTARA_CREEK/FLAT_BUSH</td>
+                        <td>179</td>
+                        <td class="has-rain">2626.80</td>
+                        <td>2.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880843</td>
+                        <td>HUIA</td>
+                        <td>335</td>
+                        <td class="has-rain">2572.93</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880805</td>
+                        <td>ORERE_STREAM</td>
+                        <td>455</td>
+                        <td class="has-rain">2545.39</td>
+                        <td>0.500</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880829</td>
+                        <td>GREAT_BARRIER_ISLAND</td>
+                        <td>553</td>
+                        <td class="has-rain">2534.73</td>
+                        <td>1.620</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880782</td>
+                        <td>SLIPPERY_CREEK</td>
+                        <td>226</td>
+                        <td class="has-rain">2509.14</td>
+                        <td>1.620</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880796</td>
+                        <td>KARAKA_CREEK</td>
+                        <td>161</td>
+                        <td class="has-rain">2236.52</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880789</td>
+                        <td>NGAKOROA_STREAM</td>
+                        <td>211</td>
+                        <td class="has-rain">2179.84</td>
+                        <td>1.690</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880913</td>
+                        <td>OKIRITOTO</td>
+                        <td>177</td>
+                        <td class="has-rain">2005.98</td>
+                        <td>3.950</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880894</td>
+                        <td>RANGITOPUNI</td>
+                        <td>158</td>
+                        <td class="has-rain">1933.98</td>
+                        <td>1.710</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880895</td>
+                        <td>PUHOI</td>
+                        <td>281</td>
+                        <td class="has-rain">1928.58</td>
+                        <td>1.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880860</td>
+                        <td>WAIWERA_RIVER</td>
+                        <td>192</td>
+                        <td class="has-rain">1791.69</td>
+                        <td>1.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880845</td>
+                        <td>ORATIA</td>
+                        <td>156</td>
+                        <td class="has-rain">1749.98</td>
+                        <td>2.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880857</td>
+                        <td>WAYBY</td>
+                        <td>400</td>
+                        <td class="has-rain">1607.53</td>
+                        <td>0.650</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880779</td>
+                        <td>TAITAIA_STREAM</td>
+                        <td>220</td>
+                        <td class="has-rain">1607.52</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880864</td>
+                        <td>WAIKIRI</td>
+                        <td>178</td>
+                        <td class="has-rain">1595.02</td>
+                        <td>2.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880925</td>
+                        <td>KUMEU_HUAPAI</td>
+                        <td>196</td>
+                        <td class="has-rain">1585.80</td>
+                        <td>1.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880743</td>
+                        <td>PUKAKI_WAOKAURI</td>
+                        <td>110</td>
+                        <td class="has-rain">1508.00</td>
+                        <td>1.730</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880882</td>
+                        <td>TAUPAKI</td>
+                        <td>192</td>
+                        <td class="has-rain">1494.04</td>
+                        <td>0.560</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880825</td>
+                        <td>WHAU</td>
+                        <td>132</td>
+                        <td class="has-rain">1478.96</td>
+                        <td>1.560</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880911</td>
+                        <td>OKURA_NORTH</td>
+                        <td>102</td>
+                        <td class="has-rain">1447.67</td>
+                        <td>1.350</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880800</td>
+                        <td>PAHUREHURE_INLET</td>
+                        <td>96</td>
+                        <td class="has-rain">1440.09</td>
+                        <td>1.620</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880826</td>
+                        <td>ALL_EASTERN_ISLAND_CATCHMENTS</td>
+                        <td>329</td>
+                        <td class="has-rain">1408.31</td>
+                        <td>0.630</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880742</td>
+                        <td>PUKEKOHE-TUTAENUI_STREAM</td>
+                        <td>140</td>
+                        <td class="has-rain">1393.52</td>
+                        <td>0.800</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880905</td>
+                        <td>OREWA_RIVER_WEST</td>
+                        <td>115</td>
+                        <td class="has-rain">1342.41</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880858</td>
+                        <td>WARKWORTH</td>
+                        <td>297</td>
+                        <td class="has-rain">1340.76</td>
+                        <td>0.670</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880769</td>
+                        <td>WAIUKU_TOWN</td>
+                        <td>80</td>
+                        <td class="has-rain">1322.96</td>
+                        <td>0.600</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880788</td>
+                        <td>OIRA_CREEK</td>
+                        <td>128</td>
+                        <td class="has-rain">1319.67</td>
+                        <td>1.580</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880959</td>
+                        <td>OTEHA_VALLEY</td>
+                        <td>75</td>
+                        <td class="has-rain">1318.88</td>
+                        <td>2.020</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880786</td>
+                        <td>ONE_TREE_HILL</td>
+                        <td>95</td>
+                        <td class="has-rain">1313.97</td>
+                        <td>1.990</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880798</td>
+                        <td>PAKURANGA_CREEK</td>
+                        <td>155</td>
+                        <td class="has-rain">1310.11</td>
+                        <td>1.050</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880841</td>
+                        <td>OPANUKU</td>
+                        <td>139</td>
+                        <td class="has-rain">1304.45</td>
+                        <td>2.170</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880907</td>
+                        <td>OMAUMAU</td>
+                        <td>151</td>
+                        <td class="has-rain">1290.44</td>
+                        <td>1.490</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880952</td>
+                        <td>WAIRAU_VALLEY</td>
+                        <td>78</td>
+                        <td class="has-rain">1288.79</td>
+                        <td>2.170</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880794</td>
+                        <td>MANGERE_INLET</td>
+                        <td>105</td>
+                        <td class="has-rain">1237.38</td>
+                        <td>1.620</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880768</td>
+                        <td>WAIUKU_TOWN-AWAROA_RIVER</td>
+                        <td>73</td>
+                        <td class="has-rain">1235.42</td>
+                        <td>0.470</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880831</td>
+                        <td>WHENUAPAI</td>
+                        <td>102</td>
+                        <td class="has-rain">1224.23</td>
+                        <td>1.540</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880917</td>
+                        <td>MATAKANA_RIVER</td>
+                        <td>268</td>
+                        <td class="has-rain">1219.38</td>
+                        <td>0.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880819</td>
+                        <td>ELLETTS_BEACH</td>
+                        <td>86</td>
+                        <td class="has-rain">1210.12</td>
+                        <td>2.480</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880778</td>
+                        <td>TE_HIHI_CREEK</td>
+                        <td>96</td>
+                        <td class="has-rain">1157.48</td>
+                        <td>1.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880874</td>
+                        <td>GUMSTOVE</td>
+                        <td>159</td>
+                        <td class="has-rain">1131.28</td>
+                        <td>2.400</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880839</td>
+                        <td>SWANSON</td>
+                        <td>127</td>
+                        <td class="has-rain">1110.90</td>
+                        <td>0.770</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880936</td>
+                        <td>COATESVILLE</td>
+                        <td>58</td>
+                        <td class="has-rain">1082.48</td>
+                        <td>1.830</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880773</td>
+                        <td>WAIMAHIA_CREEK</td>
+                        <td>72</td>
+                        <td class="has-rain">1071.51</td>
+                        <td>1.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880846</td>
+                        <td>WHANGATEAU</td>
+                        <td>146</td>
+                        <td class="has-rain">1067.25</td>
+                        <td>0.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880869</td>
+                        <td>HOBSON_BAY</td>
+                        <td>70</td>
+                        <td class="has-rain">1048.06</td>
+                        <td>1.670</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880777</td>
+                        <td>TURANGA_CREEK</td>
+                        <td>156</td>
+                        <td class="has-rain">1031.85</td>
+                        <td>0.380</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880827</td>
+                        <td>ELLERSLIE</td>
+                        <td>68</td>
+                        <td class="has-rain">1031.28</td>
+                        <td>1.490</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880958</td>
+                        <td>PAREMOREMO_1</td>
+                        <td>53</td>
+                        <td class="has-rain">1018.04</td>
+                        <td>2.020</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880872</td>
+                        <td>CBD</td>
+                        <td>53</td>
+                        <td class="has-rain">975.49</td>
+                        <td>2.140</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880902</td>
+                        <td>PAKARI</td>
+                        <td>172</td>
+                        <td class="has-rain">960.74</td>
+                        <td>0.570</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880763</td>
+                        <td>ATTWOOD</td>
+                        <td>54</td>
+                        <td class="has-rain">939.53</td>
+                        <td>2.270</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880904</td>
+                        <td>ORUAWHARO</td>
+                        <td>183</td>
+                        <td class="has-rain">929.49</td>
+                        <td>0.860</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880791</td>
+                        <td>MEOLA</td>
+                        <td>91</td>
+                        <td class="has-rain">902.85</td>
+                        <td>1.410</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880862</td>
+                        <td>WAITEITEI</td>
+                        <td>271</td>
+                        <td class="has-rain">891.60</td>
+                        <td>0.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880745</td>
+                        <td>TAMAKI_NORTH</td>
+                        <td>72</td>
+                        <td class="has-rain">860.69</td>
+                        <td>1.250</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880900</td>
+                        <td>PINE_VALLEY</td>
+                        <td>66</td>
+                        <td class="has-rain">851.42</td>
+                        <td>1.250</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880870</td>
+                        <td>EPSOM_NEWMARKET</td>
+                        <td>55</td>
+                        <td class="has-rain">850.92</td>
+                        <td>1.850</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880848</td>
+                        <td>CLARKS_BEACH</td>
+                        <td>57</td>
+                        <td class="has-rain">850.37</td>
+                        <td>1.410</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880835</td>
+                        <td>TITIRANGI/LAINGHOLM</td>
+                        <td>82</td>
+                        <td class="has-rain">843.22</td>
+                        <td>1.190</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880880</td>
+                        <td>TE_ARAI</td>
+                        <td>391</td>
+                        <td class="has-rain">797.05</td>
+                        <td>0.470</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880809</td>
+                        <td>ONEHUNGA</td>
+                        <td>61</td>
+                        <td class="has-rain">796.01</td>
+                        <td>1.850</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880892</td>
+                        <td>RIVERHEAD</td>
+                        <td>76</td>
+                        <td class="has-rain">793.27</td>
+                        <td>1.000</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880898</td>
+                        <td>POROURE</td>
+                        <td>93</td>
+                        <td class="has-rain">792.78</td>
+                        <td>1.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880838</td>
+                        <td>REDHILLS</td>
+                        <td>80</td>
+                        <td class="has-rain">792.03</td>
+                        <td>0.600</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880851</td>
+                        <td>WHANGARIPO</td>
+                        <td>226</td>
+                        <td class="has-rain">789.24</td>
+                        <td>0.560</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880748</td>
+                        <td>PAPATOETOE-TAMAKI_RIVER</td>
+                        <td>63</td>
+                        <td class="has-rain">771.14</td>
+                        <td>2.240</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880767</td>
+                        <td>OAKLEY</td>
+                        <td>80</td>
+                        <td class="has-rain">749.32</td>
+                        <td>1.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880776</td>
+                        <td>WWTP</td>
+                        <td>52</td>
+                        <td class="has-rain">704.65</td>
+                        <td>1.710</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880920</td>
+                        <td>MAHURANGI_WEST</td>
+                        <td>185</td>
+                        <td class="has-rain">695.50</td>
+                        <td>0.630</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880932</td>
+                        <td>KAIPARA_FLATS</td>
+                        <td>126</td>
+                        <td class="has-rain">683.16</td>
+                        <td>0.850</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880836</td>
+                        <td>TE_ATATU_SOUTH</td>
+                        <td>57</td>
+                        <td class="has-rain">681.76</td>
+                        <td>1.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880747</td>
+                        <td>POURAUREROA_STREAM</td>
+                        <td>135</td>
+                        <td class="has-rain">671.58</td>
+                        <td>0.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880967</td>
+                        <td>LUCAS_CREEK</td>
+                        <td>39</td>
+                        <td class="has-rain">663.46</td>
+                        <td>1.470</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880943</td>
+                        <td>AWAROA</td>
+                        <td>80</td>
+                        <td class="has-rain">654.04</td>
+                        <td>1.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880822</td>
+                        <td>BEACHLANDS/MARAETAI</td>
+                        <td>153</td>
+                        <td class="has-rain">647.37</td>
+                        <td>0.470</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880914</td>
+                        <td>OKAHUKURA</td>
+                        <td>124</td>
+                        <td class="has-rain">645.45</td>
+                        <td>1.030</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880837</td>
+                        <td>HENDERSON</td>
+                        <td>63</td>
+                        <td class="has-rain">630.72</td>
+                        <td>1.670</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880750</td>
+                        <td>HILLCREST</td>
+                        <td>34</td>
+                        <td class="has-rain">626.23</td>
+                        <td>2.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880810</td>
+                        <td>IHUMATAO</td>
+                        <td>51</td>
+                        <td class="has-rain">620.71</td>
+                        <td>1.490</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880897</td>
+                        <td>PORT_ALBERT</td>
+                        <td>157</td>
+                        <td class="has-rain">613.54</td>
+                        <td>0.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880859</td>
+                        <td>WAIWHIU_STREAM</td>
+                        <td>191</td>
+                        <td class="has-rain">597.89</td>
+                        <td>0.250</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880813</td>
+                        <td>HINGAIA_SOUTH</td>
+                        <td>39</td>
+                        <td class="has-rain">576.43</td>
+                        <td>1.640</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880832</td>
+                        <td>WEST_HARBOUR</td>
+                        <td>43</td>
+                        <td class="has-rain">575.44</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880799</td>
+                        <td>PAKURANGA-TAMAKI_RIVER</td>
+                        <td>59</td>
+                        <td class="has-rain">571.00</td>
+                        <td>0.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880871</td>
+                        <td>EASTERN_BAYS</td>
+                        <td>41</td>
+                        <td class="has-rain">554.34</td>
+                        <td>1.190</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880888</td>
+                        <td>SILVERDALE_SOUTH</td>
+                        <td>40</td>
+                        <td class="has-rain">551.59</td>
+                        <td>1.250</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880867</td>
+                        <td>AIRPORT</td>
+                        <td>46</td>
+                        <td class="has-rain">545.83</td>
+                        <td>1.230</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880840</td>
+                        <td>MASSEY</td>
+                        <td>55</td>
+                        <td class="has-rain">537.81</td>
+                        <td>1.100</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880816</td>
+                        <td>GREY_LYNN</td>
+                        <td>38</td>
+                        <td class="has-rain">509.35</td>
+                        <td>1.450</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880852</td>
+                        <td>WHANAKI</td>
+                        <td>149</td>
+                        <td class="has-rain">505.08</td>
+                        <td>0.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880790</td>
+                        <td>MOTIONS</td>
+                        <td>42</td>
+                        <td class="has-rain">501.15</td>
+                        <td>1.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880774</td>
+                        <td>WAIKOPUA_CREEK</td>
+                        <td>94</td>
+                        <td class="has-rain">496.76</td>
+                        <td>0.300</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880950</td>
+                        <td>WAIURUTOA</td>
+                        <td>28</td>
+                        <td class="has-rain">492.22</td>
+                        <td>2.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880921</td>
+                        <td>MAHURANGI_EAST</td>
+                        <td>119</td>
+                        <td class="has-rain">491.17</td>
+                        <td>0.500</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880883</td>
+                        <td>TAUHOA</td>
+                        <td>101</td>
+                        <td class="has-rain">484.17</td>
+                        <td>0.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880962</td>
+                        <td>OKURA</td>
+                        <td>37</td>
+                        <td class="has-rain">480.25</td>
+                        <td>1.180</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880926</td>
+                        <td>KAWAU_ISLAND</td>
+                        <td>123</td>
+                        <td class="has-rain">480.18</td>
+                        <td>0.310</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880764</td>
+                        <td>ALBANY_WEST</td>
+                        <td>24</td>
+                        <td class="has-rain">473.47</td>
+                        <td>2.120</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880928</td>
+                        <td>KAREPIRO</td>
+                        <td>40</td>
+                        <td class="has-rain">469.43</td>
+                        <td>0.960</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880968</td>
+                        <td>LONG_BAY</td>
+                        <td>33</td>
+                        <td class="has-rain">447.85</td>
+                        <td>1.180</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880887</td>
+                        <td>SILVERDALE_WADE</td>
+                        <td>38</td>
+                        <td class="has-rain">442.67</td>
+                        <td>1.270</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880955</td>
+                        <td>TAIAOTEA</td>
+                        <td>28</td>
+                        <td class="has-rain">425.69</td>
+                        <td>1.310</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880842</td>
+                        <td>LINCOLN</td>
+                        <td>44</td>
+                        <td class="has-rain">420.57</td>
+                        <td>1.050</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880795</td>
+                        <td>MANGEMANGEROA_CREEK</td>
+                        <td>60</td>
+                        <td class="has-rain">417.33</td>
+                        <td>0.340</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880752</td>
+                        <td>GREENHITHE</td>
+                        <td>22</td>
+                        <td class="has-rain">412.40</td>
+                        <td>1.970</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880899</td>
+                        <td>POINT_WELLS</td>
+                        <td>48</td>
+                        <td class="has-rain">410.92</td>
+                        <td>0.670</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880817</td>
+                        <td>GLENDOWIE</td>
+                        <td>33</td>
+                        <td class="has-rain">409.33</td>
+                        <td>0.860</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880941</td>
+                        <td>BIG&LITTLE_MANLY</td>
+                        <td>39</td>
+                        <td class="has-rain">408.02</td>
+                        <td>1.160</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880753</td>
+                        <td>ESKDALE</td>
+                        <td>30</td>
+                        <td class="has-rain">407.83</td>
+                        <td>1.920</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880948</td>
+                        <td>WAYSIDE</td>
+                        <td>21</td>
+                        <td class="has-rain">403.60</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880847</td>
+                        <td>COCKLE_BAY</td>
+                        <td>52</td>
+                        <td class="has-rain">393.83</td>
+                        <td>0.760</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880814</td>
+                        <td>HILLSBOROUGH</td>
+                        <td>36</td>
+                        <td class="has-rain">392.45</td>
+                        <td>1.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880971</td>
+                        <td>KYLE</td>
+                        <td>21</td>
+                        <td class="has-rain">389.17</td>
+                        <td>1.690</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880830</td>
+                        <td>WATER_VIEW</td>
+                        <td>33</td>
+                        <td class="has-rain">387.59</td>
+                        <td>1.600</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880953</td>
+                        <td>TAKAPUNA_BEACH</td>
+                        <td>22</td>
+                        <td class="has-rain">387.38</td>
+                        <td>2.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880855</td>
+                        <td>WEITI_SOUTH</td>
+                        <td>32</td>
+                        <td class="has-rain">381.13</td>
+                        <td>0.960</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880885</td>
+                        <td>STANMORE_BAY</td>
+                        <td>32</td>
+                        <td class="has-rain">379.32</td>
+                        <td>1.160</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880889</td>
+                        <td>SILVERDALE_NORTH</td>
+                        <td>31</td>
+                        <td class="has-rain">378.63</td>
+                        <td>1.080</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880828</td>
+                        <td>MT_WELLINGTON_SOUTH</td>
+                        <td>29</td>
+                        <td class="has-rain">366.72</td>
+                        <td>1.250</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880760</td>
+                        <td>BELMONT</td>
+                        <td>18</td>
+                        <td class="has-rain">364.01</td>
+                        <td>2.350</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880930</td>
+                        <td>HELENSVILLE</td>
+                        <td>30</td>
+                        <td class="has-rain">357.23</td>
+                        <td>1.780</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880762</td>
+                        <td>AWARUKU</td>
+                        <td>25</td>
+                        <td class="has-rain">345.25</td>
+                        <td>1.190</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880756</td>
+                        <td>DEEP_CREEK</td>
+                        <td>25</td>
+                        <td class="has-rain">345.10</td>
+                        <td>1.180</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880934</td>
+                        <td>HOBBS_BAY</td>
+                        <td>40</td>
+                        <td class="has-rain">344.48</td>
+                        <td>1.160</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880922</td>
+                        <td>MAENEENE</td>
+                        <td>109</td>
+                        <td class="has-rain">342.80</td>
+                        <td>0.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880850</td>
+                        <td>WELLSFORD</td>
+                        <td>101</td>
+                        <td class="has-rain">339.77</td>
+                        <td>0.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880754</td>
+                        <td>DUCK_CREEK_1</td>
+                        <td>22</td>
+                        <td class="has-rain">317.60</td>
+                        <td>2.070</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880960</td>
+                        <td>ORWELL</td>
+                        <td>16</td>
+                        <td class="has-rain">308.66</td>
+                        <td>1.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880973</td>
+                        <td>KAIPATIKI</td>
+                        <td>19</td>
+                        <td class="has-rain">296.17</td>
+                        <td>2.170</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880866</td>
+                        <td>TOMARATA,WAITAPU_STREAM</td>
+                        <td>144</td>
+                        <td class="has-rain">293.08</td>
+                        <td>0.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880758</td>
+                        <td>CASSINO</td>
+                        <td>15</td>
+                        <td class="has-rain">292.04</td>
+                        <td>2.650</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880879</td>
+                        <td>TE_HANA</td>
+                        <td>97</td>
+                        <td class="has-rain">289.92</td>
+                        <td>0.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880803</td>
+                        <td>OTAHUHU_EAST</td>
+                        <td>24</td>
+                        <td class="has-rain">285.87</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880865</td>
+                        <td>WAIKAURI_BAY</td>
+                        <td>59</td>
+                        <td class="has-rain">285.04</td>
+                        <td>0.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880856</td>
+                        <td>WEITI_RIVER_NORTH</td>
+                        <td>24</td>
+                        <td class="has-rain">284.08</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880931</td>
+                        <td>HATFIELDS</td>
+                        <td>35</td>
+                        <td class="has-rain">279.99</td>
+                        <td>1.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880937</td>
+                        <td>CHRISTIAN_BAY</td>
+                        <td>43</td>
+                        <td class="has-rain">277.88</td>
+                        <td>0.500</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880961</td>
+                        <td>ONEPOTO</td>
+                        <td>13</td>
+                        <td class="has-rain">273.73</td>
+                        <td>2.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880755</td>
+                        <td>DEVONPORT</td>
+                        <td>16</td>
+                        <td class="has-rain">272.34</td>
+                        <td>2.070</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880969</td>
+                        <td>LIGNITE</td>
+                        <td>17</td>
+                        <td class="has-rain">267.92</td>
+                        <td>1.970</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880974</td>
+                        <td>KAHIKA</td>
+                        <td>19</td>
+                        <td class="has-rain">267.56</td>
+                        <td>2.040</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880901</td>
+                        <td>PAREMOREMO_2</td>
+                        <td>24</td>
+                        <td class="has-rain">262.28</td>
+                        <td>1.070</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880970</td>
+                        <td>LAKE_PUPUKE</td>
+                        <td>15</td>
+                        <td class="has-rain">262.19</td>
+                        <td>1.970</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880972</td>
+                        <td>KAURI_POINT</td>
+                        <td>19</td>
+                        <td class="has-rain">260.54</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880877</td>
+                        <td>LITTLE_SHOAL_BAY</td>
+                        <td>15</td>
+                        <td class="has-rain">255.24</td>
+                        <td>2.070</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880759</td>
+                        <td>CAMPBELLS_BAY</td>
+                        <td>17</td>
+                        <td class="has-rain">254.59</td>
+                        <td>2.040</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880949</td>
+                        <td>WATERVIEW</td>
+                        <td>13</td>
+                        <td class="has-rain">249.38</td>
+                        <td>2.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880946</td>
+                        <td>UPPER_HARBOUR</td>
+                        <td>14</td>
+                        <td class="has-rain">246.67</td>
+                        <td>2.020</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880966</td>
+                        <td>MAIRANGI_BAY</td>
+                        <td>16</td>
+                        <td class="has-rain">246.56</td>
+                        <td>1.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880954</td>
+                        <td>TAIORAHI</td>
+                        <td>16</td>
+                        <td class="has-rain">240.64</td>
+                        <td>1.600</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880886</td>
+                        <td>SNELLS_BEACH-ALGIES_BAY</td>
+                        <td>50</td>
+                        <td class="has-rain">239.54</td>
+                        <td>0.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880957</td>
+                        <td>RANGATIRA</td>
+                        <td>17</td>
+                        <td class="has-rain">238.83</td>
+                        <td>1.830</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880915</td>
+                        <td>NUKUMEA</td>
+                        <td>26</td>
+                        <td class="has-rain">234.57</td>
+                        <td>0.960</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880942</td>
+                        <td>BADDLEYS_BEACH</td>
+                        <td>31</td>
+                        <td class="has-rain">228.22</td>
+                        <td>0.390</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880951</td>
+                        <td>WAIROA</td>
+                        <td>13</td>
+                        <td class="has-rain">227.19</td>
+                        <td>2.650</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880906</td>
+                        <td>OREWA_RIVER_EAST</td>
+                        <td>23</td>
+                        <td class="has-rain">217.08</td>
+                        <td>1.230</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880896</td>
+                        <td>PUAWAI</td>
+                        <td>19</td>
+                        <td class="has-rain">211.29</td>
+                        <td>1.350</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880893</td>
+                        <td>RED_BEACH</td>
+                        <td>19</td>
+                        <td class="has-rain">207.99</td>
+                        <td>1.270</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880956</td>
+                        <td>SHOAL_BAY</td>
+                        <td>10</td>
+                        <td class="has-rain">195.19</td>
+                        <td>2.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880878</td>
+                        <td>TE_MURI</td>
+                        <td>43</td>
+                        <td class="has-rain">189.36</td>
+                        <td>0.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880751</td>
+                        <td>HAURAKI</td>
+                        <td>9</td>
+                        <td class="has-rain">185.03</td>
+                        <td>2.090</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880963</td>
+                        <td>NORTHBORO</td>
+                        <td>9</td>
+                        <td class="has-rain">180.73</td>
+                        <td>2.190</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880890</td>
+                        <td>SHARPS_ROAD</td>
+                        <td>50</td>
+                        <td class="has-rain">177.80</td>
+                        <td>0.440</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880947</td>
+                        <td>TRAMWAY</td>
+                        <td>11</td>
+                        <td class="has-rain">172.86</td>
+                        <td>2.040</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880916</td>
+                        <td>MATHESON_BAY</td>
+                        <td>33</td>
+                        <td class="has-rain">171.85</td>
+                        <td>0.460</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880908</td>
+                        <td>OMAHA_WEST</td>
+                        <td>23</td>
+                        <td class="has-rain">170.39</td>
+                        <td>0.380</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880944</td>
+                        <td>ARKLES BAY</td>
+                        <td>13</td>
+                        <td class="has-rain">166.74</td>
+                        <td>0.980</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880924</td>
+                        <td>LEIGH</td>
+                        <td>44</td>
+                        <td class="has-rain">163.96</td>
+                        <td>0.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880939</td>
+                        <td>CAMPBELLS_BEACH</td>
+                        <td>20</td>
+                        <td class="has-rain">154.80</td>
+                        <td>0.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880909</td>
+                        <td>OMAHA_SOUTH</td>
+                        <td>23</td>
+                        <td class="has-rain">154.31</td>
+                        <td>0.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880761</td>
+                        <td>BAYVIEW</td>
+                        <td>9</td>
+                        <td class="has-rain">150.96</td>
+                        <td>1.780</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880875</td>
+                        <td>DUCK_CREEK_2</td>
+                        <td>14</td>
+                        <td class="has-rain">150.26</td>
+                        <td>1.330</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880876</td>
+                        <td>ROTHESAY_BAY</td>
+                        <td>10</td>
+                        <td class="has-rain">147.54</td>
+                        <td>1.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880783</td>
+                        <td>RANGIHOUA</td>
+                        <td>42</td>
+                        <td class="has-rain">145.68</td>
+                        <td>0.300</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880965</td>
+                        <td>MILFORD_BEACH</td>
+                        <td>9</td>
+                        <td class="has-rain">140.38</td>
+                        <td>1.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880884</td>
+                        <td>STILLWATER</td>
+                        <td>13</td>
+                        <td class="has-rain">137.64</td>
+                        <td>0.820</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880964</td>
+                        <td>NARROW_NECK</td>
+                        <td>9</td>
+                        <td class="has-rain">137.08</td>
+                        <td>1.990</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880746</td>
+                        <td>PT_CHEVALIER</td>
+                        <td>13</td>
+                        <td class="has-rain">135.97</td>
+                        <td>1.470</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880849</td>
+                        <td>WELLSFORD_SOUTH</td>
+                        <td>31</td>
+                        <td class="has-rain">122.12</td>
+                        <td>0.510</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880891</td>
+                        <td>SHAKESPEAR</td>
+                        <td>31</td>
+                        <td class="has-rain">121.32</td>
+                        <td>0.650</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880757</td>
+                        <td>CASTOR_BAY</td>
+                        <td>8</td>
+                        <td class="has-rain">113.88</td>
+                        <td>1.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880912</td>
+                        <td>OKOROMAI_BAY</td>
+                        <td>23</td>
+                        <td class="has-rain">109.90</td>
+                        <td>0.680</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880820</td>
+                        <td>CHURCH</td>
+                        <td>29</td>
+                        <td class="has-rain">107.89</td>
+                        <td>0.420</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880807</td>
+                        <td>ONETANGI</td>
+                        <td>28</td>
+                        <td class="has-rain">96.69</td>
+                        <td>0.340</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880910</td>
+                        <td>OMAHA_EAST</td>
+                        <td>14</td>
+                        <td class="has-rain">92.28</td>
+                        <td>0.430</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880844</td>
+                        <td>HERALD_ISLAND</td>
+                        <td>6</td>
+                        <td class="has-rain">90.36</td>
+                        <td>1.900</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880903</td>
+                        <td>OTANERUA</td>
+                        <td>10</td>
+                        <td class="has-rain">78.05</td>
+                        <td>1.230</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880804</td>
+                        <td>OSTEND</td>
+                        <td>21</td>
+                        <td class="has-rain">77.61</td>
+                        <td>0.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880808</td>
+                        <td>ONEROA</td>
+                        <td>19</td>
+                        <td class="has-rain">71.77</td>
+                        <td>0.500</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880781</td>
+                        <td>SURFDALE</td>
+                        <td>18</td>
+                        <td class="has-rain">69.49</td>
+                        <td>0.380</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880784</td>
+                        <td>PUTIKI</td>
+                        <td>18</td>
+                        <td class="has-rain">67.70</td>
+                        <td>0.220</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880881</td>
+                        <td>TI_POINT</td>
+                        <td>11</td>
+                        <td class="has-rain">64.56</td>
+                        <td>0.460</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880861</td>
+                        <td>WAIWERA</td>
+                        <td>10</td>
+                        <td class="has-rain">62.85</td>
+                        <td>1.030</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880793</td>
+                        <td>MATIATIA</td>
+                        <td>17</td>
+                        <td class="has-rain">60.84</td>
+                        <td>0.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880801</td>
+                        <td>OWHANAKE</td>
+                        <td>17</td>
+                        <td class="has-rain">60.12</td>
+                        <td>0.500</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880868</td>
+                        <td>ANZAC</td>
+                        <td>16</td>
+                        <td class="has-rain">55.63</td>
+                        <td>0.300</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880787</td>
+                        <td>OMIHA</td>
+                        <td>15</td>
+                        <td class="has-rain">55.29</td>
+                        <td>0.260</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880806</td>
+                        <td>ORAPIU</td>
+                        <td>10</td>
+                        <td class="has-rain">54.83</td>
+                        <td>0.370</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880785</td>
+                        <td>PUTAKI</td>
+                        <td>13</td>
+                        <td class="has-rain">49.65</td>
+                        <td>0.380</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880821</td>
+                        <td>BLACKPOOL</td>
+                        <td>13</td>
+                        <td class="has-rain">49.04</td>
+                        <td>0.420</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880775</td>
+                        <td>WAIHEKE</td>
+                        <td>14</td>
+                        <td class="has-rain">46.96</td>
+                        <td>0.220</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880940</td>
+                        <td>BUCKLETONS_BAY</td>
+                        <td>8</td>
+                        <td class="has-rain">43.68</td>
+                        <td>0.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880918</td>
+                        <td>MARTINS_BAY</td>
+                        <td>8</td>
+                        <td class="has-rain">43.41</td>
+                        <td>0.230</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880873</td>
+                        <td>HITAPA_BAY</td>
+                        <td>9</td>
+                        <td class="has-rain">35.09</td>
+                        <td>0.240</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880797</td>
+                        <td>PALM_BEACH</td>
+                        <td>9</td>
+                        <td class="has-rain">33.40</td>
+                        <td>0.310</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880933</td>
+                        <td>JAMIESON_BAY</td>
+                        <td>9</td>
+                        <td class="has-rain">30.35</td>
+                        <td>0.290</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880818</td>
+                        <td>ENCLOSURE</td>
+                        <td>7</td>
+                        <td class="has-rain">26.42</td>
+                        <td>0.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr class="data-row">
+                        <td>3880815</td>
+                        <td>HEKERUA</td>
+                        <td>6</td>
+                        <td class="has-rain">22.85</td>
+                        <td>0.320</td>
+                        <td>100.0%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="footer">
+            Rain Radar Dashboard | Auckland Council | 233 Catchments | 2025-12-26
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('search').addEventListener('keyup', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.data-row').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>

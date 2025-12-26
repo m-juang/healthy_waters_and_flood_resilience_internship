@@ -27,7 +27,7 @@ from moata_pipeline.moata.client import MoataClient
 # =====================
 INPUT_CSV = Path("data/inputs/raingauge_ari_alarms.csv")
 TRACE_MAPPING_CSV = Path("outputs/rain_gauges/analyze/alarm_summary_full.csv")
-OUTPUT_CSV = Path("outputs/ari_alarm_validation.csv")
+OUTPUT_CSV = Path("outputs/rain_gauges/ari_alarm_validation.csv")
 
 # What we are validating
 ARI_TRACE_DESC = "Max TP108 ARI"
