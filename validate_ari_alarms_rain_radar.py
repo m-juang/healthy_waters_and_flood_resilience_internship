@@ -1,89 +1,66 @@
 ﻿#!/usr/bin/env python3
 """
-Rain Gauge ARI Alarm Validation Script
+Rain Radar ARI Alarm Validation Script
 
-Validates historical ARI alarm events against actual trace data from Moata API.
-Checks if alarms were triggered correctly by comparing alarm timestamps with
-actual ARI values within a time window.
-
-Usage:
-    python validate_ari_alarms_rain_gauges.py [options]
-
-Examples:
-    # Validate with default settings
-    python validate_ari_alarms_rain_gauges.py
-    
-    # Use custom input alarm CSV
-    python validate_ari_alarms_rain_gauges.py --input data/custom_alarms.csv
-    
-    # Use custom trace mapping
-    python validate_ari_alarms_rain_gauges.py --mapping outputs/rain_gauges/analyze/custom_mapping.csv
-    
-    # Adjust validation window (±2 hours instead of ±1 hour)
-    python validate_ari_alarms_rain_gauges.py --window-before 2 --window-after 2
-    
-    # Change ARI threshold (default: 5.0 years)
-    python validate_ari_alarms_rain_gauges.py --threshold 10.0
-    
-    # Enable debug logging
-    python validate_ari_alarms_rain_gauges.py --log-level DEBUG
+Validates rain radar ARI analysis results against alarm thresholds.
+Checks which catchments would trigger alarms based on proportion of area
+exceeding the ARI threshold.
 
 Validation Logic:
-    For each alarm event:
-    1. Find the corresponding ARI trace from mapping CSV
-    2. Fetch ARI values ±N hours around alarm time
-    3. Check if max ARI value ≥ threshold
-    4. Status: VERIFIED (exceeded), NOT_VERIFIED (not exceeded), UNVERIFIABLE (error/no data)
+    - Alarm triggers if ≥30% of catchment area has ARI ≥ 5 years (configurable)
+    - Uses spatial proportion (areal coverage) not point measurement
+    - Different threshold than rain gauges due to spatial nature of radar data
 
-Requirements:
-    - Input alarm CSV with columns: assetid, name, createdtimeutc
-    - Trace mapping CSV from analyze_rain_gauges.py with: gauge_id, trace_id, trace_description
-    - Valid Moata API credentials in .env
+Usage:
+    # Auto-detect most recent analysis
+    python validate_ari_alarms_rain_radar.py
+    
+    # Validate specific historical date
+    python validate_ari_alarms_rain_radar.py --date 2025-05-09
+    
+    # Custom input file
+    python validate_ari_alarms_rain_radar.py --input outputs/rain_radar/analyze/ari_analysis_summary.csv
+    
+    # Custom proportion threshold (50% instead of default 30%)
+    python validate_ari_alarms_rain_radar.py --threshold 0.50
+    
+    # Verbose logging
+    python validate_ari_alarms_rain_radar.py --date 2025-05-09 --log-level DEBUG
+
+Output:
+    outputs/rain_radar/ari_alarm_validation.csv               (for current)
+    outputs/rain_radar/historical/DATE/ari_alarm_validation.csv  (for historical)
+    
+    Columns:
+    - catchment_id, catchment_name
+    - max_ari (maximum ARI value in catchment)
+    - pixels_total, pixels_exceeding, proportion_exceeding
+    - alarm_status (ALARM or OK)
+    - peak_duration, peak_depth_mm, peak_timestamp
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
+Version: 1.0.0
 """
 
 import argparse
 import logging
-import os
 import sys
-from datetime import timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-from dotenv import load_dotenv
 
 from moata_pipeline.logging_setup import setup_logging
-from moata_pipeline.common.constants import (
-    TOKEN_URL,
-    BASE_API_URL,
-    OAUTH_SCOPE,
-    TOKEN_TTL_SECONDS,
-    TOKEN_REFRESH_BUFFER_SECONDS,
-    DEFAULT_REQUESTS_PER_SECOND,
-)
-from moata_pipeline.moata.auth import MoataAuth
-from moata_pipeline.moata.http import MoataHttp
-from moata_pipeline.moata.client import MoataClient
 
-# Load environment variables
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
-# Default paths and settings
-DEFAULT_INPUT_CSV = Path("data/inputs/raingauge_ari_alarms.csv")
-DEFAULT_TRACE_MAPPING_CSV = Path("outputs/rain_gauges/analyze/alarm_summary_full.csv")
-DEFAULT_OUTPUT_CSV = Path("outputs/rain_gauges/ari_alarm_validation.csv")
+# Version info
+__version__ = "1.0.0"
 
-# Default validation settings
-DEFAULT_ARI_TRACE_DESC = "Max TP108 ARI"
-DEFAULT_ARI_THRESHOLD = 5.0
-DEFAULT_WINDOW_HOURS_BEFORE = 1
-DEFAULT_WINDOW_HOURS_AFTER = 1
-DEFAULT_DATA_INTERVAL_SECONDS = 300  # 5 minutes
-DEFAULT_DATA_TYPE = "None"  # Raw data
+# Default settings
+DEFAULT_PROPORTION_THRESHOLD = 0.30  # 30% of catchment area
+DEFAULT_ARI_THRESHOLD = 5.0  # years (used in analysis)
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,301 +71,305 @@ def parse_args() -> argparse.Namespace:
         Parsed arguments namespace
     """
     parser = argparse.ArgumentParser(
-        description="Validate historical ARI alarm events against actual trace data",
+        description="Validate rain radar ARI analysis against alarm thresholds",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                                        # Default settings
-  %(prog)s --input data/custom_alarms.csv         # Custom alarm input
-  %(prog)s --threshold 10.0                       # 10-year ARI threshold
-  %(prog)s --window-before 2 --window-after 2     # ±2 hour window
-  %(prog)s --log-level DEBUG                      # Verbose output
+  %(prog)s                                  # Auto-detect most recent
+  %(prog)s --date 2025-05-09                # Specific date
+  %(prog)s --input custom/ari_summary.csv   # Custom input
+  %(prog)s --threshold 0.50                 # 50%% area threshold
+  %(prog)s --log-level DEBUG                # Verbose output
 
-Validation Status:
-  - VERIFIED: Alarm correctly triggered (ARI ≥ threshold)
-  - NOT_VERIFIED: Alarm incorrectly triggered (ARI < threshold)
-  - UNVERIFIABLE: Cannot validate (missing data/trace/API error)
+Validation Logic:
+  - Alarm triggers if proportion_exceeding ≥ threshold
+  - Default: ≥30%% of catchment area with ARI ≥5 years
+  - Radar uses spatial proportion (different from point-based gauges)
 
-Input Files:
-  - Alarm CSV: Historical alarm events (from Sam/Auckland Council)
-  - Mapping CSV: Trace IDs from analyze_rain_gauges.py output
+Input Requirements:
+  - ARI analysis summary CSV from analyze_rain_radar.py
+  - Required columns: catchment_id, proportion_exceeding
 
 Output:
-  - Validation results: CSV with status for each alarm
-  - Summary statistics: Counts of VERIFIED/NOT_VERIFIED/UNVERIFIABLE
+  - Validation CSV with alarm status for each catchment
+  - Summary report with counts and percentages
+  - List of catchments that would trigger alarms
 
 Duration:
-  Depends on number of alarms and API response times.
-  Typically 1-2 minutes for ~50 alarms.
+  Typically <1 minute (simple CSV processing, no API calls)
         """
     )
     
-    parser.add_argument(
+    # Input options
+    input_group = parser.add_argument_group('Input Options')
+    
+    input_group.add_argument(
+        "--date",
+        metavar="YYYY-MM-DD",
+        help="Validate historical data for specific date. "
+             "Example: --date 2025-05-09"
+    )
+    
+    input_group.add_argument(
         "--input",
-        type=str,
-        default=str(DEFAULT_INPUT_CSV),
         metavar="PATH",
-        help=f"Path to alarm events CSV (default: {DEFAULT_INPUT_CSV})"
+        help="Path to ari_analysis_summary.csv (overrides --date and auto-detect). "
+             "Example: --input outputs/rain_radar/analyze/ari_analysis_summary.csv"
     )
     
-    parser.add_argument(
-        "--mapping",
-        type=str,
-        default=str(DEFAULT_TRACE_MAPPING_CSV),
-        metavar="PATH",
-        help=f"Path to trace mapping CSV (default: {DEFAULT_TRACE_MAPPING_CSV})"
-    )
+    # Validation options
+    validation_group = parser.add_argument_group('Validation Options')
     
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=str(DEFAULT_OUTPUT_CSV),
-        metavar="PATH",
-        help=f"Path to output validation CSV (default: {DEFAULT_OUTPUT_CSV})"
-    )
-    
-    parser.add_argument(
+    validation_group.add_argument(
         "--threshold",
         type=float,
-        default=DEFAULT_ARI_THRESHOLD,
-        metavar="YEARS",
-        help=f"ARI threshold in years (default: {DEFAULT_ARI_THRESHOLD})"
+        default=DEFAULT_PROPORTION_THRESHOLD,
+        metavar="PROPORTION",
+        help=f"Proportion threshold for alarm (default: {DEFAULT_PROPORTION_THRESHOLD} = 30%%). "
+             f"Range: 0.0 to 1.0. Example: --threshold 0.50 for 50%%"
     )
     
-    parser.add_argument(
-        "--window-before",
-        type=int,
-        default=DEFAULT_WINDOW_HOURS_BEFORE,
-        metavar="HOURS",
-        help=f"Hours to look before alarm time (default: {DEFAULT_WINDOW_HOURS_BEFORE})"
+    # Output options
+    output_group = parser.add_argument_group('Output Options')
+    
+    output_group.add_argument(
+        "--output",
+        metavar="PATH",
+        help="Custom output path for validation CSV. "
+             "Default: auto-determined based on input location"
     )
     
-    parser.add_argument(
-        "--window-after",
-        type=int,
-        default=DEFAULT_WINDOW_HOURS_AFTER,
-        metavar="HOURS",
-        help=f"Hours to look after alarm time (default: {DEFAULT_WINDOW_HOURS_AFTER})"
-    )
+    # Logging options
+    log_group = parser.add_argument_group('Logging Options')
     
-    parser.add_argument(
+    log_group.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
         help="Set logging level (default: INFO)"
     )
     
+    # Metadata
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 1.0.0"
+        version=f"%(prog)s {__version__}"
     )
     
     return parser.parse_args()
 
 
-def iso_z(dt: pd.Timestamp) -> str:
+def validate_threshold(threshold: float) -> None:
     """
-    Convert pandas Timestamp to ISO 8601 string with Z suffix.
+    Validate proportion threshold value.
     
     Args:
-        dt: Pandas timestamp (assumed UTC)
+        threshold: Proportion threshold (0.0 to 1.0)
         
-    Returns:
-        ISO formatted string (e.g., "2024-12-28T14:30:00Z")
+    Raises:
+        ValueError: If threshold is out of range
     """
-    if dt.tzinfo is None:
-        dt = dt.tz_localize("UTC")
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(
+            f"Proportion threshold must be between 0.0 and 1.0, got {threshold}\n"
+            f"Example: --threshold 0.30 for 30%"
+        )
+    
+    if threshold == 0.0:
+        logging.warning(
+            "⚠️  Threshold is 0.0 - ALL catchments will trigger alarms!"
+        )
+    elif threshold == 1.0:
+        logging.warning(
+            "⚠️  Threshold is 1.0 - NO catchments will trigger alarms!"
+        )
 
 
-def build_trace_mapping(csv_path: Path, trace_desc: str, logger) -> Dict[int, int]:
+def find_input_file(args: argparse.Namespace, logger: logging.Logger) -> Path:
     """
-    Build mapping from asset_id to trace_id for ARI traces.
+    Find ARI analysis summary file based on arguments.
     
     Args:
-        csv_path: Path to trace mapping CSV
-        trace_desc: Description to filter traces (e.g., "Max TP108 ARI")
+        args: Parsed arguments
         logger: Logger instance
         
     Returns:
-        Dictionary mapping asset_id -> trace_id
+        Path to input CSV file
         
     Raises:
-        FileNotFoundError: If CSV doesn't exist
-        ValueError: If required columns missing
+        FileNotFoundError: If file cannot be found
     """
-    if not csv_path.exists():
+    # Option 1: Custom input path
+    if args.input:
+        input_path = Path(args.input)
+        logger.info("Using custom input: %s", input_path)
+        
+    # Option 2: Specific date (historical)
+    elif args.date:
+        input_path = Path(
+            f"outputs/rain_radar/historical/{args.date}/analyze/ari_analysis_summary.csv"
+        )
+        logger.info("Using historical data for date: %s", args.date)
+        
+    # Option 3: Auto-detect (prefer historical)
+    else:
+        logger.info("Auto-detecting ARI analysis summary...")
+        
+        # Check historical directories (most recent first)
+        historical_files = sorted(
+            Path("outputs/rain_radar/historical").glob("*/analyze/ari_analysis_summary.csv"),
+            reverse=True
+        )
+        
+        # Check current directory
+        current_file = Path("outputs/rain_radar/analyze/ari_analysis_summary.csv")
+        
+        # Prefer most recent historical
+        if historical_files:
+            input_path = historical_files[0]
+            date = input_path.parent.parent.name
+            logger.info("✓ Found historical data: %s (date: %s)", input_path, date)
+        elif current_file.exists():
+            input_path = current_file
+            logger.info("✓ Found current data: %s", input_path)
+        else:
+            raise FileNotFoundError(
+                "No ARI analysis summary found.\n\n"
+                "Have you run analysis first?\n"
+                "  For current data:    python analyze_rain_radar.py\n"
+                "  For specific date:   python analyze_rain_radar.py --date 2025-05-09"
+            )
+    
+    # Validate file exists
+    if not input_path.exists():
         raise FileNotFoundError(
-            f"Trace mapping CSV not found: {csv_path}\n"
-            f"Please run analyze_rain_gauges.py first to generate this file."
+            f"Input file not found: {input_path}\n\n"
+            f"Have you run analysis first?\n"
+            f"  python analyze_rain_radar.py" + 
+            (f" --date {args.date}" if args.date else "")
         )
     
-    logger.info(f"Loading trace mapping from {csv_path}...")
-    df = pd.read_csv(csv_path)
+    return input_path
+
+
+def run_validation(
+    ari_summary_path: Path,
+    output_path: Path,
+    proportion_threshold: float,
+    logger: logging.Logger,
+) -> Dict:
+    """
+    Validate ARI analysis against proportion threshold.
+    
+    Args:
+        ari_summary_path: Path to ARI summary CSV
+        output_path: Path to save validation results
+        proportion_threshold: Proportion threshold for alarm
+        logger: Logger instance
+        
+    Returns:
+        Dictionary with validation results
+        
+    Raises:
+        ValueError: If required columns are missing
+    """
+    logger.info("Loading ARI summary from %s", ari_summary_path)
+    df = pd.read_csv(ari_summary_path)
+    logger.info("✓ Loaded %d catchment records", len(df))
     
     # Validate required columns
-    required_cols = ["gauge_id", "trace_id", "trace_description"]
+    required_cols = ["catchment_id", "proportion_exceeding"]
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         raise ValueError(
-            f"Missing required columns in trace mapping CSV: {missing_cols}\n"
-            f"Found columns: {df.columns.tolist()}"
+            f"Missing required columns in ARI summary: {missing_cols}\n"
+            f"Found columns: {df.columns.tolist()}\n\n"
+            f"The file may be incomplete. Try running analyze_rain_radar.py again."
         )
     
-    # Filter for ARI traces
-    ari = df[df["trace_description"] == trace_desc].copy()
-    ari = ari.dropna(subset=["gauge_id", "trace_id"])
+    # Apply validation logic
+    df["would_alarm"] = df["proportion_exceeding"] >= proportion_threshold
+    df["alarm_status"] = df["would_alarm"].map({True: "ALARM", False: "OK"})
     
-    if len(ari) == 0:
-        raise ValueError(
-            f"No traces found with description '{trace_desc}' in {csv_path}\n"
-            f"Available descriptions: {df['trace_description'].unique().tolist()}"
-        )
+    # Save results
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Build mapping
-    mapping = {}
-    for _, row in ari.iterrows():
-        asset_id = int(row["gauge_id"])
-        trace_id = int(row["trace_id"])
-        mapping[asset_id] = trace_id
+    cols = [
+        "catchment_id", "catchment_name", "max_ari", "pixels_total",
+        "pixels_exceeding", "proportion_exceeding", "alarm_status",
+        "peak_duration", "peak_depth_mm", "peak_timestamp",
+    ]
+    available_cols = [c for c in cols if c in df.columns]
+    df[available_cols].to_csv(output_path, index=False)
     
-    logger.info(f"✓ Found {len(mapping)} gauges with '{trace_desc}' traces")
-    return mapping
-
-
-def validate_alarms(
-    client: MoataClient,
-    alarms_df: pd.DataFrame,
-    asset_to_trace: Dict[int, int],
-    threshold: float,
-    window_before: int,
-    window_after: int,
-    data_interval: int,
-    data_type: str,
-    logger
-) -> List[Dict]:
-    """
-    Validate each alarm event against actual trace data.
+    logger.info("✓ Saved validation results to %s", output_path)
     
-    Args:
-        client: Moata API client
-        alarms_df: DataFrame with alarm events
-        asset_to_trace: Mapping of asset_id -> trace_id
-        threshold: ARI threshold for validation
-        window_before: Hours before alarm to check
-        window_after: Hours after alarm to check
-        data_interval: Data interval in seconds
-        data_type: Data type for API call
-        logger: Logger instance
-        
-    Returns:
-        List of validation result dictionaries
-    """
-    results: List[Dict] = []
-    total = len(alarms_df)
+    # Generate report
+    lines = []
+    lines.append("=" * 70)
+    lines.append("RAIN RADAR ALARM VALIDATION REPORT")
+    lines.append(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    lines.append("=" * 70)
+    lines.append("")
+    lines.append("CONFIGURATION")
+    lines.append("-" * 70)
+    lines.append(f"ARI Threshold: {DEFAULT_ARI_THRESHOLD} years (used in analysis)")
+    lines.append(f"Proportion Threshold: {proportion_threshold*100:.0f}% of catchment area")
+    lines.append("")
+    lines.append("SUMMARY")
+    lines.append("-" * 70)
+    lines.append(f"Total catchments: {len(df)}")
     
-    for idx, row in alarms_df.iterrows():
-        asset_id = int(row["assetid"])
-        gauge_name = str(row["name"])
-        alarm_time = pd.to_datetime(row["createdtimeutc"], utc=True)
-        
-        logger.info("")
-        logger.info(f"[{idx+1}/{total}] {gauge_name} (Asset ID: {asset_id})")
-        logger.info(f"  Alarm time: {alarm_time}")
-        
-        # Get trace_id from mapping
-        trace_id = asset_to_trace.get(asset_id)
-        if not trace_id:
-            logger.warning(f"  ⚠️  No trace mapping found for asset {asset_id}")
-            results.append({
-                "assetid": asset_id,
-                "gauge_name": gauge_name,
-                "alarm_time_utc": alarm_time,
-                "trace_id": None,
-                "status": "UNVERIFIABLE",
-                "reason": "No trace mapping found",
-                "max_ari_value": None,
-                "threshold": threshold,
-            })
-            continue
-        
-        # Fetch data around alarm time
-        from_time = iso_z(alarm_time - timedelta(hours=window_before))
-        to_time = iso_z(alarm_time + timedelta(hours=window_after))
-        
-        try:
-            data = client.get_trace_data(
-                trace_id=trace_id,
-                from_time=from_time,
-                to_time=to_time,
-                data_type=data_type,
-                data_interval=data_interval,
-            )
-        except Exception as e:
-            logger.warning(f"  ⚠️  Failed to fetch data: {e}")
-            results.append({
-                "assetid": asset_id,
-                "gauge_name": gauge_name,
-                "alarm_time_utc": alarm_time,
-                "trace_id": trace_id,
-                "status": "UNVERIFIABLE",
-                "reason": f"API error: {str(e)[:100]}",
-                "max_ari_value": None,
-                "threshold": threshold,
-            })
-            continue
-        
-        items = data.get("items", [])
-        if not items:
-            logger.warning(f"  ⚠️  No data returned for time window")
-            results.append({
-                "assetid": asset_id,
-                "gauge_name": gauge_name,
-                "alarm_time_utc": alarm_time,
-                "trace_id": trace_id,
-                "status": "UNVERIFIABLE",
-                "reason": "No data in time window",
-                "max_ari_value": None,
-                "threshold": threshold,
-            })
-            continue
-        
-        # Find max value (same logic as original - handle potential None)
-        values = [item.get("value", 0) for item in items]
-        max_value = max(values) if values else 0
-        
-        # Check if threshold was exceeded
-        exceeded = max_value >= threshold
-        status = "VERIFIED" if exceeded else "NOT_VERIFIED"
-        
-        logger.info(f"  Trace ID: {trace_id}")
-        logger.info(f"  Max ARI value: {max_value:.2f} years")
-        logger.info(f"  Threshold: {threshold} years")
-        logger.info(f"  Status: {'✅ ' if exceeded else '❌ '}{status}")
-        
-        results.append({
-            "assetid": asset_id,
-            "gauge_name": gauge_name,
-            "alarm_time_utc": alarm_time,
-            "trace_id": trace_id,
-            "status": status,
-            "reason": "",
-            "max_ari_value": round(max_value, 2),
-            "threshold": threshold,
-        })
+    alarm_count = int(df["would_alarm"].sum())
+    ok_count = len(df) - alarm_count
+    alarm_pct = (alarm_count / len(df) * 100) if len(df) > 0 else 0
     
-    return results
+    lines.append(f"Would trigger ALARM: {alarm_count} ({alarm_pct:.1f}%)")
+    lines.append(f"Status OK: {ok_count}")
+    lines.append("")
+    
+    # List alarms
+    alarms = df[df["would_alarm"]].sort_values("proportion_exceeding", ascending=False)
+    if not alarms.empty:
+        lines.append("CATCHMENTS THAT WOULD ALARM")
+        lines.append("-" * 70)
+        for _, row in alarms.iterrows():
+            name = row.get("catchment_name", "Unknown")
+            prop = row.get("proportion_exceeding", 0)
+            max_ari = row.get("max_ari", 0)
+            lines.append(f"  {name}: {prop*100:.1f}% area, max ARI {max_ari:.1f}y")
+    else:
+        lines.append("NO ALARMS WOULD BE TRIGGERED")
+        lines.append("-" * 70)
+        lines.append("All catchments below proportion threshold.")
+    
+    lines.append("")
+    lines.append("=" * 70)
+    
+    report = "\n".join(lines)
+    
+    return {
+        "validation_df": df,
+        "report": report,
+        "output_path": output_path,
+        "alarm_count": alarm_count,
+        "ok_count": ok_count,
+        "total_count": len(df),
+    }
 
 
 def main() -> int:
     """
-    Main entry point for ARI alarm validation.
+    Main entry point for radar alarm validation.
     
     Returns:
-        Exit code (0 for success, 1 for failure)
+        Exit code (0=success, 1=error, 130=interrupted)
     """
-    args = parse_args()
+    # Parse arguments
+    try:
+        args = parse_args()
+    except SystemExit as e:
+        return e.code if e.code is not None else 0
     
     # Setup logging
     setup_logging(args.log_level)
@@ -396,153 +377,101 @@ def main() -> int:
     
     try:
         logger.info("=" * 80)
-        logger.info("Starting Rain Gauge ARI Alarm Validation")
-        logger.info("=" * 80)
-        logger.info(f"Input alarm CSV: {args.input}")
-        logger.info(f"Trace mapping CSV: {args.mapping}")
-        logger.info(f"Output CSV: {args.output}")
-        logger.info(f"ARI threshold: {args.threshold} years")
-        logger.info(f"Time window: -{args.window_before}h to +{args.window_after}h")
+        logger.info("Rain Radar Alarm Validation - v%s", __version__)
         logger.info("=" * 80)
         
-        # Validate credentials
-        client_id = os.getenv("MOATA_CLIENT_ID")
-        client_secret = os.getenv("MOATA_CLIENT_SECRET")
-        if not client_id or not client_secret:
-            raise RuntimeError(
-                "MOATA_CLIENT_ID and MOATA_CLIENT_SECRET must be set in .env\n"
-                "See .env.example for configuration details."
-            )
+        # Validate threshold
+        validate_threshold(args.threshold)
+        logger.info(f"Proportion threshold: {args.threshold*100:.0f}% of catchment area")
         
-        # Initialize Moata client (verify_ssl=False for Auckland Council network)
-        logger.info("Initializing Moata API client...")
-        auth = MoataAuth(
-            token_url=TOKEN_URL,
-            scope=OAUTH_SCOPE,
-            client_id=client_id,
-            client_secret=client_secret,
-            verify_ssl=False,  # Disabled for Auckland Council network compatibility
-            ttl_seconds=TOKEN_TTL_SECONDS,
-            refresh_buffer_seconds=TOKEN_REFRESH_BUFFER_SECONDS,
-        )
+        # Find input file
+        input_path = find_input_file(args, logger)
         
-        http = MoataHttp(
-            get_token_fn=auth.get_token,
-            base_url=BASE_API_URL,
-            requests_per_second=DEFAULT_REQUESTS_PER_SECOND,
-            verify_ssl=False,  # Disabled for Auckland Council network compatibility
-        )
+        # Determine output path
+        if args.output:
+            output_path = Path(args.output)
+            logger.info("Custom output path: %s", output_path)
+        else:
+            # Put validation CSV next to analyze directory
+            # e.g., outputs/rain_radar/historical/DATE/analyze/ 
+            #    → outputs/rain_radar/historical/DATE/ari_alarm_validation.csv
+            output_path = input_path.parent.parent / "ari_alarm_validation.csv"
+            logger.info("Auto-determined output path: %s", output_path)
         
-        client = MoataClient(http=http)
-        logger.info("✓ Moata API client ready")
-        
-        # Build trace mapping
-        mapping_path = Path(args.mapping)
-        asset_to_trace = build_trace_mapping(
-            csv_path=mapping_path,
-            trace_desc=DEFAULT_ARI_TRACE_DESC,
-            logger=logger
-        )
-        
-        # Load alarm events
-        input_path = Path(args.input)
-        if not input_path.exists():
-            raise FileNotFoundError(
-                f"Input alarm CSV not found: {input_path}\n"
-                f"Please ensure the file exists and path is correct."
-            )
-        
-        logger.info(f"Loading alarm events from {input_path}...")
-        alarms_df = pd.read_csv(input_path)
-        
-        # Validate required columns
-        required_cols = ["assetid", "name", "createdtimeutc"]
-        missing_cols = [col for col in required_cols if col not in alarms_df.columns]
-        if missing_cols:
-            raise ValueError(
-                f"Missing required columns in alarm CSV: {missing_cols}\n"
-                f"Found columns: {alarms_df.columns.tolist()}"
-            )
-        
-        logger.info(f"✓ Loaded {len(alarms_df)} alarm events")
+        logger.info("")
+        logger.info("Configuration:")
+        logger.info(f"  Input:     {input_path}")
+        logger.info(f"  Output:    {output_path}")
+        logger.info(f"  Threshold: {args.threshold*100:.0f}%")
         logger.info("=" * 80)
+        logger.info("")
         
-        # Validate alarms
+        # Run validation
         logger.info("Starting validation process...")
-        results = validate_alarms(
-            client=client,
-            alarms_df=alarms_df,
-            asset_to_trace=asset_to_trace,
-            threshold=args.threshold,
-            window_before=args.window_before,
-            window_after=args.window_after,
-            data_interval=DEFAULT_DATA_INTERVAL_SECONDS,
-            data_type=DEFAULT_DATA_TYPE,
-            logger=logger
+        
+        result = run_validation(
+            ari_summary_path=input_path,
+            output_path=output_path,
+            proportion_threshold=args.threshold,
+            logger=logger,
         )
         
-        # Save results
-        output_path = Path(args.output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Display report
+        logger.info("")
+        logger.info(result["report"])
         
-        out_df = pd.DataFrame(results)
-        out_df.to_csv(output_path, index=False)
-        
-        # Display summary
         logger.info("")
         logger.info("=" * 80)
-        logger.info("VALIDATION SUMMARY")
+        logger.info("✅ Validation completed successfully")
         logger.info("=" * 80)
-        status_counts = out_df["status"].value_counts()
-        for status, count in status_counts.items():
-            logger.info(f"  {status}: {count}")
-        
-        # Calculate percentages
-        total = len(out_df)
-        if total > 0:
-            logger.info("")
-            logger.info("Percentages:")
-            for status, count in status_counts.items():
-                pct = (count / total) * 100
-                logger.info(f"  {status}: {pct:.1f}%")
-        
-        logger.info("=" * 80)
-        logger.info(f"✅ Results saved to: {output_path}")
+        logger.info(f"Results saved to: {result['output_path']}")
+        logger.info("")
+        logger.info("Summary:")
+        logger.info(f"  Total catchments:   {result['total_count']}")
+        logger.info(f"  Would alarm:        {result['alarm_count']}")
+        logger.info(f"  Status OK:          {result['ok_count']}")
         logger.info("=" * 80)
         
         return 0
         
     except KeyboardInterrupt:
-        logger.warning("\n⚠️  Validation interrupted by user (Ctrl+C)")
-        logger.info("Partial results may have been saved")
+        logger.warning("")
+        logger.warning("=" * 80)
+        logger.warning("⚠️  Validation interrupted by user (Ctrl+C)")
+        logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
-        logger.error(f"❌ File not found: {e}")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ File Not Found")
+        logger.error("=" * 80)
+        logger.error(str(e))
         return 1
         
     except ValueError as e:
-        logger.error(f"❌ Invalid data: {e}")
-        return 1
-        
-    except RuntimeError as e:
-        logger.error(f"❌ Configuration error: {e}")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Validation Error")
+        logger.error("=" * 80)
+        logger.error(str(e))
+        logger.error("")
+        logger.error("Run with --help for usage information.")
         return 1
         
     except Exception as e:
+        logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ VALIDATION FAILED")
+        logger.error("❌ Validation Failed")
         logger.error("=" * 80)
-        logger.error(f"Error type: {type(e).__name__}")
-        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Error: {e}")
         logger.exception("Full traceback:")
         logger.error("")
-        logger.error("Troubleshooting tips:")
-        logger.error("1. Ensure analyze_rain_gauges.py completed successfully")
-        logger.error("2. Check that alarm CSV contains required columns")
-        logger.error("3. Verify Moata API credentials in .env")
-        logger.error("4. Check network connection to Moata API")
-        logger.error("5. Try running with --log-level DEBUG for more information")
+        logger.error("Troubleshooting:")
+        logger.error("1. Verify analyze_rain_radar.py completed successfully")
+        logger.error("2. Check ARI summary CSV has required columns")
+        logger.error("3. Ensure proportion values are in range [0.0, 1.0]")
+        logger.error("4. Try with --log-level DEBUG for more details")
         return 1
 
 
