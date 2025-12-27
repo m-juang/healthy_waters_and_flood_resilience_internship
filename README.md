@@ -295,22 +295,21 @@ Create a `.env` file in the project root with the following variables:
 MOATA_CLIENT_ID=your_oauth_client_id_here
 MOATA_CLIENT_SECRET=your_oauth_secret_here
 
-# Moata API Configuration
-MOATA_API_BASE_URL=https://api.moata.io
-MOATA_TOKEN_URL=https://api.moata.io/oauth2/token
-
-# Optional: Logging Level (default: INFO)
-LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# Optional: Logging Level (can also be set via --log-level flag)
+# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
+
+**Note:** API URLs (`https://api.moata.io`) are configured in the code. If you need to change them (e.g., for testing), edit `moata_pipeline/common/constants.py`.
 
 ### How to Get Credentials
 
 1. Contact your Auckland Council supervisor or project manager
-2. Request Moata API OAuth2 credentials for the rain monitoring project
-3. You should receive:
-   - Client ID (alphanumeric string)
-   - Client Secret (long alphanumeric string)
-4. Never commit `.env` to Git (already in `.gitignore`)
+2. Request **Moata API OAuth2 credentials** for the rain monitoring project
+3. You will receive:
+   - **Client ID** (alphanumeric string)
+   - **Client Secret** (long alphanumeric string)
+4. Copy these into your `.env` file
+5. Never commit `.env` to Git (already in `.gitignore`)
 
 ### Security Best Practices
 
@@ -337,6 +336,10 @@ python retrieve_rain_gauges.py
 # → Outputs to: outputs/rain_gauges/raw/
 # → Duration: ~5-10 minutes
 
+# Advanced options:
+python retrieve_rain_gauges.py --log-level DEBUG   # Verbose logging
+python retrieve_rain_gauges.py --help              # Show all options
+
 # 2. Analyze and filter gauges
 python analyze_rain_gauges.py
 # → Applies quality filters
@@ -344,11 +347,21 @@ python analyze_rain_gauges.py
 # → Outputs to: outputs/rain_gauges/analyze/
 # → Duration: ~2-3 minutes
 
+# Advanced options:
+python analyze_rain_gauges.py --inactive-months 6          # Custom inactivity threshold
+python analyze_rain_gauges.py --exclude-keyword "backup"   # Custom exclusion filter
+python analyze_rain_gauges.py --log-level DEBUG            # Verbose logging
+
 # 3. Generate interactive dashboard
 python visualize_rain_gauges.py
 # → Creates HTML dashboard with charts
 # → Outputs to: outputs/rain_gauges/visualizations/
 # → Duration: ~3-5 minutes
+
+# Advanced options:
+python visualize_rain_gauges.py --csv path/to/analysis.csv   # Custom input
+python visualize_rain_gauges.py --out custom/output/dir/     # Custom output
+python visualize_rain_gauges.py --log-level DEBUG            # Verbose logging
 
 # 4. Validate alarm configurations (optional)
 python validate_ari_alarms_rain_gauges.py
@@ -387,6 +400,23 @@ outputs/rain_gauges/
 │   └── validation_dashboard.html               # Validation comparison
 └── ari_alarm_validation.csv                    # Validation results
 ```
+
+#### Command-Line Options
+
+| Script | Options | Description |
+|--------|---------|-------------|
+| `retrieve_rain_gauges.py` | `--log-level LEVEL` | Set logging level (DEBUG/INFO/WARNING/ERROR) |
+| | `--help` | Show usage and examples |
+| `analyze_rain_gauges.py` | `--inactive-months N` | Inactivity threshold in months (default: 3) |
+| | `--exclude-keyword WORD` | Exclude gauges with keyword (default: "test") |
+| | `--log-level LEVEL` | Set logging level |
+| | `--help` | Show usage and examples |
+| `visualize_rain_gauges.py` | `--csv PATH` | Custom input CSV (auto-detects if omitted) |
+| | `--out DIR` | Custom output directory |
+| | `--log-level LEVEL` | Set logging level |
+| | `--help` | Show usage and examples |
+| `validate_ari_alarms_rain_gauges.py` | *(to be documented)* | *(options pending)* |
+| `visualize_ari_alarms_rain_gauges.py` | *(to be documented)* | *(options pending)* |
 
 ---
 
