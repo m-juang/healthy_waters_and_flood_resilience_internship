@@ -1,6 +1,19 @@
 ﻿"""
-Data loading and cleaning for radar dashboard.
+Radar Data Cleaning Module
+
+Data loading and analysis for radar visualization.
+
+Functions:
+    load_catchments: Load catchments CSV
+    load_pixel_mappings: Load pixel mappings
+    analyze_catchment: Analyze single catchment
+    load_and_analyze: Main analysis pipeline
+
+Author: Auckland Council Internship Team (COMPSCI 778)
+Last Modified: 2024-12-28
+Version: 1.0.0
 """
+
 from __future__ import annotations
 
 import json
@@ -11,20 +24,37 @@ from typing import Dict, List
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+
+__version__ = "1.0.0"
 
 
 def load_catchments(catchments_dir: Path) -> pd.DataFrame:
-    """Load catchments data."""
+    """
+    Load catchments data from CSV.
+    
+    Args:
+        catchments_dir: Directory containing stormwater_catchments.csv
+        
+    Returns:
+        DataFrame with catchment data
+    """
     file_path = catchments_dir / "stormwater_catchments.csv"
     if not file_path.exists():
-        logger.warning("Catchments file not found: %s", file_path)
+        logging.getLogger(__name__).warning(f"Catchments file not found: {file_path}")
         return pd.DataFrame()
     return pd.read_csv(file_path)
 
 
 def load_pixel_mappings(mappings_dir: Path) -> Dict[int, List[int]]:
-    """Load pixel mappings from pickle or JSON."""
+    """
+    Load pixel mappings from pickle or JSON.
+    
+    Args:
+        mappings_dir: Directory containing pixel mapping files
+        
+    Returns:
+        Dictionary mapping catchment_id to list of pixel indices
+    """
     pkl_path = mappings_dir / "catchment_pixel_mapping.pkl"
     json_path = mappings_dir / "catchment_pixel_mapping.json"
     
@@ -35,9 +65,9 @@ def load_pixel_mappings(mappings_dir: Path) -> Dict[int, List[int]]:
         with open(json_path, "r") as f:
             data = json.load(f)
         return {int(k): v for k, v in data.items()}
-    else:
-        logger.warning("Pixel mappings not found")
-        return {}
+    
+    logging.getLogger(__name__).warning("Pixel mappings not found")
+    return {}
 
 
 def analyze_catchment(
@@ -46,7 +76,18 @@ def analyze_catchment(
     catchment_name: str,
     pixel_count: int,
 ) -> Dict:
-    """Analyze radar data for one catchment."""
+    """
+    Analyze radar data for one catchment.
+    
+    Args:
+        radar_dir: Directory containing radar CSV files
+        catchment_id: Catchment ID
+        catchment_name: Catchment name
+        pixel_count: Number of pixels in catchment
+        
+    Returns:
+        Dictionary with analysis results
+    """
     radar_files = list(radar_dir.glob(f"{catchment_id}_*.csv"))
     
     if not radar_files:
@@ -86,7 +127,20 @@ def analyze_catchment(
 
 
 def load_and_analyze(data_dir: Path) -> pd.DataFrame:
-    """Load radar data and analyze all catchments."""
+    """
+    Load radar data and analyze all catchments.
+    
+    Args:
+        data_dir: Root data directory containing catchments/, pixel_mappings/, radar_data/
+        
+    Returns:
+        DataFrame with analysis results for all catchments
+        
+    Raises:
+        ValueError: If no catchments or pixel mappings found
+    """
+    logger = logging.getLogger(__name__)
+    
     catchments_dir = data_dir / "catchments"
     mappings_dir = data_dir / "pixel_mappings"
     radar_dir = data_dir / "radar_data"
@@ -95,10 +149,9 @@ def load_and_analyze(data_dir: Path) -> pd.DataFrame:
     pixel_mappings = load_pixel_mappings(mappings_dir)
     
     if catchments.empty or not pixel_mappings:
-        logger.error("No data to analyze")
-        return pd.DataFrame()
+        raise ValueError("No catchments or pixel mappings found")
     
-    logger.info("Analyzing %d catchments...", len(pixel_mappings))
+    logger.info(f"Analyzing {len(pixel_mappings)} catchments...")
     
     stats = []
     total = len(pixel_mappings)
@@ -111,7 +164,7 @@ def load_and_analyze(data_dir: Path) -> pd.DataFrame:
         stats.append(stat)
         
         if idx % 50 == 0:
-            logger.info("  Progress: %d/%d", idx, total)
+            logger.info(f"  Progress: {idx}/{total}")
     
-    logger.info("✓ Analyzed %d catchments", len(stats))
+    logger.info(f"✓ Analyzed {len(stats)} catchments")
     return pd.DataFrame(stats)

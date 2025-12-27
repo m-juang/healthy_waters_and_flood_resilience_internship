@@ -1,16 +1,50 @@
-# alarm_analysis.py
+"""
+Alarm Analysis Module
+
+Analyzes rain gauge alarm configurations and creates comprehensive DataFrames
+for reporting and validation.
+
+Key Functions:
+    analyze_alarms: Main entry point - creates all_traces and alarms_only DataFrames
+    
+Helper Functions:
+    Type casting: _as_str, _as_bool, _as_int
+    Datetime: _parse_iso, _to_utc, _fmt_ddmmyyyy, _fmt_iso
+    Normalizers: resolution_bucket, data_variable_type_fields, style_config_fields
+    Alarm helpers: _get_alarm_name, alarms_by_type_inventory
+
+Author: Auckland Council Internship Team (COMPSCI 778)
+Last Modified: 2024-12-28
+Version: 1.0.0
+"""
+
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 
-# ----------------------------
-# Generic safe getters / casting
-# ----------------------------
+# Version info
+__version__ = "1.0.0"
+
+
+# =============================================================================
+# Type Casting Helpers
+# =============================================================================
+
 def _as_str(x: Any) -> Optional[str]:
+    """
+    Safely cast value to string.
+    
+    Args:
+        x: Value to cast
+        
+    Returns:
+        String value or None if empty/invalid
+    """
     if x is None:
         return None
     s = str(x).strip()
@@ -18,6 +52,17 @@ def _as_str(x: Any) -> Optional[str]:
 
 
 def _as_bool(x: Any) -> Optional[bool]:
+    """
+    Safely cast value to boolean.
+    
+    Handles: bool, int, float, str ("true", "yes", "1", etc.)
+    
+    Args:
+        x: Value to cast
+        
+    Returns:
+        Boolean value or None if cannot determine
+    """
     if x is None:
         return None
     if isinstance(x, bool):
@@ -34,6 +79,15 @@ def _as_bool(x: Any) -> Optional[bool]:
 
 
 def _as_int(x: Any) -> Optional[int]:
+    """
+    Safely cast value to integer.
+    
+    Args:
+        x: Value to cast
+        
+    Returns:
+        Integer value or None if invalid
+    """
     if x is None:
         return None
     if isinstance(x, bool):
@@ -53,15 +107,24 @@ def _as_int(x: Any) -> Optional[int]:
     return None
 
 
-# ----------------------------
-# Datetime helpers
-# ----------------------------
+# =============================================================================
+# Datetime Helpers
+# =============================================================================
+
 def _parse_iso(dt_str: Optional[str]) -> Optional[datetime]:
     """
-    Parse ISO datetime strings that may include:
-      - timezone offsets: 2025-12-25T15:59:30+12:00
-      - Z suffix:         2025-12-25T03:59:30Z
-      - naive dt:         2025-12-25T03:59:30  (assumed UTC)
+    Parse ISO datetime strings with various formats.
+    
+    Supports:
+        - Timezone offsets: 2025-12-25T15:59:30+12:00
+        - Z suffix: 2025-12-25T03:59:30Z
+        - Naive: 2025-12-25T03:59:30 (assumed UTC)
+        
+    Args:
+        dt_str: ISO datetime string
+        
+    Returns:
+        Datetime object or None if invalid
     """
     if not dt_str:
         return None
@@ -83,6 +146,15 @@ def _parse_iso(dt_str: Optional[str]) -> Optional[datetime]:
 
 
 def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """
+    Convert datetime to UTC timezone.
+    
+    Args:
+        dt: Datetime to convert
+        
+    Returns:
+        UTC datetime or None
+    """
     if dt is None:
         return None
     if dt.tzinfo is None:
@@ -91,23 +163,33 @@ def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def _fmt_ddmmyyyy(dt: Optional[datetime]) -> Optional[str]:
+    """Format datetime as DD/MM/YYYY."""
     return dt.strftime("%d/%m/%Y") if dt else None
 
 
 def _fmt_iso(dt: Optional[datetime]) -> Optional[str]:
+    """Format datetime as ISO string."""
     return dt.isoformat() if dt else None
 
 
-# ----------------------------
-# Normalizers (for heterogenous fields)
-# ----------------------------
+# =============================================================================
+# Field Normalizers (for heterogeneous API data)
+# =============================================================================
+
 def resolution_bucket(res: Any) -> Optional[str]:
     """
-    resolution sometimes looks like:
-      - 300 or 3600 (seconds)
-      - "5m", "1m"
-      - {"unit":"minute","value":5}
-    We normalize to a stable string.
+    Normalize resolution field to stable string.
+    
+    Handles:
+        - Numeric seconds: 300, 3600
+        - String format: "5m", "1m"
+        - Dict format: {"unit":"minute", "value":5}
+        
+    Args:
+        res: Resolution value in various formats
+        
+    Returns:
+        Normalized string or None
     """
     if res is None:
         return None
@@ -117,9 +199,8 @@ def resolution_bucket(res: Any) -> Optional[str]:
         val = res.get("value")
         return f"{val}{unit}"
 
-    # If it is numeric (commonly seconds)
+    # If numeric (commonly seconds)
     if isinstance(res, (int, float)) and not isinstance(res, bool):
-        # keep as int if possible
         r = _as_int(res)
         return str(r) if r is not None else _as_str(res)
 
@@ -128,11 +209,19 @@ def resolution_bucket(res: Any) -> Optional[str]:
 
 def data_variable_type_fields(dvt_raw: Any) -> Dict[str, Any]:
     """
-    dataVariableType may be:
-      - dict with id/name/description/type/units...
-      - a plain id
-      - a plain name
-      - null
+    Extract and normalize dataVariableType fields.
+    
+    Handles heterogeneous formats:
+        - dict with id/name/description/type/units
+        - plain id (numeric)
+        - plain name (string)
+        - null
+        
+    Args:
+        dvt_raw: Raw dataVariableType value
+        
+    Returns:
+        Dictionary with normalized fields
     """
     out: Dict[str, Any] = {
         "trace_var_type_id": None,
@@ -161,7 +250,7 @@ def data_variable_type_fields(dvt_raw: Any) -> Dict[str, Any]:
             out["trace_units_is_total_relevant"] = units.get("isTotalRelevant")
         return out
 
-    # Fallback: store as name-ish if string, or id-ish if numeric
+    # Fallback: store as name if string, id if numeric
     if isinstance(dvt_raw, str):
         out["trace_var_type_name"] = dvt_raw
     elif isinstance(dvt_raw, (int, float)) and not isinstance(dvt_raw, bool):
@@ -172,10 +261,18 @@ def data_variable_type_fields(dvt_raw: Any) -> Dict[str, Any]:
 
 def style_config_fields(sc_raw: Any) -> Dict[str, Any]:
     """
-    styleConfig may be:
-      - {"all": {"type":..., "color":..., "attach":...}}
-      - {"type":..., "invert":...}
-      - something else / null
+    Extract and normalize styleConfig fields.
+    
+    Handles formats:
+        - {"all": {"type":..., "color":..., "attach":...}}
+        - {"type":..., "invert":...}
+        - null
+        
+    Args:
+        sc_raw: Raw styleConfig value
+        
+    Returns:
+        Dictionary with normalized style fields
     """
     out = {
         "trace_style_type": None,
@@ -183,6 +280,7 @@ def style_config_fields(sc_raw: Any) -> Dict[str, Any]:
         "trace_style_attach": None,
         "trace_style_invert": None,
     }
+    
     if not isinstance(sc_raw, dict):
         return out
 
@@ -197,19 +295,27 @@ def style_config_fields(sc_raw: Any) -> Dict[str, Any]:
     # Flat shape
     out["trace_style_type"] = sc_raw.get("type")
     out["trace_style_invert"] = sc_raw.get("invert")
-    # color/attach may not exist in flat form; keep None
+    
     return out
 
 
 def virtual_trace_fields(vt_raw: Any) -> Dict[str, Any]:
     """
-    virtualTrace may be:
-      - bool true/false
-      - dict with {id, description, parentTraceId}
-      - null
+    Extract and normalize virtualTrace fields.
+    
+    Handles formats:
+        - bool true/false
+        - dict with {id, description, parentTraceId}
+        - null
+        
+    Args:
+        vt_raw: Raw virtualTrace value
+        
+    Returns:
+        Dictionary with normalized virtual trace fields
     """
     out = {
-        "trace_virtual_bool": None,          # bool summary if available
+        "trace_virtual_bool": None,
         "trace_virtual_id": None,
         "trace_virtual_description": None,
         "trace_virtual_parent_trace_id": None,
@@ -229,13 +335,21 @@ def virtual_trace_fields(vt_raw: Any) -> Dict[str, Any]:
     return out
 
 
-# ----------------------------
-# Alarm helpers
-# ----------------------------
+# =============================================================================
+# Alarm Analysis Helpers
+# =============================================================================
+
 def _get_alarm_name(th: Dict[str, Any]) -> str:
     """
-    Get a descriptive alarm name from threshold config.
+    Get descriptive alarm name from threshold config.
+    
     Falls back to alarmDescription if name is too short (e.g., "mm").
+    
+    Args:
+        th: Threshold dictionary
+        
+    Returns:
+        Alarm name string
     """
     alarm_name = (th.get("name") or "").strip()
 
@@ -252,10 +366,13 @@ def _get_alarm_name(th: Dict[str, Any]) -> str:
 
 def alarms_by_type_inventory(trace_wrap: Dict[str, Any]) -> Tuple[List[str], Dict[str, int]]:
     """
-    Determine which alarm types are present based on alarms_by_type payload non-empty.
+    Determine which alarm types are present based on alarms_by_type payload.
+    
+    Args:
+        trace_wrap: Trace wrapper dictionary
+        
     Returns:
-      - list of alarm types present
-      - counts by type (approx; list length or dict size)
+        Tuple of (list of alarm types present, counts by type)
     """
     present: List[str] = []
     counts: Dict[str, int] = {}
@@ -279,8 +396,7 @@ def alarms_by_type_inventory(trace_wrap: Dict[str, Any]) -> Tuple[List[str], Dic
         elif payload is None:
             n = 0
         else:
-            # some other scalar payload => treat as present
-            n = 1
+            n = 1  # Some other scalar payload
 
         if n > 0:
             present.append(k)
@@ -292,7 +408,13 @@ def alarms_by_type_inventory(trace_wrap: Dict[str, Any]) -> Tuple[List[str], Dic
 
 def detailed_alarm_inventory(trace_wrap: Dict[str, Any]) -> Optional[str]:
     """
-    Try to extract a human-readable "type" / name from detailed_alarm.
+    Extract human-readable alarm type from detailed_alarm.
+    
+    Args:
+        trace_wrap: Trace wrapper dictionary
+        
+    Returns:
+        Alarm type string or None
     """
     da = trace_wrap.get("detailed_alarm")
     if not isinstance(da, dict) or not da:
@@ -306,12 +428,35 @@ def detailed_alarm_inventory(trace_wrap: Dict[str, Any]) -> Optional[str]:
     return "present"
 
 
-# ----------------------------
-# Trace extractor (robust)
-# ----------------------------
+def json_dumps_safe(obj: Any) -> Optional[str]:
+    """
+    Safely serialize object to JSON string.
+    
+    Args:
+        obj: Object to serialize
+        
+    Returns:
+        JSON string or None if serialization fails
+    """
+    try:
+        return json.dumps(obj, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        return None
+
+
+# =============================================================================
+# Trace Extraction
+# =============================================================================
+
 def _extract_trace_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract trace fields with heterogeneity guards.
+    
+    Args:
+        trace: Trace dictionary
+        
+    Returns:
+        Dictionary with normalized trace fields
     """
     result: Dict[str, Any] = {
         "trace_id": trace.get("id"),
@@ -322,7 +467,7 @@ def _extract_trace_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
         "trace_resolution_raw": trace.get("resolution"),
         "trace_resolution": resolution_bucket(trace.get("resolution")),
         "trace_timezone": _as_str(trace.get("timeZone")),
-        # time fields
+        # Time fields
         "trace_telemetered_max_time": trace.get("telemeteredMaximumTime"),
         "trace_archived_min_time": trace.get("archivedMinimumTime"),
         "trace_archived_max_time": trace.get("archivedMaximumTime"),
@@ -343,15 +488,18 @@ def _extract_trace_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-# ----------------------------
-# Trace selection helpers
-# ----------------------------
+# =============================================================================
+# Trace Selection Helpers
+# =============================================================================
+
 def _is_primary_rainfall_trace(trace: Dict[str, Any]) -> bool:
+    """Check if trace is primary rainfall trace."""
     desc = (trace.get("description") or "").strip().lower()
     return desc == "rainfall"
 
 
 def _get_latest_telemetered_time(traces: List[Dict[str, Any]]) -> Optional[datetime]:
+    """Get latest telemetered time across all traces."""
     latest: Optional[datetime] = None
     for td in traces:
         t = td.get("trace", {}) or {}
@@ -364,6 +512,12 @@ def _get_latest_telemetered_time(traces: List[Dict[str, Any]]) -> Optional[datet
 def _get_primary_rainfall_times(
     traces: List[Dict[str, Any]],
 ) -> Tuple[Optional[datetime], Optional[datetime], Optional[datetime]]:
+    """
+    Get archived min/max and telemetered max from primary rainfall trace.
+    
+    Returns:
+        Tuple of (archived_min, archived_max, telemetered_max)
+    """
     for td in traces:
         t = td.get("trace", {}) or {}
         if _is_primary_rainfall_trace(t):
@@ -374,9 +528,10 @@ def _get_primary_rainfall_times(
     return None, None, None
 
 
-# ----------------------------
-# Main
-# ----------------------------
+# =============================================================================
+# Main Analysis Function
+# =============================================================================
+
 def analyze_alarms(
     active_gauges: List[Dict[str, Any]],
     *,
@@ -384,21 +539,37 @@ def analyze_alarms(
     now_utc: Optional[datetime] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Build 2 DataFrames from JSON payload.
-
-    Returns:
-        (all_traces_df, alarms_only_df)
-
+    Build comprehensive alarm analysis DataFrames from gauge data.
+    
+    Creates two DataFrames:
+        1. all_traces_df: Complete inventory of all traces and configurations
+        2. alarms_only_df: Filtered to only alarm/threshold configurations
+        
     all_traces_df includes:
-      - 1 derived recency row per gauge (source=derived_recency)
-      - 1 "trace inventory" row per trace (source=trace_inventory)
-      - 1 row per threshold config (source=threshold_config)
-
+        - 1 derived recency row per gauge (source=derived_recency)
+        - 1 trace inventory row per trace (source=trace_inventory)
+        - 1 row per threshold config (source=threshold_config)
+        
     alarms_only_df includes:
-      - derived recency row per gauge
-      - threshold_config rows
-      - (optional) alarm_inventory rows if alarms_by_type/detailed_alarm indicate presence
-        (source=alarm_inventory) so you can report "what alarms exist" even if thresholds empty
+        - Derived recency rows
+        - Threshold config rows
+        - Alarm inventory rows (if alarms_by_type/detailed_alarm present)
+        
+    Args:
+        active_gauges: List of active gauge dictionaries from filter_gauges()
+        inactive_threshold_months: Months threshold for recency calculation
+        now_utc: Current time (default: datetime.now(timezone.utc))
+        
+    Returns:
+        Tuple of (all_traces_df, alarms_only_df)
+        
+    Example:
+        >>> all_df, alarms_df = analyze_alarms(
+        ...     active_gauges,
+        ...     inactive_threshold_months=3
+        ... )
+        >>> print(f"Total traces: {len(all_df)}")
+        >>> print(f"Alarms found: {len(alarms_df)}")
     """
     all_records: List[Dict[str, Any]] = []
     alarm_records: List[Dict[str, Any]] = []
@@ -458,7 +629,7 @@ def analyze_alarms(
             "is_active_by_months": is_active_by_months,
         }
 
-        # A template for alarm-related columns
+        # Template for alarm-related columns
         alarm_cols_empty = {
             "alarm_id": None,
             "alarm_name": None,
@@ -470,19 +641,17 @@ def analyze_alarms(
             "threshold_category_id": None,
             "severity": None,
             "is_critical": None,
-            "alarm_types_present": None,          # inventory string
+            "alarm_types_present": None,
             "alarm_types_present_count": None,
             "alarm_types_counts_json": None,
             "detailed_alarm_type": None,
             "source": None,
         }
 
-        # ------------------------------------
         # (A) Derived Recency (1 per gauge)
-        # ------------------------------------
         recency_row = {
             **gauge_base,
-            # trace-ish fields blanked
+            # Trace fields blanked
             "trace_id": None,
             "trace_asset_id": None,
             "trace_description": "Rainfall (primary)" if telem_max_primary else "Rainfall (primary not found)",
@@ -513,7 +682,7 @@ def analyze_alarms(
             "trace_style_color": None,
             "trace_style_attach": None,
             "trace_style_invert": None,
-            # alarm columns
+            # Alarm columns
             **alarm_cols_empty,
             "alarm_name": "Data Recency (derived from telemeteredMaximumTime)",
             "alarm_type": "Recency",
@@ -521,11 +690,9 @@ def analyze_alarms(
             "source": "derived_recency",
         }
         all_records.append(recency_row)
-        alarm_records.append(recency_row)  # Sam said it's derived; we keep it in alarms-only, but labeled.
+        alarm_records.append(recency_row)
 
-        # ------------------------------------
         # (B) Per-trace inventory + thresholds + alarms inventory
-        # ------------------------------------
         for trace_wrap in traces:
             if not isinstance(trace_wrap, dict):
                 continue
@@ -536,7 +703,7 @@ def analyze_alarms(
 
             trace_fields = _extract_trace_fields(trace)
 
-            # 1) Trace inventory row (always)
+            # 1) Trace inventory row
             present_alarm_types, alarm_type_counts = alarms_by_type_inventory(trace_wrap)
             detailed_type = detailed_alarm_inventory(trace_wrap)
 
@@ -552,8 +719,7 @@ def analyze_alarms(
             }
             all_records.append(trace_inventory_row)
 
-            # 2) If alarms exist via alarms_by_type or detailed_alarm, add an alarms_only "inventory" row
-            #    (This helps your goal: "mencatat alarm apa saja" even when thresholds empty.)
+            # 2) Alarm inventory row (if alarms exist)
             if (present_alarm_types and len(present_alarm_types) > 0) or (detailed_type is not None):
                 inv_alarm_row = {
                     **trace_inventory_row,
@@ -566,7 +732,6 @@ def analyze_alarms(
             # 3) Threshold configs (one row per threshold)
             thresholds = trace_wrap.get("thresholds", []) or []
             if isinstance(thresholds, dict):
-                # sometimes thresholds could be dict-like; convert to values
                 thresholds = list(thresholds.values())
 
             if isinstance(thresholds, list) and thresholds:
@@ -594,7 +759,7 @@ def analyze_alarms(
                         "threshold_category_id": th.get("thresholdCategoryId"),
                         "severity": th.get("severity"),
                         "is_critical": th.get("isCritical"),
-                        # keep inventory context too (useful for debugging)
+                        # Keep inventory context
                         "alarm_types_present": ",".join(present_alarm_types) if present_alarm_types else None,
                         "alarm_types_present_count": len(present_alarm_types) if present_alarm_types else 0,
                         "alarm_types_counts_json": json_dumps_safe(alarm_type_counts) if alarm_type_counts else None,
@@ -606,12 +771,5 @@ def analyze_alarms(
 
     all_traces_df = pd.DataFrame(all_records)
     alarms_only_df = pd.DataFrame(alarm_records)
+    
     return all_traces_df, alarms_only_df
-
-
-def json_dumps_safe(obj: Any) -> Optional[str]:
-    try:
-        import json
-        return json.dumps(obj, ensure_ascii=False, sort_keys=True)
-    except Exception:
-        return None
