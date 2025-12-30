@@ -419,7 +419,7 @@ The rain gauge pipeline processes data from ~200 point-based rainfall gauges acr
 python retrieve_rain_gauges.py
 # → Fetches last 30 days of data
 # → Outputs to: outputs/rain_gauges/raw/
-# → Duration: ~5-10 minutes
+# → Duration: ~ 1 hour
 
 # Advanced options (NEW in v1.0.0):
 python retrieve_rain_gauges.py --log-level DEBUG   # Verbose logging
