@@ -249,7 +249,7 @@ def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> P
         )
     
     # Check if directory has data
-    data_files = list(radar_data_dir.glob("*.json"))
+    data_files = list(radar_data_dir.glob("*.csv"))
     if not data_files:
         raise FileNotFoundError(
             f"No radar data files found in: {radar_data_dir}\n"

@@ -226,7 +226,7 @@ def detect_data_dir(args: argparse.Namespace, logger: logging.Logger) -> tuple[P
         )
     
     # Check for data files
-    radar_files = list((data_dir / "radar_data").glob("*.json"))
+    radar_files = list((data_dir / "radar_data").glob("*.csv"))
     if not radar_files:
         raise FileNotFoundError(
             f"No radar data files found in: {data_dir / 'radar_data'}\n"

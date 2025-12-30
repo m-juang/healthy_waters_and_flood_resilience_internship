@@ -3,4 +3,15 @@
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Generated outputs / reports
 outputs/
+*_output/
+*.log
+
+# Data exports
+*.csv
+*.json
+*.png
+*.html
+*.txt
