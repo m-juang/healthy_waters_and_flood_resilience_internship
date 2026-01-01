@@ -159,7 +159,7 @@ class MoataHttp:
         if not verify_ssl:
             warnings.filterwarnings(
                 'ignore',
-                message='Unverified HTTPS request',
+                message='UnVALIDATED HTTPS request',
                 category=urllib3.exceptions.InsecureRequestWarning
             )
         

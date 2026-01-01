@@ -124,9 +124,9 @@ def create_status_chart(df: pd.DataFrame, out_dir: Path, logger) -> None:
     status_counts = df["status"].value_counts()
     
     colors = {
-        "VERIFIED": "#28a745",
-        "NOT_VERIFIED": "#dc3545", 
-        "UNVERIFIABLE": "#6c757d",
+        "VALIDATED": "#28a745",
+        "NOT_VALIDATED": "#dc3545", 
+        "UNVALIDATABLE": "#6c757d",
     }
     
     plt.figure(figsize=(8, 6))
@@ -203,9 +203,9 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
     df["max_ari_value"] = pd.to_numeric(df["max_ari_value"], errors="coerce")
     
     total = len(df)
-    verified = (df["status"] == "VERIFIED").sum()
-    not_verified = (df["status"] == "NOT_VERIFIED").sum()
-    unverifiable = (df["status"] == "UNVERIFIABLE").sum()
+    VALIDATED = (df["status"] == "VALIDATED").sum()
+    not_VALIDATED = (df["status"] == "NOT_VALIDATED").sum()
+    UNVALIDATABLE = (df["status"] == "UNVALIDATABLE").sum()
     
     avg_ari = df["max_ari_value"].mean() if df["max_ari_value"].notna().any() else 0
     max_ari = df["max_ari_value"].max() if df["max_ari_value"].notna().any() else 0
@@ -228,9 +228,9 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
         .stat-card:hover {{ transform: translateY(-5px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }}
         .stat-card .value {{ font-size: 2em; font-weight: bold; }}
         .stat-card .label {{ color: #666; font-size: 0.9em; margin-top: 5px; }}
-        .stat-card.verified .value {{ color: #28a745; }}
-        .stat-card.not-verified .value {{ color: #dc3545; }}
-        .stat-card.unverifiable .value {{ color: #6c757d; }}
+        .stat-card.VALIDATED .value {{ color: #28a745; }}
+        .stat-card.not-VALIDATED .value {{ color: #dc3545; }}
+        .stat-card.UNVALIDATABLE .value {{ color: #6c757d; }}
         .section {{ background: white; padding: 25px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }}
         .section h2 {{ color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #28a745; }}
         .charts {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }}
@@ -240,9 +240,9 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
         th {{ background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; }}
         td {{ padding: 10px 12px; border-bottom: 1px solid #eee; }}
         tr:hover {{ background: #f9f9f9; }}
-        .status-verified {{ color: #28a745; font-weight: bold; }}
-        .status-not-verified {{ color: #dc3545; font-weight: bold; }}
-        .status-unverifiable {{ color: #6c757d; }}
+        .status-VALIDATED {{ color: #28a745; font-weight: bold; }}
+        .status-not-VALIDATED {{ color: #dc3545; font-weight: bold; }}
+        .status-UNVALIDATABLE {{ color: #6c757d; }}
         .search-box {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 1em; }}
         .search-box:focus {{ outline: none; border-color: #28a745; }}
         .footer {{ text-align: center; color: #666; padding: 20px; font-size: 0.9em; border-top: 1px solid #ddd; margin-top: 20px; }}
@@ -260,17 +260,17 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
                 <div class="value">{total}</div>
                 <div class="label">Total Alarms</div>
             </div>
-            <div class="stat-card verified">
-                <div class="value">{verified}</div>
-                <div class="label">Verified (✓)</div>
+            <div class="stat-card VALIDATED">
+                <div class="value">{VALIDATED}</div>
+                <div class="label">VALIDATED (✓)</div>
             </div>
-            <div class="stat-card not-verified">
-                <div class="value">{not_verified}</div>
-                <div class="label">Not Verified (✗)</div>
+            <div class="stat-card not-VALIDATED">
+                <div class="value">{not_VALIDATED}</div>
+                <div class="label">Not VALIDATED (✗)</div>
             </div>
-            <div class="stat-card unverifiable">
-                <div class="value">{unverifiable}</div>
-                <div class="label">Unverifiable (?)</div>
+            <div class="stat-card UNVALIDATABLE">
+                <div class="value">{UNVALIDATABLE}</div>
+                <div class="label">UNVALIDATABLE (?)</div>
             </div>
             <div class="stat-card">
                 <div class="value">{avg_ari:.1f}</div>

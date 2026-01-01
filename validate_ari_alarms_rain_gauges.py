@@ -123,7 +123,7 @@ def main() -> None:
                 "gauge_name": gauge_name,
                 "alarm_time_utc": alarm_time,
                 "trace_id": None,
-                "status": "UNVERIFIABLE",
+                "status": "UNVALIDATABLE",
                 "reason": "No trace mapping found",
                 "max_ari_value": None,
                 "threshold": ARI_THRESHOLD,
@@ -149,7 +149,7 @@ def main() -> None:
                 "gauge_name": gauge_name,
                 "alarm_time_utc": alarm_time,
                 "trace_id": trace_id,
-                "status": "UNVERIFIABLE",
+                "status": "UNVALIDATABLE",
                 "reason": f"API error: {e}",
                 "max_ari_value": None,
                 "threshold": ARI_THRESHOLD,
@@ -164,7 +164,7 @@ def main() -> None:
                 "gauge_name": gauge_name,
                 "alarm_time_utc": alarm_time,
                 "trace_id": trace_id,
-                "status": "UNVERIFIABLE",
+                "status": "UNVALIDATABLE",
                 "reason": "No data in window",
                 "max_ari_value": None,
                 "threshold": ARI_THRESHOLD,
@@ -177,7 +177,7 @@ def main() -> None:
 
         # Check if threshold was exceeded
         exceeded = max_value >= ARI_THRESHOLD
-        status = "VERIFIED" if exceeded else "NOT_VERIFIED"
+        status = "VALIDATED" if exceeded else "NOT_VALIDATED"
 
         print(f"  Trace ID: {trace_id}")
         print(f"  Max ARI value: {max_value:.2f}")
