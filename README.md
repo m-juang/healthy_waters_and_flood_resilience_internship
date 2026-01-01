@@ -81,7 +81,7 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 pip install customtkinter
 
 # Run the GUI
-python rain_monitoring_gui_modern.py
+python rain_monitoring_gui.py
 ```
 
 **Features:**
