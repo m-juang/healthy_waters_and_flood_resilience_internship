@@ -7,7 +7,7 @@ Built with CustomTkinter for a professional, modern appearance.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-30
-Version: 3.0.0 (CustomTkinter Modern UI)
+Version: 3.0.1 (Fixed subprocess deadlock)
 
 Requirements:
     pip install customtkinter
@@ -195,7 +195,7 @@ class ModernApp(ctk.CTk):
         
         title_label = ctk.CTkLabel(
             header,
-            text="🌧️  MOATA-INGEST",
+            text="🌧 MOATA-RETRIEVER",
             font=ctk.CTkFont(size=24, weight="bold"),
             text_color="white"
         )
@@ -290,7 +290,7 @@ class ModernApp(ctk.CTk):
         
         footer_text = ctk.CTkLabel(
             footer,
-            text=f"Version 3.0.0  •  {datetime.now().strftime('%Y-%m-%d')}  •  COMPSCI 778 Internship",
+            text=f"Version 1.0.0  •  {datetime.now().strftime('%Y-%m-%d')}  •  COMPSCI 778 Internship",
             font=ctk.CTkFont(size=10),
             text_color=self.colors["text_secondary"]
         )
@@ -852,7 +852,7 @@ class ModernApp(ctk.CTk):
         callback(selection["value"])
     
     def show_execution_window(self, title, script, args, callback):
-        """Show script execution window."""
+        """Show script execution window with real-time output."""
         exec_window = ctk.CTkToplevel(self)
         exec_window.title(title)
         exec_window.geometry("900x600")
@@ -939,14 +939,16 @@ class ModernApp(ctk.CTk):
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     creationflags = subprocess.CREATE_NO_WINDOW
                 
+                # FIX: Merge stderr into stdout to prevent deadlock
                 process = subprocess.Popen(
                     cmd,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # <-- KEY FIX: merge stderr to stdout
                     text=True,
                     encoding="utf-8",
                     errors="replace",
+                    bufsize=1,  # Line buffered
                     env=env,
                     startupinfo=startupinfo,
                     creationflags=creationflags,
@@ -958,24 +960,37 @@ class ModernApp(ctk.CTk):
                 elif "radar" in script.lower():
                     timeout_seconds = 1800
                 else:
-                    timeout_seconds = 300
+                    timeout_seconds = 600  # Increased from 300
                 
                 start_time = time.time()
                 
-                # Read output in real-time
+                # Read output line by line in real-time
                 while True:
+                    # Check if window still exists
+                    try:
+                        exec_window.winfo_exists()
+                    except:
+                        process.kill()
+                        return
+                    
+                    # Non-blocking read with timeout
                     ret = process.poll()
                     
+                    # Read available output
                     if process.stdout:
                         try:
                             line = process.stdout.readline()
                             if line:
+                                # Filter out unicode errors
                                 if not any(x in line for x in ["UnicodeEncodeError", "charmap_encode"]):
                                     console_text.insert("end", line)
                                     console_text.see("end")
-                        except:
+                                    # Force UI update
+                                    exec_window.update_idletasks()
+                        except Exception:
                             pass
                     
+                    # Update elapsed time
                     elapsed = int(time.time() - start_time)
                     try:
                         status_label.configure(text=f"⏳ Running... ({elapsed}s elapsed)")
@@ -983,74 +998,84 @@ class ModernApp(ctk.CTk):
                         process.kill()
                         return
                     
+                    # Check timeout
                     if elapsed > timeout_seconds:
                         process.kill()
-                        status_label.configure(text=f"⏱️ Timeout after {timeout_seconds}s", text_color=self.colors["danger"])
-                        console_text.insert("end", f"\n{'='*70}\n⏱️ TIMEOUT\n")
-                        break
-                    
-                    if ret is not None:
                         try:
-                            remaining = process.stdout.read()
-                            if remaining:
-                                console_text.insert("end", remaining)
+                            status_label.configure(text=f"⏱️ Timeout after {timeout_seconds}s", text_color=self.colors["danger"])
+                            console_text.insert("end", f"\n{'='*70}\n⏱️ TIMEOUT\n")
                         except:
                             pass
                         break
                     
-                    time.sleep(0.1)
+                    # Check if process finished
+                    if ret is not None:
+                        # Read any remaining output
+                        try:
+                            remaining = process.stdout.read()
+                            if remaining:
+                                console_text.insert("end", remaining)
+                                console_text.see("end")
+                        except:
+                            pass
+                        break
+                    
+                    # Small sleep to prevent CPU spinning
+                    time.sleep(0.05)
                 
-                progress.stop()
+                # Stop progress bar
+                try:
+                    progress.stop()
+                except:
+                    pass
+                
                 return_code = process.returncode if process.returncode is not None else -1
                 
-                # Read stderr
-                stderr_data = process.stderr.read() if process.stderr else ""
-                if stderr_data:
-                    # Filter unicode errors
-                    filtered_lines = [l for l in stderr_data.split('\n') 
-                                     if not any(x in l for x in ["charmap_encode", "UnicodeEncodeError"])]
-                    if filtered_lines:
-                        console_text.insert("end", "\n=== Errors ===\n")
-                        console_text.insert("end", "\n".join(filtered_lines))
-                
-                if return_code == 0:
-                    status_label.configure(text="✅ Completed Successfully!", text_color=self.colors["success"])
-                    console_text.insert("end", f"\n{'='*70}\n✅ SUCCESS\n")
-                    success = True
-                else:
-                    status_label.configure(text=f"❌ Failed (Exit Code {return_code})", text_color=self.colors["danger"])
-                    console_text.insert("end", f"\n{'='*70}\n❌ ERROR - Exit code {return_code}\n")
-                    success = False
-                
-                console_text.see("end")
-                
-                # Add close button
-                close_btn = ctk.CTkButton(
-                    status_frame,
-                    text="Close",
-                    font=ctk.CTkFont(size=13, weight="bold"),
-                    fg_color=self.colors["primary"],
-                    corner_radius=8,
-                    width=100,
-                    command=lambda: [exec_window.destroy(), callback(success)]
-                )
-                close_btn.pack(side="right", padx=15, pady=8)
+                # Update status based on result
+                try:
+                    if return_code == 0:
+                        status_label.configure(text="✅ Completed Successfully!", text_color=self.colors["success"])
+                        console_text.insert("end", f"\n{'='*70}\n✅ SUCCESS\n")
+                        success = True
+                    else:
+                        status_label.configure(text=f"❌ Failed (Exit Code {return_code})", text_color=self.colors["danger"])
+                        console_text.insert("end", f"\n{'='*70}\n❌ ERROR - Exit code {return_code}\n")
+                        success = False
+                    
+                    console_text.see("end")
+                    
+                    # Add close button
+                    close_btn = ctk.CTkButton(
+                        status_frame,
+                        text="Close",
+                        font=ctk.CTkFont(size=13, weight="bold"),
+                        fg_color=self.colors["primary"],
+                        corner_radius=8,
+                        width=100,
+                        command=lambda: [exec_window.destroy(), callback(success)]
+                    )
+                    close_btn.pack(side="right", padx=15, pady=8)
+                except:
+                    pass
                 
             except Exception as e:
-                progress.stop()
-                status_label.configure(text=f"❌ Exception: {str(e)}", text_color=self.colors["danger"])
-                console_text.insert("end", f"\n❌ EXCEPTION: {str(e)}\n")
-                
-                close_btn = ctk.CTkButton(
-                    status_frame,
-                    text="Close",
-                    font=ctk.CTkFont(size=13, weight="bold"),
-                    fg_color=self.colors["primary"],
-                    corner_radius=8,
-                    width=100,
-                    command=lambda: [exec_window.destroy(), callback(False)]
-                )
-                close_btn.pack(side="right", padx=15, pady=8)
+                try:
+                    progress.stop()
+                    status_label.configure(text=f"❌ Exception: {str(e)}", text_color=self.colors["danger"])
+                    console_text.insert("end", f"\n❌ EXCEPTION: {str(e)}\n")
+                    
+                    close_btn = ctk.CTkButton(
+                        status_frame,
+                        text="Close",
+                        font=ctk.CTkFont(size=13, weight="bold"),
+                        fg_color=self.colors["primary"],
+                        corner_radius=8,
+                        width=100,
+                        command=lambda: [exec_window.destroy(), callback(False)]
+                    )
+                    close_btn.pack(side="right", padx=15, pady=8)
+                except:
+                    pass
         
         thread = threading.Thread(target=run_script, daemon=True)
         thread.start()
