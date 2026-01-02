@@ -81,7 +81,7 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 pip install customtkinter
 
 # Run the GUI
-python rain_monitoring_gui.py
+python rain_monitoring_gui_modern.py
 ```
 
 **Features:**
@@ -157,17 +157,32 @@ internship-project/
 │   ├── moata/                    # Moata API client
 │   └── viz/                      # Visualization
 │
+├── 📁 rain_monitoring_gui/       # GUI package (modular)
+│   ├── __init__.py               # Package init
+│   ├── __main__.py               # Module entry point
+│   ├── config.py                 # Colors, constants, themes
+│   ├── components.py             # Reusable UI components
+│   ├── executor.py               # Script execution handler
+│   ├── main.py                   # Main application window
+│   └── pipelines/                # Pipeline implementations
+│       ├── __init__.py
+│       ├── base.py               # Abstract base class
+│       ├── gauge.py              # Rain Gauge pipeline
+│       └── radar.py              # Rain Radar pipeline
+│
 ├── 📁 outputs/                   # Generated outputs (Git-ignored)
 │   ├── rain_gauges/
 │   │   ├── raw/                  # Raw API data
 │   │   ├── analyze/              # Analysis results
-│   │   └── gauge_analysis_viz/  # HTML dashboard
+│   │   └── visualizations/       # HTML dashboard
 │   │
 │   └── rain_radar/
 │       ├── raw/                  # Current radar data
-│       ├── historical/           # Historical data by date
-│       │   └── YYYY-MM-DD/
-│       └── visualizations/
+│       └── historical/           # Historical data by date
+│           └── YYYY-MM-DD/
+│               ├── raw/          # Raw radar data
+│               ├── analyze/      # Analysis results
+│               └── dashboard/    # HTML dashboard
 │
 ├── 🚀 Scripts - Rain Gauges
 ├── retrieve_rain_gauges.py
@@ -183,8 +198,8 @@ internship-project/
 ├── validate_ari_alarms_rain_radar.py
 ├── visualize_ari_alarms_rain_radar.py
 │
-├── 🎨 GUI Application
-├── rain_monitoring_gui.py  # Graphical user interface
+├── 🎨 GUI Entry Point
+├── rain_monitoring_gui_modern.py # GUI launcher
 │
 ├── .env                          # Credentials (Git-ignored, REQUIRED)
 ├── .env.example                  # Template
