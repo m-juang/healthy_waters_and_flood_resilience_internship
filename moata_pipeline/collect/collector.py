@@ -9,8 +9,8 @@ Classes:
     RadarDataCollector: Collects radar QPE data for stormwater catchments
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2025-01-02
+Version: 1.1.0 - Added atomic writes with temp folder for radar data
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import pickle
+import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -39,7 +40,7 @@ except ImportError:
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # =============================================================================
@@ -365,6 +366,11 @@ class RadarDataCollector:
     Collects spatial rainfall data from radar for stormwater catchments,
     including pixel mapping and timeseries data.
     
+    IMPORTANT: This collector uses atomic writes - data is written to a
+    temporary folder first, then moved to the final location only after
+    successful completion. This ensures existing data is not corrupted
+    if the collection is cancelled or fails.
+    
     Output Structure:
         outputs/rain_radar/raw/
         ├── catchments/
@@ -447,15 +453,16 @@ class RadarDataCollector:
         self._max_hours_per_request = max_hours_per_request
         self._logger = logging.getLogger(f"{__name__}.RadarDataCollector")
         
-        # Sub-directories
-        self._catchments_dir = self._base_output_dir / "catchments"
-        self._pixel_mappings_dir = self._base_output_dir / "pixel_mappings"
-        self._radar_data_dir = self._base_output_dir / "radar_data"
+        # Temporary directory for atomic writes
+        self._temp_dir: Optional[Path] = None
+        
+        # Working directories (will point to temp during collection)
+        self._catchments_dir: Optional[Path] = None
+        self._pixel_mappings_dir: Optional[Path] = None
+        self._radar_data_dir: Optional[Path] = None
         
         # Cache for pixel mappings (catchment_id -> [pixel_indices])
         self._pixel_cache: Dict[int, List[int]] = {}
-        self._pixel_cache_json = self._pixel_mappings_dir / "catchment_pixel_mapping.json"
-        self._pixel_cache_pkl = self._pixel_mappings_dir / "catchment_pixel_mapping.pkl"
         
         # Catchments cache
         self._catchments: List[Dict[str, Any]] = []
@@ -464,8 +471,77 @@ class RadarDataCollector:
         self._logger.info(f"  Output directory: {self._base_output_dir}")
         self._logger.info(f"  Pixel batch size: {self._pixel_batch_size}")
 
+    def _setup_temp_dir(self) -> None:
+        """
+        Create temporary directory for atomic writes.
+        
+        Data is written here first, then moved to final location on success.
+        """
+        # Create temp directory as sibling to output dir
+        self._temp_dir = self._base_output_dir.parent / f"_temp_{self._base_output_dir.name}"
+        
+        # Clean up any existing temp dir (from previous failed run)
+        if self._temp_dir.exists():
+            self._logger.warning(f"Removing existing temp directory: {self._temp_dir}")
+            shutil.rmtree(self._temp_dir)
+        
+        # Set working directories to temp location
+        self._catchments_dir = self._temp_dir / "catchments"
+        self._pixel_mappings_dir = self._temp_dir / "pixel_mappings"
+        self._radar_data_dir = self._temp_dir / "radar_data"
+        
+        # Create temp directories
+        for dir_path in [self._catchments_dir, self._pixel_mappings_dir, self._radar_data_dir]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            self._logger.debug(f"  Created temp directory: {dir_path}")
+        
+        self._logger.info(f"✓ Created temp directory: {self._temp_dir}")
+
+    def _cleanup_temp_dir(self) -> None:
+        """Remove temporary directory (on failure or cancellation)."""
+        if self._temp_dir and self._temp_dir.exists():
+            try:
+                shutil.rmtree(self._temp_dir)
+                self._logger.info(f"✓ Cleaned up temp directory: {self._temp_dir}")
+            except Exception as e:
+                self._logger.warning(f"Failed to clean up temp directory: {e}")
+
+    def _finalize_output(self) -> None:
+        """
+        Move data from temp directory to final location.
+        
+        This is called only after successful completion of collection.
+        Existing data in final location is replaced atomically.
+        """
+        if not self._temp_dir or not self._temp_dir.exists():
+            self._logger.warning("No temp directory to finalize")
+            return
+        
+        self._logger.info("Finalizing output (moving from temp to final location)...")
+        
+        # Remove existing final directory if it exists
+        if self._base_output_dir.exists():
+            self._logger.info(f"  Removing existing output: {self._base_output_dir}")
+            shutil.rmtree(self._base_output_dir)
+        
+        # Move temp to final location
+        shutil.move(str(self._temp_dir), str(self._base_output_dir))
+        self._logger.info(f"✓ Moved data to final location: {self._base_output_dir}")
+        
+        # Update directory references to final location
+        self._catchments_dir = self._base_output_dir / "catchments"
+        self._pixel_mappings_dir = self._base_output_dir / "pixel_mappings"
+        self._radar_data_dir = self._base_output_dir / "radar_data"
+        self._temp_dir = None
+
     def _ensure_dirs(self) -> None:
         """Create output directories if they don't exist."""
+        if self._catchments_dir is None:
+            # If not using temp dir, set up final directories directly
+            self._catchments_dir = self._base_output_dir / "catchments"
+            self._pixel_mappings_dir = self._base_output_dir / "pixel_mappings"
+            self._radar_data_dir = self._base_output_dir / "radar_data"
+        
         for dir_path in [self._catchments_dir, self._pixel_mappings_dir, self._radar_data_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
             self._logger.debug(f"  Ensured directory: {dir_path}")
@@ -548,19 +624,37 @@ class RadarDataCollector:
     # Pixel Cache Management
     # -------------------------------------------------------------------------
     
+    @property
+    def _pixel_cache_json(self) -> Path:
+        """Path to JSON pixel cache file."""
+        if self._pixel_mappings_dir is None:
+            return self._base_output_dir / "pixel_mappings" / "catchment_pixel_mapping.json"
+        return self._pixel_mappings_dir / "catchment_pixel_mapping.json"
+    
+    @property
+    def _pixel_cache_pkl(self) -> Path:
+        """Path to pickle pixel cache file."""
+        if self._pixel_mappings_dir is None:
+            return self._base_output_dir / "pixel_mappings" / "catchment_pixel_mapping.pkl"
+        return self._pixel_mappings_dir / "catchment_pixel_mapping.pkl"
+    
     def _load_pixel_cache(self) -> bool:
         """
-        Load cached pixel mappings from disk.
+        Load cached pixel mappings from disk (from FINAL location, not temp).
         
         Tries pickle first (faster), then JSON (portable).
         
         Returns:
             True if cache was loaded successfully, False otherwise
         """
+        # Always load from final location (not temp)
+        pkl_path = self._base_output_dir / "pixel_mappings" / "catchment_pixel_mapping.pkl"
+        json_path = self._base_output_dir / "pixel_mappings" / "catchment_pixel_mapping.json"
+        
         # Try pickle first (faster)
-        if self._pixel_cache_pkl.exists():
+        if pkl_path.exists():
             try:
-                with open(self._pixel_cache_pkl, "rb") as f:
+                with open(pkl_path, "rb") as f:
                     self._pixel_cache = pickle.load(f)
                 self._logger.info(
                     "✓ Loaded pixel cache from pkl: %d catchments",
@@ -571,9 +665,9 @@ class RadarDataCollector:
                 self._logger.warning(f"Failed to load pkl cache: {e}")
         
         # Fallback to JSON
-        if self._pixel_cache_json.exists():
+        if json_path.exists():
             try:
-                with open(self._pixel_cache_json, "r", encoding="utf-8") as f:
+                with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self._pixel_cache = {int(k): v for k, v in data.items()}
                 self._logger.info(
@@ -1001,6 +1095,10 @@ class RadarDataCollector:
         """
         Collect radar data for all (or selected) stormwater catchments.
         
+        IMPORTANT: Uses atomic writes - data is written to a temporary folder
+        first, then moved to final location only after successful completion.
+        If cancelled or failed, existing data remains intact.
+        
         Args:
             project_id: Moata project ID
             start_time: Start time (UTC)
@@ -1021,69 +1119,98 @@ class RadarDataCollector:
             ...     catchment_ids=[123, 456]  # Optional: specific catchments
             ... )
         """
-        self._ensure_dirs()
-        
         self._logger.info("=" * 80)
         self._logger.info("Starting radar data collection for all catchments")
         self._logger.info("=" * 80)
         self._logger.info(f"Project ID: {project_id}")
         self._logger.info(f"Time range: {start_time} to {end_time}")
         self._logger.info(f"Force refresh pixels: {force_refresh_pixels}")
+        self._logger.info(f"Using atomic writes (temp folder strategy)")
         
-        # Load pixel cache unless forced refresh
-        if not force_refresh_pixels:
-            self._load_pixel_cache()
-        else:
-            self._logger.info("Forcing pixel mapping refresh (cache will be rebuilt)")
+        # Setup temporary directory for atomic writes
+        self._setup_temp_dir()
         
-        # Fetch catchments
-        catchments = self.get_stormwater_catchments(
-            project_id=project_id,
-            asset_type_id=asset_type_id,
-        )
-        
-        self.save_catchments_csv()
-        
-        # Filter to specific catchments if requested
-        if catchment_ids:
-            catchments = [
-                c for c in catchments
-                if safe_int(c.get("id")) in catchment_ids
-            ]
-            self._logger.info(f"Filtered to {len(catchments)} specified catchments")
-        
-        # Collect data for each catchment
-        results: List[Dict[str, Any]] = []
-        
-        for idx, catchment in enumerate(catchments, start=1):
-            name = catchment.get("name", "Unknown")
-            self._logger.info(f"\n[{idx}/{len(catchments)}] {name}")
+        try:
+            # Load pixel cache from FINAL location (not temp) unless forced refresh
+            if not force_refresh_pixels:
+                self._load_pixel_cache()
+            else:
+                self._logger.info("Forcing pixel mapping refresh (cache will be rebuilt)")
             
-            result = self.collect_catchment_data(
-                catchment=catchment,
-                start_time=start_time,
-                end_time=end_time,
-                save_csv=save_csvs,
+            # Fetch catchments
+            catchments = self.get_stormwater_catchments(
+                project_id=project_id,
+                asset_type_id=asset_type_id,
             )
-            results.append(result)
-        
-        # Save pixel cache and summary
-        self._save_pixel_cache()
-        self._save_collection_summary(results, start_time, end_time)
-        
-        successful = len([r for r in results if not r.get("error")])
-        failed = len([r for r in results if r.get("error")])
-        
-        self._logger.info("")
-        self._logger.info("=" * 80)
-        self._logger.info("Collection Complete")
-        self._logger.info("=" * 80)
-        self._logger.info(f"Total catchments: {len(results)}")
-        self._logger.info(f"Successful: {successful}")
-        self._logger.info(f"Failed: {failed}")
-        self._logger.info("=" * 80)
-        
-        return results
+            
+            self.save_catchments_csv()
+            
+            # Filter to specific catchments if requested
+            if catchment_ids:
+                catchments = [
+                    c for c in catchments
+                    if safe_int(c.get("id")) in catchment_ids
+                ]
+                self._logger.info(f"Filtered to {len(catchments)} specified catchments")
+            
+            # Collect data for each catchment
+            results: List[Dict[str, Any]] = []
+            
+            for idx, catchment in enumerate(catchments, start=1):
+                name = catchment.get("name", "Unknown")
+                self._logger.info(f"\n[{idx}/{len(catchments)}] {name}")
+                
+                result = self.collect_catchment_data(
+                    catchment=catchment,
+                    start_time=start_time,
+                    end_time=end_time,
+                    save_csv=save_csvs,
+                )
+                results.append(result)
+            
+            # Save pixel cache and summary (to temp dir)
+            self._save_pixel_cache()
+            self._save_collection_summary(results, start_time, end_time)
+            
+            # SUCCESS: Move temp to final location
+            self._finalize_output()
+            
+            successful = len([r for r in results if not r.get("error")])
+            failed = len([r for r in results if r.get("error")])
+            
+            self._logger.info("")
+            self._logger.info("=" * 80)
+            self._logger.info("✅ Collection Complete")
+            self._logger.info("=" * 80)
+            self._logger.info(f"Total catchments: {len(results)}")
+            self._logger.info(f"Successful: {successful}")
+            self._logger.info(f"Failed: {failed}")
+            self._logger.info(f"Output: {self._base_output_dir}")
+            self._logger.info("=" * 80)
+            
+            return results
+            
+        except KeyboardInterrupt:
+            # User cancelled - clean up temp dir, keep existing data
+            self._logger.warning("")
+            self._logger.warning("=" * 80)
+            self._logger.warning("⚠️  Collection cancelled by user")
+            self._logger.warning("=" * 80)
+            self._logger.warning("Cleaning up temporary files...")
+            self._cleanup_temp_dir()
+            self._logger.warning("✓ Existing data preserved (no changes made)")
+            raise
+            
+        except Exception as e:
+            # Error occurred - clean up temp dir, keep existing data
+            self._logger.error("")
+            self._logger.error("=" * 80)
+            self._logger.error(f"❌ Collection failed: {e}")
+            self._logger.error("=" * 80)
+            self._logger.error("Cleaning up temporary files...")
+            self._cleanup_temp_dir()
+            self._logger.error("✓ Existing data preserved (no changes made)")
+            raise
 
     def _save_collection_summary(
         self,
@@ -1102,6 +1229,9 @@ class RadarDataCollector:
         Returns:
             Path to saved summary file
         """
+        # Get the base dir (could be temp or final)
+        base_dir = self._temp_dir if self._temp_dir else self._base_output_dir
+        
         summary = {
             "collection_time": datetime.now(timezone.utc).isoformat(),
             "data_start_time": start_time.isoformat(),
@@ -1114,7 +1244,7 @@ class RadarDataCollector:
             "catchments": results,
         }
         
-        out_path = self._base_output_dir / "collection_summary.json"
+        out_path = base_dir / "collection_summary.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, default=str)
         
