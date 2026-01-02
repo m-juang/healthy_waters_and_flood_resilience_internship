@@ -11,13 +11,16 @@ Usage:
 Examples:
     # Analyze with default settings
     python analyze_rain_gauges.py
-    
+
+    # Analyze (alias) current mode - same behavior, kept for CLI consistency
+    python analyze_rain_gauges.py --current
+
     # Override inactivity threshold (default: 3 months)
     python analyze_rain_gauges.py --inactive-months 6
-    
+
     # Change exclusion keyword (default: "test")
     python analyze_rain_gauges.py --exclude-keyword "backup"
-    
+
     # Enable debug logging
     python analyze_rain_gauges.py --log-level DEBUG
 
@@ -28,7 +31,7 @@ Filters Applied:
     - Name filtering: Excludes gauges matching keyword (default: "test")
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
+Last Modified: 2025-01-02
 """
 
 import argparse
@@ -60,6 +63,7 @@ def parse_args() -> argparse.Namespace:
         epilog="""
 Examples:
   %(prog)s                                    # Default settings
+  %(prog)s --current                          # Alias (no effect); analyze latest raw data
   %(prog)s --inactive-months 6                # Consider 6-month inactivity
   %(prog)s --exclude-keyword "backup"         # Exclude gauges with "backup"
   %(prog)s --log-level DEBUG                  # Verbose output
@@ -80,6 +84,14 @@ Output:
 Duration:
   Typically 2-3 minutes depending on dataset size.
         """
+    )
+    
+    # NOTE: --current is a NO-OP alias for CLI consistency with radar scripts
+    # Rain gauge analyzer always reads from outputs/rain_gauges/raw/
+    parser.add_argument(
+        "--current",
+        action="store_true",
+        help="Alias for convenience (no effect). Analyze latest raw data."
     )
     
     parser.add_argument(
@@ -108,7 +120,7 @@ Duration:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 1.0.0"
+        version="%(prog)s 1.0.1"
     )
     
     return parser.parse_args()
