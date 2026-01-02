@@ -40,7 +40,7 @@ class GaugePipeline(BasePipeline):
     
     @property
     def icon(self) -> str:
-        return "🌊"
+        return "💧"
     
     @property
     def color_key(self) -> str:

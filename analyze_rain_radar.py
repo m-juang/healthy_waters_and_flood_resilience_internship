@@ -46,6 +46,9 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from moata_pipeline.logging_setup import setup_logging
 from moata_pipeline.analyze.radar_analysis import run_radar_analysis
 

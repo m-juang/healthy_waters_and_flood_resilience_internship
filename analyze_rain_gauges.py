@@ -36,6 +36,9 @@ import logging
 import sys
 from typing import Dict, Any
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from moata_pipeline.logging_setup import setup_logging
 from moata_pipeline.analyze.runner import run_filter_active_gauges
 from moata_pipeline.common.constants import (

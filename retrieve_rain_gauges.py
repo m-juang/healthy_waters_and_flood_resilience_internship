@@ -26,6 +26,9 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from moata_pipeline.logging_setup import setup_logging
 from moata_pipeline.collect.runner import run_collect_rain_gauges
