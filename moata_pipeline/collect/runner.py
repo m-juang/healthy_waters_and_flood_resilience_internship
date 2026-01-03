@@ -81,10 +81,6 @@ def _create_client() -> MoataClient:
     Raises:
         CredentialsError: If credentials are missing
         ClientCreationError: If client creation fails
-        
-    Example:
-        >>> client = _create_client()
-        >>> gauges = client.get_rain_gauges(project_id=594, asset_type_id=100)
     """
     logger = logging.getLogger(__name__)
     
@@ -120,7 +116,7 @@ def _create_client() -> MoataClient:
             scope=OAUTH_SCOPE,
             client_id=client_id,
             client_secret=client_secret,
-            verify_ssl=False,  # Disabled for Auckland Council network compatibility
+            verify_ssl=False,
             ttl_seconds=TOKEN_TTL_SECONDS,
             refresh_buffer_seconds=TOKEN_REFRESH_BUFFER_SECONDS,
         )
@@ -130,7 +126,7 @@ def _create_client() -> MoataClient:
             get_token_fn=auth.get_token,
             base_url=BASE_API_URL,
             requests_per_second=DEFAULT_REQUESTS_PER_SECOND,
-            verify_ssl=False,  # Disabled for Auckland Council network compatibility
+            verify_ssl=False,
         )
         
         # Create API client
@@ -195,16 +191,71 @@ def _determine_radar_output_dir(
     
     return output_dir
 
+# ============================================================================
+# ← ADDED: New helper function for gauge output directory
+# ============================================================================
+
+def _determine_gauge_output_dir(
+    start_time: datetime,
+    end_time: datetime,
+    custom_dir: Optional[Path] = None,
+) -> Path:
+    """
+    Determine output directory for gauge data based on time range.
+    
+    Logic:
+        - If custom_dir provided: use it
+        - If data is recent (within 24h of now): outputs/rain_gauges/raw
+        - If data is historical: outputs/rain_gauges/historical/YYYY-MM-DD/raw
+        
+    Args:
+        start_time: Data start time (UTC)
+        end_time: Data end time (UTC)
+        custom_dir: Optional custom directory
+        
+    Returns:
+        Path to output directory
+    """
+    logger = logging.getLogger(__name__)
+    
+    if custom_dir is not None:
+        logger.info(f"Using custom output directory: {custom_dir}")
+        return custom_dir
+    
+    # Check if data is recent (within last 24 hours)
+    now = datetime.now(timezone.utc)
+    hours_since_end = (now - end_time).total_seconds() / 3600
+    
+    is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
+    
+    if is_recent:
+        output_dir = Path("outputs/rain_gauges/raw")
+        logger.info("Recent data (within 24h) - output to: %s", output_dir)
+    else:
+        # Historical data - use date-based directory
+        date_str = start_time.strftime("%Y-%m-%d")
+        output_dir = Path(f"outputs/rain_gauges/historical/{date_str}/raw")
+        logger.info("Historical data (%s) - output to: %s", date_str, output_dir)
+    
+    return output_dir
+
 
 # =============================================================================
 # Public Runner Functions
 # =============================================================================
 
+# ============================================================================
+# ← MODIFIED: run_collect_rain_gauges() - added time range support
+# ============================================================================
+
 def run_collect_rain_gauges(
     project_id: int = DEFAULT_PROJECT_ID,
     asset_type_id: int = DEFAULT_RAIN_GAUGE_ASSET_TYPE_ID,
+    start_time: Optional[datetime] = None,  # ← ADDED
+    end_time: Optional[datetime] = None,    # ← ADDED
     trace_batch_size: int = 100,
     fetch_thresholds: bool = True,
+    output_dir: Optional[Path] = None,      # ← ADDED
 ) -> None:
     """
     Collect rain gauge data with traces, alarms, and thresholds.
@@ -212,15 +263,18 @@ def run_collect_rain_gauges(
     High-level function that:
         1. Creates authenticated API client
         2. Collects all rain gauge assets
-        3. Fetches traces for each gauge
+        3. Fetches traces for each gauge with time range
         4. Fetches alarms and thresholds for each trace
         5. Saves combined JSON output
         
     Args:
         project_id: Moata project ID (default from constants)
         asset_type_id: Rain gauge asset type ID (default from constants)
+        start_time: Start of time range (default: 24 hours ago)  # ← ADDED
+        end_time: End of time range (default: now)               # ← ADDED
         trace_batch_size: Traces to fetch per API batch (default: 100)
         fetch_thresholds: Whether to fetch alarm thresholds (default: True)
+        output_dir: Custom output directory (default: auto based on date)  # ← ADDED
         
     Raises:
         CredentialsError: If API credentials missing
@@ -228,10 +282,13 @@ def run_collect_rain_gauges(
         CollectionRunnerError: If collection fails
         
     Example:
+        >>> # Collect last 24 hours
+        >>> run_collect_rain_gauges()
+        
+        >>> # Collect specific date
         >>> run_collect_rain_gauges(
-        ...     project_id=594,
-        ...     asset_type_id=100,
-        ...     trace_batch_size=50
+        ...     start_time=datetime(2025, 5, 9, tzinfo=timezone.utc),
+        ...     end_time=datetime(2025, 5, 10, tzinfo=timezone.utc)
         ... )
     """
     logger = logging.getLogger(__name__)
@@ -241,6 +298,18 @@ def run_collect_rain_gauges(
     logger.info("=" * 80)
     logger.info(f"Project ID: {project_id}")
     logger.info(f"Asset Type ID: {asset_type_id}")
+    
+    # ← ADDED: Determine time range
+    if end_time is None:
+        end_time = datetime.now(timezone.utc)
+    if start_time is None:
+        start_time = end_time - timedelta(hours=24)
+    
+    logger.info(f"Time Range:")
+    logger.info(f"  Start: {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    logger.info(f"  End:   {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    logger.info(f"  Duration: {(end_time - start_time).total_seconds() / 3600:.1f} hours")
+    
     logger.info(f"Trace Batch Size: {trace_batch_size}")
     logger.info(f"Fetch Thresholds: {fetch_thresholds}")
     logger.info("=" * 80)
@@ -252,18 +321,20 @@ def run_collect_rain_gauges(
         client = _create_client()
         logger.info("✓ API client ready")
         
-        # Initialize paths
-        paths = PipelinePaths()
-        logger.info(f"Output directory: {paths.rain_gauges_raw_dir}")
+        # ← ADDED: Determine output directory
+        output_path = _determine_gauge_output_dir(start_time, end_time, output_dir)
         
         # Create collector and collect data
         logger.info("")
         logger.info("Starting collection...")
         collector = RainGaugeCollector(client=client)
         
+        # ← MODIFIED: Pass time parameters
         all_data = collector.collect(
             project_id=project_id,
             asset_type_id=asset_type_id,
+            start_time=start_time,      # ← ADDED
+            end_time=end_time,          # ← ADDED
             trace_batch_size=trace_batch_size,
             fetch_thresholds=fetch_thresholds,
         )
@@ -271,15 +342,21 @@ def run_collect_rain_gauges(
         # Save output
         logger.info("")
         logger.info("Saving data...")
-        writer = JsonOutputWriter(out_dir=paths.rain_gauges_raw_dir)
-        output_path = writer.write_combined(all_data)
+        
+        # ← ADDED: Create output directory if it doesn't exist
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # ← MODIFIED: Use output_path instead of paths.rain_gauges_raw_dir
+        writer = JsonOutputWriter(out_dir=output_path)
+        output_file = writer.write_combined(all_data)
         
         logger.info("")
         logger.info("=" * 80)
         logger.info("✓ Collection Complete")
         logger.info("=" * 80)
         logger.info(f"Gauges collected: {len(all_data)}")
-        logger.info(f"Output file: {output_path}")
+        logger.info(f"Output file: {output_file}")
+        logger.info(f"Output directory: {output_path}")  # ← ADDED
         logger.info("=" * 80)
         
     except CredentialsError as e:

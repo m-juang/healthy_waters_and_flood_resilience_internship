@@ -5,7 +5,7 @@ Implements the rain gauge data processing pipeline.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2025-01-02
-Version: 1.0.0
+Version: 1.1.0 (Added CLI date arguments support)
 """
 
 from __future__ import annotations
@@ -79,12 +79,103 @@ class GaugePipeline(BasePipeline):
     # =========================================================================
     
     def run_retrieve(self) -> None:
-        """Run retrieve step - collect gauge metadata."""
+        """Run retrieve step with date selection."""
+        # If dates were pre-filled from CLI, use them directly
+        if self.initial_start_time and self.initial_end_time:
+            duration_days = (self.initial_end_time - self.initial_start_time).days
+            if duration_days == 1:
+                # Single date
+                self._run_retrieve_with_date(
+                    self.initial_start_time.strftime('%Y-%m-%d')
+                )
+            else:
+                # Date range
+                self._run_retrieve_with_range(
+                    self.initial_start_time.strftime('%Y-%m-%d'),
+                    self.initial_end_time.strftime('%Y-%m-%d')
+                )
+            return
+        
+        # Otherwise show date selection dialog
+        selection = show_date_selection_dialog(
+            self.app,
+            title="Select Data to Retrieve",
+            options=[
+                ("📅  Current (Real-time Last 24h)", "current",
+                 "Retrieve gauge data from past 24 hours"),
+                ("📆  Specific Historical Date", "date",
+                 "Retrieve gauge data for a specific 24h period"),
+                ("📊  Date Range", "range",
+                 "Retrieve gauge data for multiple days"),
+            ],
+            colors=self.app.colors,
+        )
+        
+        if not selection:
+            return
+        
         script = "retrieve_rain_gauges.py"
+        args = []
+        
+        if selection == "date":
+            date_str = ctk.CTkInputDialog(
+                text="Enter date in YYYY-MM-DD format:",
+                title="Enter Date"
+            ).get_input()
+            if not date_str:
+                return
+            self._run_retrieve_with_date(date_str)
+            return
+        
+        elif selection == "range":
+            start_str = ctk.CTkInputDialog(
+                text="Enter START date in YYYY-MM-DD format:",
+                title="Enter Start Date"
+            ).get_input()
+            if not start_str:
+                return
+            
+            end_str = ctk.CTkInputDialog(
+                text="Enter END date in YYYY-MM-DD format:",
+                title="Enter End Date"
+            ).get_input()
+            if not end_str:
+                return
+            
+            self._run_retrieve_with_range(start_str, end_str)
+            return
+        
+        # selection == "current" - no args (default: last 24h)
         self.app.executor.execute(
             "Step 1: Retrieve Data",
             script,
-            [],
+            args,
+            self._on_retrieve_complete
+        )
+    
+    def _run_retrieve_with_date(self, date_str: str) -> None:
+        """Run retrieve with specified single date."""
+        script = "retrieve_rain_gauges.py"
+        args = ["--date", date_str]
+        self.app.selected_date = date_str
+        
+        self.app.executor.execute(
+            "Step 1: Retrieve Data",
+            script,
+            args,
+            self._on_retrieve_complete
+        )
+    
+    def _run_retrieve_with_range(self, start_str: str, end_str: str) -> None:
+        """Run retrieve with specified date range."""
+        script = "retrieve_rain_gauges.py"
+        args = ["--start", start_str, "--end", end_str]
+        self.app.selected_date = f"{start_str} to {end_str}"
+        
+        self.app.executor.execute(
+            "Step 1: Retrieve Data",
+            script,
+            args,
             self._on_retrieve_complete
         )
     

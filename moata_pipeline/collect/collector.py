@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import pickle
+import time
 import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -103,10 +104,17 @@ class RainGaugeCollector:
         self._client = client
         self._logger = logging.getLogger(f"{__name__}.RainGaugeCollector")
 
+
+    # ============================================================================
+    # ← MODIFIED: collect() method - added time range parameters
+    # ============================================================================
+    
     def collect(
         self,
         project_id: int,
         asset_type_id: int,
+        start_time: Optional[datetime] = None,  # ← ADDED
+        end_time: Optional[datetime] = None,    # ← ADDED
         trace_batch_size: int = 100,
         fetch_thresholds: bool = True,
     ) -> List[Dict[str, Any]]:
@@ -116,13 +124,15 @@ class RainGaugeCollector:
         Args:
             project_id: Moata project ID
             asset_type_id: Asset type ID for rain gauges (typically 100)
+            start_time: Start of time range (default: 24 hours ago)  # ← ADDED
+            end_time: End of time range (default: now)                # ← ADDED
             trace_batch_size: Number of assets to fetch traces for per batch
             fetch_thresholds: Whether to fetch alarm thresholds (slower)
             
         Returns:
             List of dictionaries, each containing:
                 - gauge: Asset information
-                - traces: List of trace data with alarms and thresholds
+                - traces: List of trace data with alarms, thresholds, and timeseries
                 
         Raises:
             ValueError: If project_id or asset_type_id are invalid
@@ -132,6 +142,8 @@ class RainGaugeCollector:
             >>> data = collector.collect(
             ...     project_id=594,
             ...     asset_type_id=100,
+            ...     start_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            ...     end_time=datetime(2025, 1, 2, tzinfo=timezone.utc),
             ...     trace_batch_size=50,
             ...     fetch_thresholds=False
             ... )
@@ -148,9 +160,22 @@ class RainGaugeCollector:
                 f"trace_batch_size must be positive int, got {trace_batch_size}"
             )
         
+        # ← ADDED: Set default time range if not provided
+        if end_time is None:
+            end_time = datetime.now(timezone.utc)
+        if start_time is None:
+            start_time = end_time - timedelta(hours=24)
+        
         self._logger.info("Starting rain gauge collection...")
         self._logger.info(f"  Project ID: {project_id}")
         self._logger.info(f"  Asset Type ID: {asset_type_id}")
+        
+        # ← ADDED: Log time range
+        self._logger.info(f"  Time Range:")
+        self._logger.info(f"    Start: {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        self._logger.info(f"    End:   {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        self._logger.info(f"    Duration: {(end_time - start_time).total_seconds() / 3600:.1f} hours")
+        
         self._logger.info(f"  Trace Batch Size: {trace_batch_size}")
         self._logger.info(f"  Fetch Thresholds: {fetch_thresholds}")
         
@@ -172,12 +197,15 @@ class RainGaugeCollector:
             traces_by_asset = self._fetch_traces_batched(asset_ids, trace_batch_size)
             
             # 5) Enrich each gauge with trace data, alarms, and thresholds
+            # ← MODIFIED: Pass time parameters
             all_data = self._enrich_gauges_with_traces(
                 asset_ids=asset_ids,
                 gauge_by_id=gauge_by_id,
                 traces_by_asset=traces_by_asset,
                 detailed_by_trace=detailed_by_trace,
                 fetch_thresholds=fetch_thresholds,
+                start_time=start_time,  # ← ADDED
+                end_time=end_time,      # ← ADDED
             )
             
             self._logger.info(f"✓ Collection complete: {len(all_data)} gauges")
@@ -186,6 +214,13 @@ class RainGaugeCollector:
         except Exception as e:
             self._logger.error(f"Collection failed: {e}")
             raise CollectionError(f"Failed to collect rain gauge data: {e}") from e
+
+    # ← EXISTING: Keep all other methods unchanged until _enrich_gauges_with_traces
+    # _fetch_gauges() - NO CHANGES
+    # _fetch_detailed_alarms() - NO CHANGES
+    # _prepare_asset_lookup() - NO CHANGES
+    # _fetch_traces_batched() - NO CHANGES
+
 
     def _fetch_gauges(self, project_id: int, asset_type_id: int) -> List[Dict[str, Any]]:
         """Fetch rain gauge assets."""
@@ -261,6 +296,7 @@ class RainGaugeCollector:
                 self._logger.error(f"  Failed to fetch batch {batch_idx}: {e}")
                 # Continue with other batches
 
+
         self._logger.info(f"✓ Fetched {len(all_traces)} traces total")
 
         # Group traces by asset ID
@@ -273,6 +309,23 @@ class RainGaugeCollector:
 
         return traces_by_asset
 
+        self._logger.info(f"✓ Fetched {len(all_traces)} traces total")
+
+        # Group traces by asset ID
+        traces_by_asset: Dict[int, List[Dict[str, Any]]] = {}
+        for t in all_traces:
+            asset_id = safe_int(t.get("assetId"))
+            if asset_id is None:
+                continue
+            traces_by_asset.setdefault(asset_id, []).append(t)
+
+        return 
+    
+
+    # ============================================================================
+    # ← MODIFIED: _enrich_gauges_with_traces() - added time parameters
+    # ============================================================================
+    
     def _enrich_gauges_with_traces(
         self,
         asset_ids: List[int],
@@ -280,8 +333,10 @@ class RainGaugeCollector:
         traces_by_asset: Dict[int, List[Dict[str, Any]]],
         detailed_by_trace: Dict[int, Dict[str, Any]],
         fetch_thresholds: bool,
+        start_time: Optional[datetime] = None,  # ← ADDED
+        end_time: Optional[datetime] = None,    # ← ADDED
     ) -> List[Dict[str, Any]]:
-        """Enrich each gauge with its traces, alarms, and thresholds."""
+        """Enrich each gauge with its traces, alarms, thresholds, and timeseries."""
         all_data: List[Dict[str, Any]] = []
 
         for idx, asset_id in enumerate(asset_ids, start=1):
@@ -296,10 +351,13 @@ class RainGaugeCollector:
             traces_out: List[Dict[str, Any]] = []
 
             for trace in traces:
+                # ← MODIFIED: Pass time parameters
                 enriched_trace = self._enrich_single_trace(
                     trace=trace,
                     detailed_by_trace=detailed_by_trace,
                     fetch_thresholds=fetch_thresholds,
+                    start_time=start_time,  # ← ADDED
+                    end_time=end_time,      # ← ADDED
                 )
                 
                 if enriched_trace:
@@ -308,14 +366,20 @@ class RainGaugeCollector:
             all_data.append({"gauge": gauge, "traces": traces_out})
 
         return all_data
-
+    
+    # ============================================================================
+    # ← MODIFIED: _enrich_single_trace() - added timeseries fetching
+    # ============================================================================
+    
     def _enrich_single_trace(
         self,
         trace: Dict[str, Any],
         detailed_by_trace: Dict[int, Dict[str, Any]],
         fetch_thresholds: bool,
+        start_time: Optional[datetime] = None,  # ← ADDED
+        end_time: Optional[datetime] = None,    # ← ADDED
     ) -> Optional[Dict[str, Any]]:
-        """Enrich a single trace with alarms and thresholds."""
+        """Enrich a single trace with alarms, thresholds, and timeseries data."""
         trace_id = trace.get("id") or trace.get("traceId")
         trace_id_int = safe_int(trace_id)
         
@@ -333,6 +397,7 @@ class RainGaugeCollector:
         }
         thresholds: List[Dict[str, Any]] = []
 
+        # ← EXISTING: Fetch alarms and thresholds (unchanged)
         if has_alarms:
             try:
                 alarms_raw = self._client.get_alarms_for_trace(trace_id_int)
@@ -346,12 +411,54 @@ class RainGaugeCollector:
 
         detailed_alarm = detailed_by_trace.get(trace_id_int)
 
+        # ============================================================================
+        # ← ADDED: Fetch timeseries data if time range specified
+        # ============================================================================
+        timeseries_data = []
+        if start_time and end_time:
+            try:
+                # Convert datetime to ISO 8601 string format
+                from moata_pipeline.common.time_utils import iso_z
+                from_time_str = iso_z(start_time)
+                to_time_str = iso_z(end_time)
+                
+                self._logger.debug(
+                    f"  Fetching timeseries for trace {trace_id_int}: {from_time_str} to {to_time_str}"
+                )
+                
+                # Get trace data
+                trace_data = self._client.get_trace_data(
+                trace_id=trace_id_int,
+                from_time=from_time_str,
+                to_time=to_time_str,
+                data_interval=60,
+            )
+                
+                # Extract items from response
+                timeseries_data = trace_data.get("items", [])
+                
+                if timeseries_data:
+                    self._logger.debug(
+                        f"  ✓ Fetched {len(timeseries_data)} data points for trace {trace_id_int}"
+                    )
+                else:
+                    self._logger.debug(
+                        f"  No timeseries data available for trace {trace_id_int}"
+                    )
+                
+            except Exception as e:
+                self._logger.warning(
+                    f"  Failed to fetch timeseries for trace {trace_id_int}: {e}"
+                )
+
+        # ← MODIFIED: Return with timeseries field added
         return {
             "trace": trace,
             "alarms": alarms_raw,
             "alarms_by_type": alarms_split,
             "detailed_alarm": detailed_alarm,
             "thresholds": thresholds,
+            "timeseries": timeseries_data,  # ← ADDED
         }
 
 
@@ -454,7 +561,7 @@ class RadarDataCollector:
         self._logger = logging.getLogger(f"{__name__}.RadarDataCollector")
         
         # Temporary directory for atomic writes
-        self._temp_dir: Optional[Path] = None
+        self._temp_dir: Optional[Path] = self._base_output_dir / "_temp_raw"
         
         # Working directories (will point to temp during collection)
         self._catchments_dir: Optional[Path] = None
@@ -472,31 +579,94 @@ class RadarDataCollector:
         self._logger.info(f"  Pixel batch size: {self._pixel_batch_size}")
 
     def _setup_temp_dir(self) -> None:
-        """
-        Create temporary directory for atomic writes.
+        """Setup temporary directory for atomic writes with robust cleanup."""
+        import time
+        import uuid
         
-        Data is written here first, then moved to final location on success.
-        """
-        # Create temp directory as sibling to output dir
-        self._temp_dir = self._base_output_dir.parent / f"_temp_{self._base_output_dir.name}"
-        
-        # Clean up any existing temp dir (from previous failed run)
         if self._temp_dir.exists():
             self._logger.warning(f"Removing existing temp directory: {self._temp_dir}")
-            shutil.rmtree(self._temp_dir)
+            
+            # Strategy: Try progressively more aggressive approaches
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # Try normal removal
+                    shutil.rmtree(self._temp_dir)
+                    self._logger.debug(f"✓ Successfully removed temp directory")
+                    break
+                    
+                except PermissionError as e:
+                    self._logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries}: Permission denied - {e}"
+                    )
+                    
+                    if attempt < max_retries - 1:
+                        # Wait and retry (files might be temporarily locked)
+                        time.sleep(2)
+                        continue
+                    
+                    # Last attempt: Try to work around the lock
+                    self._logger.warning("Trying alternative cleanup strategies...")
+                    
+                    # Strategy 1: Rename locked directory and create new one
+                    try:
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        old_dir = self._temp_dir.parent / f"_temp_raw_old_{timestamp}"
+                        
+                        # Try to rename the locked directory
+                        self._temp_dir.rename(old_dir)
+                        self._logger.warning(
+                            f"Could not delete temp directory. Renamed to: {old_dir}"
+                        )
+                        self._logger.warning(
+                            "Please manually delete this folder later when files are released."
+                        )
+                        break
+                        
+                    except Exception as rename_error:
+                        self._logger.error(f"Rename strategy failed: {rename_error}")
+                        
+                        # Strategy 2: Try to clear contents individually
+                        try:
+                            self._logger.warning("Attempting to clear locked files individually...")
+                            cleared = 0
+                            failed = []
+                            
+                            for item in self._temp_dir.rglob('*'):
+                                if item.is_file():
+                                    try:
+                                        item.unlink()
+                                        cleared += 1
+                                    except Exception:
+                                        failed.append(str(item))
+                            
+                            if cleared > 0:
+                                self._logger.info(f"Cleared {cleared} files, {len(failed)} remain locked")
+                            
+                            if failed:
+                                self._logger.warning(
+                                    f"Could not remove {len(failed)} locked files. "
+                                    f"Collection will proceed but cleanup incomplete."
+                                )
+                            
+                        except Exception as clear_error:
+                            self._logger.error(f"Individual file cleanup failed: {clear_error}")
+                            
+                            # Last resort: Inform user and continue
+                            self._logger.error(
+                                f"Unable to clean temp directory: {self._temp_dir}\n"
+                                f"Please close any programs accessing this folder and try again.\n"
+                                f"Or manually delete it before running collection."
+                            )
+                            raise PermissionError(
+                                f"Cannot access temp directory: {self._temp_dir}\n"
+                                f"Close File Explorer or other programs using this folder."
+                            ) from e
         
-        # Set working directories to temp location
-        self._catchments_dir = self._temp_dir / "catchments"
-        self._pixel_mappings_dir = self._temp_dir / "pixel_mappings"
-        self._radar_data_dir = self._temp_dir / "radar_data"
-        
-        # Create temp directories
-        for dir_path in [self._catchments_dir, self._pixel_mappings_dir, self._radar_data_dir]:
-            dir_path.mkdir(parents=True, exist_ok=True)
-            self._logger.debug(f"  Created temp directory: {dir_path}")
-        
-        self._logger.info(f"✓ Created temp directory: {self._temp_dir}")
-
+        # Create fresh temp directory
+        self._temp_dir.mkdir(parents=True, exist_ok=True)
+        self._logger.debug(f"✓ Temp directory ready: {self._temp_dir}")
+    
     def _cleanup_temp_dir(self) -> None:
         """Remove temporary directory (on failure or cancellation)."""
         if self._temp_dir and self._temp_dir.exists():
@@ -532,7 +702,6 @@ class RadarDataCollector:
         self._catchments_dir = self._base_output_dir / "catchments"
         self._pixel_mappings_dir = self._base_output_dir / "pixel_mappings"
         self._radar_data_dir = self._base_output_dir / "radar_data"
-        self._temp_dir = None
 
     def _ensure_dirs(self) -> None:
         """Create output directories if they don't exist."""

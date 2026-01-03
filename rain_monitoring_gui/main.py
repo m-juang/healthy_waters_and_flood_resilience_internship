@@ -1,11 +1,11 @@
 """
 Rain Monitoring System GUI - Main Module
 
-Main application window and entry point.
+Main application window and entry point with CLI arguments support.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
-Version: 2.0.0 (Modular architecture)
+Last Modified: 2025-01-03
+Version: 2.1.0 (Added CLI arguments support)
 """
 
 from __future__ import annotations
@@ -51,9 +51,18 @@ class ModernApp(ctk.CTk):
     - Navigation between main menu and pipeline views
     - Pipeline instances for gauge and radar
     - Script execution via executor
+    - Pre-filled date ranges from CLI arguments
     """
     
-    def __init__(self):
+    def __init__(self, initial_start_time: Optional[datetime] = None, 
+                 initial_end_time: Optional[datetime] = None):
+        """
+        Initialize application.
+        
+        Args:
+            initial_start_time: Optional pre-filled start datetime
+            initial_end_time: Optional pre-filled end datetime
+        """
         super().__init__()
         
         # Window configuration
@@ -70,21 +79,44 @@ class ModernApp(ctk.CTk):
         self.output_dir: Optional[str] = None
         self.selected_date: Optional[str] = None
         
+        # Store initial dates for pre-filling
+        self.initial_start_time = initial_start_time
+        self.initial_end_time = initial_end_time
+        
         # Initialize executor
         self.executor = ScriptExecutor(self, self.colors)
         
-        # Initialize pipelines
+        # Initialize pipelines with initial dates
         self.pipelines = {
-            "gauge": GaugePipeline(self),
-            "radar": RadarPipeline(self),
+            "gauge": GaugePipeline(self, initial_start_time, initial_end_time),
+            "radar": RadarPipeline(self, initial_start_time, initial_end_time),
         }
         
         # Configure grid
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         
+        # Show notification if dates were pre-filled
+        if initial_start_time and initial_end_time:
+            self.after(100, self._show_prefill_notification)
+        
         # Show main menu
         self.show_main_menu()
+    
+    def _show_prefill_notification(self):
+        """Show notification that dates were pre-filled."""
+        try:
+            import tkinter.messagebox as messagebox
+            messagebox.showinfo(
+                "Dates Pre-filled",
+                f"Date range pre-filled from command line:\n\n"
+                f"Start: {self.initial_start_time.strftime('%Y-%m-%d')}\n"
+                f"End: {self.initial_end_time.strftime('%Y-%m-%d')}\n\n"
+                f"Select a pipeline to proceed."
+            )
+        except Exception:
+            # If messagebox fails, just print to console
+            print(f"✓ Dates pre-filled: {self.initial_start_time.date()} to {self.initial_end_time.date()}")
     
     def toggle_theme(self) -> None:
         """Toggle between dark and light mode."""
@@ -143,7 +175,7 @@ class ModernApp(ctk.CTk):
         content.grid_columnconfigure((0, 1), weight=1)
         content.grid_rowconfigure(1, weight=1)
         
-        # Welcome message
+        # Welcome message (with date info if pre-filled)
         welcome_frame = ctk.CTkFrame(content, fg_color=self.colors["surface"], corner_radius=10)
         welcome_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 15))
         
@@ -154,6 +186,16 @@ class ModernApp(ctk.CTk):
             text_color=self.colors["text"]
         )
         welcome_title.pack(pady=(15, 5))
+        
+        # Show date range if pre-filled
+        if self.initial_start_time and self.initial_end_time:
+            date_info = ctk.CTkLabel(
+                welcome_frame,
+                text=f"📅 Date Range: {self.initial_start_time.strftime('%Y-%m-%d')} to {self.initial_end_time.strftime('%Y-%m-%d')}",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=self.colors["success"]
+            )
+            date_info.pack(pady=(0, 5))
         
         welcome_desc = ctk.CTkLabel(
             welcome_frame,
@@ -218,7 +260,7 @@ class ModernApp(ctk.CTk):
             pipeline_type: "gauge" or "radar"
         """
         self.current_pipeline = pipeline_type
-        self.selected_date = None  # Reset date for new pipeline
+        self.selected_date = None  # Reset date for new pipeline (unless pre-filled)
         self.show_pipeline_steps()
     
     def show_pipeline_steps(self) -> None:
@@ -308,10 +350,24 @@ class ModernApp(ctk.CTk):
         back_btn.pack(anchor="w", pady=(10, 0))
 
 
-def main():
-    """Application entry point."""
-    app = ModernApp()
+def main(initial_start_time: Optional[datetime] = None,
+         initial_end_time: Optional[datetime] = None) -> int:
+    """
+    Application entry point.
+    
+    Args:
+        initial_start_time: Optional pre-filled start datetime
+        initial_end_time: Optional pre-filled end datetime
+        
+    Returns:
+        Exit code (0 for success)
+    """
+    app = ModernApp(
+        initial_start_time=initial_start_time,
+        initial_end_time=initial_end_time
+    )
     app.mainloop()
+    return 0
 
 
 if __name__ == "__main__":

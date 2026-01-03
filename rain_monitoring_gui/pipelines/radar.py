@@ -5,7 +5,7 @@ Implements the rain radar data processing pipeline.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2025-01-02
-Version: 1.0.0
+Version: 1.2.0 (Added date range support with warnings) (Added CLI date arguments support)
 """
 
 from __future__ import annotations
@@ -80,6 +80,13 @@ class RadarPipeline(BasePipeline):
     
     def run_retrieve(self) -> None:
         """Run retrieve step with date selection."""
+        # If dates were pre-filled from CLI, use them directly
+        if self.initial_start_time and self.initial_end_time:
+            self._run_retrieve_with_date(
+                self.initial_start_time.strftime('%Y-%m-%d')
+            )
+            return
+        
         selection = show_date_selection_dialog(
             self.app,
             title="Select Data to Retrieve",
@@ -88,6 +95,8 @@ class RadarPipeline(BasePipeline):
                  "Retrieve radar data from past 24 hours"),
                 ("📆  Specific Historical Date", "date",
                  "Retrieve radar data for a specific 24h period"),
+                ("📊  Date Range (Advanced)", "range",
+                 "⚠️ Warning: 15-30 min per range, 500MB-5GB output"),
             ],
             colors=self.app.colors,
         )
@@ -105,10 +114,98 @@ class RadarPipeline(BasePipeline):
             ).get_input()
             if not date_str:
                 return
-            args = ["--date", date_str]
-            self.app.selected_date = date_str
-        else:
-            self.app.selected_date = None
+            self._run_retrieve_with_date(date_str)
+            return
+        
+        elif selection == "range":
+            start_str = ctk.CTkInputDialog(
+                text="Enter START date in YYYY-MM-DD format:",
+                title="Enter Start Date"
+            ).get_input()
+            if not start_str:
+                return
+            
+            end_str = ctk.CTkInputDialog(
+                text="Enter END date in YYYY-MM-DD format:",
+                title="Enter End Date"
+            ).get_input()
+            if not end_str:
+                return
+            
+            # Calculate duration and warn user
+            from datetime import datetime
+            try:
+                start_dt = datetime.strptime(start_str, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_str, "%Y-%m-%d")
+                duration_days = (end_dt - start_dt).days
+                
+                if duration_days <= 0:
+                    messagebox.showerror(
+                        "Invalid Range",
+                        "End date must be after start date."
+                    )
+                    return
+                
+                # Estimate time and size
+                est_time_min = duration_days * 15
+                est_size_gb = duration_days * 0.5
+                
+                msg = (
+                    f"⚠️  WARNING: Large Data Operation\n\n"
+                    f"Date range: {start_str} to {end_str}\n"
+                    f"Duration: {duration_days} day(s)\n\n"
+                    f"Estimated:\n"
+                    f"• Processing time: {est_time_min}-{est_time_min*2} minutes\n"
+                    f"• Disk space needed: {est_size_gb:.1f}-{est_size_gb*10:.1f} GB\n"
+                    f"• ~157 catchments × pixel data\n\n"
+                    f"This will:\n"
+                    f"• Run for extended period\n"
+                    f"• Use significant disk space\n"
+                    f"• Consume API quota\n\n"
+                    f"Continue?"
+                )
+                
+                confirmed = messagebox.askokcancel("Confirm Large Operation", msg)
+                if not confirmed:
+                    return
+                
+            except ValueError:
+                messagebox.showerror(
+                    "Invalid Date",
+                    "Please enter dates in YYYY-MM-DD format."
+                )
+                return
+            
+            self._run_retrieve_with_range(start_str, end_str)
+            return
+        
+        # selection == "current" - run with no args (default: last 24h)
+        self.app.selected_date = None
+        self.app.executor.execute(
+            "Step 1: Retrieve Data",
+            script,
+            args,
+            self._on_retrieve_complete
+        )
+    
+    def _run_retrieve_with_date(self, date_str: str) -> None:
+        """Run retrieve with specified date."""
+        script = "retrieve_rain_radar.py"
+        args = ["--date", date_str]
+        self.app.selected_date = date_str
+        
+        self.app.executor.execute(
+            "Step 1: Retrieve Data",
+            script,
+            args,
+            self._on_retrieve_complete
+        )
+    
+    def _run_retrieve_with_range(self, start_str: str, end_str: str) -> None:
+        """Run retrieve with specified date range."""
+        script = "retrieve_rain_radar.py"
+        args = ["--start", start_str, "--end", end_str]
+        self.app.selected_date = f"{start_str} to {end_str}"
         
         self.app.executor.execute(
             "Step 1: Retrieve Data",

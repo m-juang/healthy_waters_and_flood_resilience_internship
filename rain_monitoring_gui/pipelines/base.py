@@ -29,14 +29,18 @@ class BasePipeline(ABC):
     - get_steps(): Return list of pipeline steps
     """
     
-    def __init__(self, app: "ModernApp"):
+    def __init__(self, app: "ModernApp", initial_start_time=None, initial_end_time=None):
         """
         Initialize pipeline.
         
         Args:
             app: Parent application instance
+            initial_start_time: Optional pre-filled start datetime
+            initial_end_time: Optional pre-filled end datetime
         """
         self.app = app
+        self.initial_start_time = initial_start_time
+        self.initial_end_time = initial_end_time
     
     @property
     @abstractmethod
