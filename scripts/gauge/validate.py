@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 from pathlib import Path
+import sys
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -10,8 +11,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import pandas as pd
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
+load_dotenv(dotenv_path=project_root / ".env")
 
 from moata_pipeline.common.constants import (
     TOKEN_URL,

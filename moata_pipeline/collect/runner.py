@@ -9,8 +9,8 @@ Functions:
     run_collect_radar: Collect radar QPE data for stormwater catchments
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2026-01-03
-Version: 1.1.0 (Added gauge historical support)
+Last Modified: 2025-01-04
+Version: 1.2.0 - CRITICAL FIX #2: Better error handling with specific exceptions
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from moata_pipeline.collect.collector import RainGaugeCollector, RadarDataCollec
 
 
 # Version info
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Default time window for recent vs historical classification
 RECENT_DATA_THRESHOLD_HOURS = 24
@@ -331,7 +331,7 @@ def run_collect_rain_gauges(
         collector = RainGaugeCollector(client=client, output_dir=output_base_dir)
         
         # Setup temporary directory
-        collector._setup_temp_dir()
+        collector.setup_temp_dir()
         logger.info("✓ Temporary directory ready")
         
         # Collect data
@@ -360,7 +360,7 @@ def run_collect_rain_gauges(
             # Finalize: move temp to final location
             logger.info("")
             logger.info("Finalizing (moving from temp to final location)...")
-            collector._finalize_output()
+            collector.finalize_output()
             
             # Determine final file location for logging
             final_file = output_base_dir / "rain_gauges_traces_alarms.json"
@@ -402,42 +402,147 @@ def run_collect_rain_gauges(
         
         if 'collector' in locals():
             logger.warning("Cleaning up temporary files...")
-            collector._cleanup_temp_dir()
+            collector.cleanup_temp_dir()
             logger.warning("✓ Existing data preserved (no changes made)")
         
         raise
         
     except CredentialsError as e:
-        logger.error("Credentials error:")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Credentials Error")
+        logger.error("=" * 80)
         logger.error(str(e))
         
         if 'collector' in locals():
-            collector._cleanup_temp_dir()
+            collector.cleanup_temp_dir()
         
         raise
         
     except ClientCreationError as e:
-        logger.error("Client creation error:")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Client Creation Error")
+        logger.error("=" * 80)
         logger.error(str(e))
         
         if 'collector' in locals():
-            collector._cleanup_temp_dir()
+            collector.cleanup_temp_dir()
         
         raise
+    
+    # ========================================================================
+    # ✅ CRITICAL FIX #2: Better error handling with specific exceptions
+    # ========================================================================
+    
+    except (OSError, IOError, PermissionError) as e:
+        # File/disk errors
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ File System Error")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. Disk full or insufficient space")
+        logger.error("2. Permission denied on output directory")
+        logger.error("3. Output directory is on read-only filesystem")
+        logger.error("4. File is locked by another program (e.g., Excel)")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check disk space: `df -h` (Linux) or File Explorer (Windows)")
+        logger.error("2. Check directory permissions")
+        logger.error("3. Close any programs that might have files open")
+        logger.error("4. Try running as administrator (if permission issue)")
         
-    except Exception as e:
-        logger.error(f"Collection failed: {e}")
-        logger.exception("Full traceback:")
-        
-        # Clean up temp directory on any error
         if 'collector' in locals():
+            logger.error("")
             logger.error("Cleaning up temporary files...")
-            collector._cleanup_temp_dir()
+            collector.cleanup_temp_dir()
             logger.error("✓ Existing data preserved (no changes made)")
         
         raise CollectionRunnerError(
-            f"Rain gauge collection failed: {e}\n\n"
-            f"Check logs above for details."
+            f"File system error: {e}\n"
+            f"Check disk space and permissions."
+        ) from e
+    
+    except ValueError as e:
+        # Data validation errors
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Data Validation Error")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. Invalid date range (start >= end)")
+        logger.error("2. Invalid project_id or asset_type_id")
+        logger.error("3. Invalid trace_batch_size")
+        logger.error("4. Corrupted data from API")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check date parameters are correct")
+        logger.error("2. Verify project_id=594 and asset_type_id=100")
+        logger.error("3. Ensure trace_batch_size is > 0")
+        
+        if 'collector' in locals():
+            collector.cleanup_temp_dir()
+        
+        raise CollectionRunnerError(
+            f"Data validation failed: {e}\n"
+            f"Check input parameters."
+        ) from e
+    
+    except KeyError as e:
+        # Missing expected data in API response
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Missing Data in API Response")
+        logger.error("=" * 80)
+        logger.error(f"Missing key: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. API response format changed")
+        logger.error("2. Incomplete data returned from API")
+        logger.error("3. Network issue during data transfer")
+        logger.error("4. API version mismatch")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check internet connection")
+        logger.error("2. Try again (might be temporary API issue)")
+        logger.error("3. Check if Moata API has been updated")
+        logger.error("4. Contact Moata support if persists")
+        
+        if 'collector' in locals():
+            collector.cleanup_temp_dir()
+        
+        raise CollectionRunnerError(
+            f"API response missing expected data: {e}\n"
+            f"API format may have changed."
+        ) from e
+    
+    except Exception as e:
+        # Unexpected errors - log full details and re-raise
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Unexpected Error")
+        logger.error("=" * 80)
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.exception("Full traceback:")
+        logger.error("")
+        logger.error("This is an unexpected error that should be reported.")
+        logger.error("Please provide the full error message above when reporting.")
+        
+        if 'collector' in locals():
+            logger.error("")
+            logger.error("Cleaning up temporary files...")
+            collector.cleanup_temp_dir()
+            logger.error("✓ Existing data preserved (no changes made)")
+        
+        raise CollectionRunnerError(
+            f"Unexpected error during collection: {type(e).__name__}: {e}\n\n"
+            f"This is unexpected. Please report this error with the traceback above."
         ) from e
 
 
@@ -576,19 +681,104 @@ def run_collect_radar(
                     logger.warning(f"  - {r.get('catchment_name')}: {r.get('error')}")
         
     except CredentialsError as e:
-        logger.error("Credentials error:")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Credentials Error")
+        logger.error("=" * 80)
         logger.error(str(e))
         raise
         
     except ClientCreationError as e:
-        logger.error("Client creation error:")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Client Creation Error")
+        logger.error("=" * 80)
         logger.error(str(e))
         raise
+    
+    # ========================================================================
+    # ✅ CRITICAL FIX #2: Better error handling with specific exceptions
+    # ========================================================================
+    
+    except (OSError, IOError, PermissionError) as e:
+        # File/disk errors
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ File System Error")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. Disk full or insufficient space")
+        logger.error("2. Permission denied on output directory")
+        logger.error("3. Cannot write CSV files")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check disk space")
+        logger.error("2. Check directory permissions")
+        logger.error("3. Close any programs that might have files open")
         
-    except Exception as e:
-        logger.error(f"Collection failed: {e}")
-        logger.exception("Full traceback:")
         raise CollectionRunnerError(
-            f"Radar collection failed: {e}\n\n"
-            f"Check logs above for details."
+            f"File system error: {e}\n"
+            f"Check disk space and permissions."
+        ) from e
+    
+    except ValueError as e:
+        # Data validation errors
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Data Validation Error")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. Invalid date range")
+        logger.error("2. Invalid project_id or catchment_ids")
+        logger.error("3. Invalid pixel_batch_size")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check date parameters")
+        logger.error("2. Verify project_id and catchment_ids")
+        
+        raise CollectionRunnerError(
+            f"Data validation failed: {e}\n"
+            f"Check input parameters."
+        ) from e
+    
+    except KeyError as e:
+        # Missing data in API response
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Missing Data in API Response")
+        logger.error("=" * 80)
+        logger.error(f"Missing key: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error("1. API response format changed")
+        logger.error("2. Network issue during transfer")
+        logger.error("")
+        logger.error("How to fix:")
+        logger.error("1. Check internet connection")
+        logger.error("2. Try again (might be temporary)")
+        
+        raise CollectionRunnerError(
+            f"API response missing expected data: {e}\n"
+            f"API format may have changed."
+        ) from e
+    
+    except Exception as e:
+        # Unexpected errors
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Unexpected Error")
+        logger.error("=" * 80)
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.exception("Full traceback:")
+        logger.error("")
+        logger.error("This is unexpected. Please report this error.")
+        
+        raise CollectionRunnerError(
+            f"Unexpected error: {type(e).__name__}: {e}\n\n"
+            f"Please report this error with the traceback above."
         ) from e

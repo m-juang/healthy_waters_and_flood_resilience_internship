@@ -7,36 +7,30 @@ Fetches data for all active rain gauges and saves raw responses to outputs/rain_
 
 Usage:
     # Collect last 24 hours (current data)
-    python retrieve_rain_gauges.py
+    gauge-retrieve
     
     # Collect specific date (historical)
-    python retrieve_rain_gauges.py --date 2025-05-09
+    gauge-retrieve --date 2025-05-09
     
     # Collect date range
-    python retrieve_rain_gauges.py --start 2025-05-09 --end 2025-05-10
+    gauge-retrieve --start 2025-05-09 --end 2025-05-10
     
     # Verbose logging
-    python retrieve_rain_gauges.py --date 2025-05-09 --log-level DEBUG
+    gauge-retrieve --date 2025-05-09 --log-level DEBUG
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-03
-Version: 2.0.0
+Last Modified: 2025-01-04
+Version: 2.1.0 - Fixed: Removed sys.path manipulation, proper packaging
 """
-
-import sys
-from pathlib import Path
-# Add project root to Python path
-project_root = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
 import sys
-from datetime import datetime, timedelta, timezone  # ← MODIFIED: added timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional  # ← ADDED
-import urllib3
+from typing import Optional
 
+import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from moata_pipeline.logging_setup import setup_logging
@@ -44,12 +38,8 @@ from moata_pipeline.collect.runner import run_collect_rain_gauges
 
 
 # Version info
-__version__ = "2.0.0"  # ← MODIFIED: updated version
+__version__ = "2.1.0"
 
-
-# ============================================================================
-# ← ADDED: New helper functions (parse_date, validate_date_range)
-# ============================================================================
 
 def parse_date(date_str: str, param_name: str) -> datetime:
     """
@@ -105,10 +95,6 @@ def validate_date_range(start_time: datetime, end_time: datetime) -> None:
         )
 
 
-# ============================================================================
-# ← MODIFIED: parse_args() - added date arguments
-# ============================================================================
-
 def parse_args() -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -145,7 +131,7 @@ Notes:
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
-    # ← ADDED: Date options (mutually exclusive)
+    # Date options (mutually exclusive)
     date_group = parser.add_argument_group('Date Options (choose one)')
     date_mutex = date_group.add_mutually_exclusive_group()
     
@@ -170,7 +156,7 @@ Notes:
              "Requires --start. Example: --end 2025-05-12"
     )
     
-    # Logging options (EXISTING - kept as is)
+    # Logging options
     log_group = parser.add_argument_group('Logging Options')
     
     log_group.add_argument(
@@ -181,7 +167,7 @@ Notes:
              "Use DEBUG for verbose output."
     )
     
-    # Metadata (EXISTING - kept as is)
+    # Metadata
     parser.add_argument(
         "--version",
         action="version",
@@ -190,7 +176,7 @@ Notes:
     
     args = parser.parse_args()
     
-    # ← ADDED: Validate mutually exclusive date arguments
+    # Validate mutually exclusive date arguments
     if args.start and not args.end:
         parser.error("--start requires --end")
     if args.end and not args.start:
@@ -200,10 +186,6 @@ Notes:
     
     return args
 
-
-# ============================================================================
-# ← MODIFIED: main() - added time range handling
-# ============================================================================
 
 def main() -> int:
     """
@@ -228,7 +210,7 @@ def main() -> int:
         logger.info("Rain Gauge Data Collection - v%s", __version__)
         logger.info("=" * 80)
         
-        # ← ADDED: Determine time range
+        # Determine time range
         start_time: Optional[datetime] = None
         end_time: Optional[datetime] = None
         mode: str = "current"
@@ -261,7 +243,7 @@ def main() -> int:
             start_time = end_time - timedelta(hours=24)
             mode = "current"
         
-        # ← ADDED: Log time range
+        # Log time range
         if start_time and end_time:
             logger.info(f"Start time (UTC): {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
             logger.info(f"End time (UTC):   {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -269,12 +251,12 @@ def main() -> int:
         logger.info("=" * 80)
         logger.info("")
         
-        # ← MODIFIED: Run collection with time parameters
+        # Run collection with time parameters
         logger.info("Starting rain gauge data collection...")
         
         run_collect_rain_gauges(
-            start_time=start_time,  # ← ADDED
-            end_time=end_time,      # ← ADDED
+            start_time=start_time,
+            end_time=end_time,
         )
         
         logger.info("")
@@ -282,7 +264,7 @@ def main() -> int:
         logger.info("✅ Rain gauge data collection completed successfully")
         logger.info("=" * 80)
         
-        # ← ADDED: Log output location
+        # Log output location
         if mode == "historical" and args.date:
             output_dir = f"outputs/rain_gauges/historical/{args.date}/raw/"
             logger.info(f"Output location: {output_dir}")
@@ -300,9 +282,8 @@ def main() -> int:
         logger.warning("=" * 80)
         logger.warning("Partial data may have been saved.")
         logger.warning("You can resume by running the script again.")
-        return 130  # ← EXISTING: kept as is
-        
-    # ← ADDED: ValueError handling
+        return 130
+
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
@@ -312,11 +293,12 @@ def main() -> int:
         logger.error("")
         logger.error("Run with --help for usage information.")
         return 1
+    
         
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Collection Failed")
+        logger.error("❌ Unexpected Error")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

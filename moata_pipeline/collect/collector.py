@@ -317,19 +317,6 @@ class RainGaugeCollector:
 
         return traces_by_asset
 
-        self._logger.info(f"✓ Fetched {len(all_traces)} traces total")
-
-        # Group traces by asset ID
-        traces_by_asset: Dict[int, List[Dict[str, Any]]] = {}
-        for t in all_traces:
-            asset_id = safe_int(t.get("assetId"))
-            if asset_id is None:
-                continue
-            traces_by_asset.setdefault(asset_id, []).append(t)
-
-        return 
-    
-
     # ============================================================================
     # ← MODIFIED: _enrich_gauges_with_traces() - added time parameters
     # ============================================================================
@@ -469,7 +456,7 @@ class RainGaugeCollector:
             "timeseries": timeseries_data,  # ← ADDED
         }
     
-    def _setup_temp_dir(self) -> None:
+    def setup_temp_dir(self) -> None:
         """Setup temporary directory for atomic writes with robust cleanup."""
         import time
         
@@ -535,7 +522,7 @@ class RainGaugeCollector:
         self._temp_dir.mkdir(parents=True, exist_ok=True)
         self._logger.debug(f"✓ Temp directory ready: {self._temp_dir}")
 
-    def _cleanup_temp_dir(self) -> None:
+    def cleanup_temp_dir(self) -> None:
         """Remove temporary directory (on failure or cancellation)."""
         if self._temp_dir and self._temp_dir.exists():
             try:
@@ -544,13 +531,16 @@ class RainGaugeCollector:
             except Exception as e:
                 self._logger.warning(f"Failed to clean up temp directory: {e}")
 
-    def _finalize_output(self) -> None:
+
+    def finalize_output(self) -> None:
         """
         Move data from temp directory to final location.
         
         This is called only after successful completion of collection.
         Existing data in final location is replaced atomically.
         """
+        import time
+        
         if not self._temp_dir or not self._temp_dir.exists():
             self._logger.warning("No temp directory to finalize")
             return
@@ -567,15 +557,52 @@ class RainGaugeCollector:
         # Ensure base directory exists
         self._base_output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Move file to final location (overwrites if exists)
+        # Move file to final location (with retry mechanism)
         final_json = self._base_output_dir / "rain_gauges_traces_alarms.json"
         
-        if final_json.exists():
-            self._logger.info(f"  Replacing existing file: {final_json}")
-            final_json.unlink()
-        
-        shutil.move(str(temp_json), str(final_json))
-        self._logger.info(f"✓ Moved data to final location: {final_json}")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if final_json.exists():
+                    self._logger.info(f"  Replacing existing file: {final_json}")
+                    final_json.unlink()
+                
+                shutil.move(str(temp_json), str(final_json))
+                self._logger.info(f"✓ Moved data to final location: {final_json}")
+                break  # Success!
+                
+            except PermissionError as e:
+                self._logger.warning(
+                    f"Attempt {attempt + 1}/{max_retries}: Permission denied - {e}"
+                )
+                
+                if attempt < max_retries - 1:
+                    self._logger.debug("Waiting 2 seconds before retry...")
+                    time.sleep(2)
+                    continue
+                
+                # Last attempt failed
+                self._logger.error(
+                    f"\n{'='*80}\n"
+                    f"⚠️  COLLECTION SUCCEEDED BUT FINALIZATION BLOCKED\n"
+                    f"{'='*80}\n"
+                    f"Your data is safe in: {temp_json}\n"
+                    f"\n"
+                    f"The existing file is locked: {final_json}\n"
+                    f"\n"
+                    f"To complete the process:\n"
+                    f"1. Close the JSON file if it's opened in an editor\n"
+                    f"2. Close File Explorer windows showing this folder\n"
+                    f"3. Then manually:\n"
+                    f"   - Delete: {final_json}\n"
+                    f"   - Copy: {temp_json} → {final_json}\n"
+                    f"{'='*80}\n"
+                )
+                raise PermissionError(
+                    f"Cannot finalize output - file is locked: {final_json}\n"
+                    f"Close any programs using this file.\n"
+                    f"Your data is safe in: {temp_json}"
+                ) from e
         
         # Clean up temp directory
         try:
@@ -583,6 +610,9 @@ class RainGaugeCollector:
             self._logger.debug(f"✓ Removed temp directory: {self._temp_dir}")
         except Exception as e:
             self._logger.warning(f"Failed to remove temp directory: {e}")
+        
+        self._logger.info("✓ Finalization complete")
+
 
 
 # =============================================================================
@@ -701,7 +731,7 @@ class RadarDataCollector:
         self._logger.info(f"  Output directory: {self._base_output_dir}")
         self._logger.info(f"  Pixel batch size: {self._pixel_batch_size}")
 
-    def _setup_temp_dir(self) -> None:
+    def setup_temp_dir(self) -> None:
         """Setup temporary directory for atomic writes with robust cleanup."""
         import time
         import uuid
@@ -790,7 +820,7 @@ class RadarDataCollector:
         self._temp_dir.mkdir(parents=True, exist_ok=True)
         self._logger.debug(f"✓ Temp directory ready: {self._temp_dir}")
     
-    def _cleanup_temp_dir(self) -> None:
+    def cleanup_temp_dir(self) -> None:
         """Remove temporary directory (on failure or cancellation)."""
         if self._temp_dir and self._temp_dir.exists():
             try:
@@ -799,32 +829,105 @@ class RadarDataCollector:
             except Exception as e:
                 self._logger.warning(f"Failed to clean up temp directory: {e}")
 
-    def _finalize_output(self) -> None:
+    def finalize_output(self) -> None:
         """
         Move data from temp directory to final location.
         
         This is called only after successful completion of collection.
         Existing data in final location is replaced atomically.
         """
+        import time
+        
         if not self._temp_dir or not self._temp_dir.exists():
             self._logger.warning("No temp directory to finalize")
             return
         
         self._logger.info("Finalizing output (moving from temp to final location)...")
         
-        # Remove existing final directory if it exists
         if self._base_output_dir.exists():
-            self._logger.info(f"  Removing existing output: {self._base_output_dir}")
-            shutil.rmtree(self._base_output_dir)
+            # Try to remove, if fails, rename old folder
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    self._logger.info(f"  Removing existing output: {self._base_output_dir}")
+                    shutil.rmtree(self._base_output_dir)
+                    self._logger.debug(f"✓ Successfully removed existing directory")
+                    break  # Success!
+                    
+                except PermissionError as e:
+                    self._logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries}: Permission denied - {e}"
+                    )
+                    
+                    if attempt < max_retries - 1:
+                        # Wait and retry (files might be temporarily locked)
+                        self._logger.debug("Waiting 2 seconds before retry...")
+                        time.sleep(2)
+                        continue
+                    
+                    # Last attempt failed - rename the locked folder
+                    self._logger.warning("Trying alternative cleanup strategies...")
+                    try:
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        old_dir = self._base_output_dir.parent / f"raw_old_{timestamp}"
+                        
+                        # Try to rename the locked directory
+                        self._base_output_dir.rename(old_dir)
+                        self._logger.warning(
+                            f"Could not delete existing folder. Renamed to: {old_dir}"
+                        )
+                        self._logger.warning(
+                            "Please manually delete this folder later when files are released.\n"
+                            "Close File Explorer or any programs accessing the old folder."
+                        )
+                        break  # Successfully renamed
+                        
+                    except Exception as rename_error:
+                        self._logger.error(f"Rename strategy failed: {rename_error}")
+                        
+                        # Last resort: Keep temp data and inform user
+                        self._logger.error(
+                            f"\n{'='*80}\n"
+                            f"⚠️  COLLECTION SUCCEEDED BUT FINALIZATION BLOCKED\n"
+                            f"{'='*80}\n"
+                            f"Your data is safe in: {self._temp_dir}\n"
+                            f"\n"
+                            f"The existing folder is locked: {self._base_output_dir}\n"
+                            f"\n"
+                            f"To complete the process:\n"
+                            f"1. Close File Explorer windows showing this folder\n"
+                            f"2. Close any CSV files opened from this folder\n"
+                            f"3. Close any other programs accessing these files\n"
+                            f"4. Then manually:\n"
+                            f"   - Delete or rename: {self._base_output_dir}\n"
+                            f"   - Rename: {self._temp_dir} → {self._base_output_dir}\n"
+                            f"{'='*80}\n"
+                        )
+                        raise PermissionError(
+                            f"Cannot finalize output - folder is locked: {self._base_output_dir}\n"
+                            f"Close File Explorer or other programs using this folder.\n"
+                            f"Your data is safe in: {self._temp_dir}"
+                        ) from e
         
         # Move temp to final location
-        shutil.move(str(self._temp_dir), str(self._base_output_dir))
-        self._logger.info(f"✓ Moved data to final location: {self._base_output_dir}")
+        try:
+            shutil.move(str(self._temp_dir), str(self._base_output_dir))
+            self._logger.info(f"✓ Moved data to final location: {self._base_output_dir}")
+        except Exception as e:
+            self._logger.error(f"Failed to move temp to final location: {e}")
+            self._logger.error(
+                f"\nYour data is still safe in: {self._temp_dir}\n"
+                f"You can manually rename it to: {self._base_output_dir}"
+            )
+            raise
         
         # Update directory references to final location
         self._catchments_dir = self._base_output_dir / "catchments"
         self._pixel_mappings_dir = self._base_output_dir / "pixel_mappings"
         self._radar_data_dir = self._base_output_dir / "radar_data"
+        
+        self._logger.info("✓ Finalization complete")
+
 
     def _ensure_dirs(self) -> None:
         """Create output directories if they don't exist."""
@@ -1420,7 +1523,7 @@ class RadarDataCollector:
         self._logger.info(f"Using atomic writes (temp folder strategy)")
         
         # Setup temporary directory for atomic writes
-        self._setup_temp_dir()
+        self.setup_temp_dir()
         
         try:
             # Load pixel cache from FINAL location (not temp) unless forced refresh
@@ -1465,7 +1568,7 @@ class RadarDataCollector:
             self._save_collection_summary(results, start_time, end_time)
             
             # SUCCESS: Move temp to final location
-            self._finalize_output()
+            self.finalize_output()
             
             successful = len([r for r in results if not r.get("error")])
             failed = len([r for r in results if r.get("error")])
@@ -1489,7 +1592,7 @@ class RadarDataCollector:
             self._logger.warning("⚠️  Collection cancelled by user")
             self._logger.warning("=" * 80)
             self._logger.warning("Cleaning up temporary files...")
-            self._cleanup_temp_dir()
+            self.cleanup_temp_dir()
             self._logger.warning("✓ Existing data preserved (no changes made)")
             raise
             
@@ -1500,7 +1603,7 @@ class RadarDataCollector:
             self._logger.error(f"❌ Collection failed: {e}")
             self._logger.error("=" * 80)
             self._logger.error("Cleaning up temporary files...")
-            self._cleanup_temp_dir()
+            self.cleanup_temp_dir()
             self._logger.error("✓ Existing data preserved (no changes made)")
             raise
 

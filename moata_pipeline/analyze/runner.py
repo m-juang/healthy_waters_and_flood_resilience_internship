@@ -430,4 +430,4 @@ def run_filter_active_gauges(
         raise AnalysisRunnerError(
             f"Rain gauge analysis failed: {e}\n\n"
             f"Check logs above for details."
-        ) from e
+        ) 
