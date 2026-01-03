@@ -3,7 +3,7 @@
 Pipeline for collecting, analyzing, and visualizing rain monitoring data from Moata API.
 
 > **Internship Project**: Auckland Council (COMPSCI 778)  
-> **Version**: 1.0.0
+> **Version**: 2.0.0 (Updated Jan 2026)
 
 ---
 
@@ -72,16 +72,13 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 
 ## Usage
 
-### GUI Mode (Recommended for Beginners) 🎨
+### GUI Mode (Recommended) 🎨
 
 **Easy-to-use graphical interface:**
 
 ```bash
-# Install GUI dependency (if not yet installed)
-pip install customtkinter
-
 # Run the GUI
-python rain_monitoring_gui_modern.py
+python rain_monitoring_gui.py
 ```
 
 **Features:**
@@ -105,38 +102,38 @@ python rain_monitoring_gui_modern.py
 
 ```bash
 # 1. Retrieve data from API (~60 minutes)
-python retrieve_rain_gauges.py
+python scripts/gauge/retrieve.py
 
 # 2. Analyze data (~2-3 minutes)
-python analyze_rain_gauges.py
+python scripts/gauge/analyze.py
 
 # 3. Generate HTML dashboard (~3-5 minutes)
-python visualize_rain_gauges.py
+python scripts/gauge/visualize.py
 
 # 4. [Optional] Validate alarms
-python validate_ari_alarms_rain_gauges.py
-python visualize_ari_alarms_rain_gauges.py
+python scripts/gauge/validate.py
+python scripts/gauge/visualize_validation.py
 ```
 
 **View all options:**
 ```bash
-python retrieve_rain_gauges.py --help
+python scripts/gauge/retrieve.py --help
 ```
 
 ### Rain Radar Pipeline
 
 **Current Data (Last 24 hours):**
 ```bash
-python retrieve_rain_radar.py
-python analyze_rain_radar.py --current
-python visualize_rain_radar.py
+python scripts/radar/retrieve.py
+python scripts/radar/analyze.py --current
+python scripts/radar/visualize.py
 ```
 
 **Historical Data (Specific date):**
 ```bash
-python retrieve_rain_radar.py --date 2025-05-09
-python analyze_rain_radar.py --date 2025-05-09
-python visualize_rain_radar.py --date 2025-05-09
+python scripts/radar/retrieve.py --date 2025-05-09
+python scripts/radar/analyze.py --date 2025-05-09
+python scripts/radar/visualize.py --date 2025-05-09
 ```
 
 ---
@@ -150,14 +147,14 @@ internship-project/
 │   ├── raingauge_ari_alarms.csv
 │   └── tp108_stats.csv
 │
-├── 📁 moata_pipeline/            # Source code
+├── 📁 moata_pipeline/            # Source code (backend)
 │   ├── analyze/                  # ARI analysis
 │   ├── collect/                  # Data collection
 │   ├── common/                   # Utilities
 │   ├── moata/                    # Moata API client
 │   └── viz/                      # Visualization
 │
-├── 📁 rain_monitoring_gui/       # GUI package (modular)
+├── 📁 rain_monitoring_gui/       # GUI application
 │   ├── __init__.py               # Package init
 │   ├── __main__.py               # Module entry point
 │   ├── config.py                 # Colors, constants, themes
@@ -169,6 +166,20 @@ internship-project/
 │       ├── base.py               # Abstract base class
 │       ├── gauge.py              # Rain Gauge pipeline
 │       └── radar.py              # Rain Radar pipeline
+│
+├── 📁 scripts/                   # Command-line scripts
+│   ├── gauge/                    # Rain gauge pipeline scripts
+│   │   ├── retrieve.py           # Data collection
+│   │   ├── analyze.py            # Data analysis
+│   │   ├── visualize.py          # Dashboard generation
+│   │   ├── validate.py           # Alarm validation
+│   │   └── visualize_validation.py  # Validation dashboard
+│   └── radar/                    # Rain radar pipeline scripts
+│       ├── retrieve.py           # Data collection
+│       ├── analyze.py            # Data analysis
+│       ├── visualize.py          # Dashboard generation
+│       ├── validate.py           # Alarm validation
+│       └── visualize_validation.py  # Validation dashboard
 │
 ├── 📁 outputs/                   # Generated outputs (Git-ignored)
 │   ├── rain_gauges/
@@ -184,22 +195,8 @@ internship-project/
 │               ├── analyze/      # Analysis results
 │               └── dashboard/    # HTML dashboard
 │
-├── 🚀 Scripts - Rain Gauges
-├── retrieve_rain_gauges.py
-├── analyze_rain_gauges.py
-├── visualize_rain_gauges.py
-├── validate_ari_alarms_rain_gauges.py
-├── visualize_ari_alarms_rain_gauges.py
-│
-├── 🚀 Scripts - Rain Radar
-├── retrieve_rain_radar.py
-├── analyze_rain_radar.py
-├── visualize_rain_radar.py
-├── validate_ari_alarms_rain_radar.py
-├── visualize_ari_alarms_rain_radar.py
-│
-├── 🎨 GUI Entry Point
-├── rain_monitoring_gui_modern.py # GUI launcher
+├── 🎨 Main Entry Point
+├── rain_monitoring_gui.py        # GUI launcher
 │
 ├── .env                          # Credentials (Git-ignored, REQUIRED)
 ├── .env.example                  # Template
@@ -210,6 +207,21 @@ internship-project/
 ---
 
 ## Troubleshooting
+
+### Error: ModuleNotFoundError: No module named 'moata_pipeline'
+
+**Cause**: Scripts moved to `scripts/` folder can't find `moata_pipeline` module.
+
+**Solution**: Scripts have been updated with path fixing code. If you still see this error, ensure you're running the latest version of the scripts.
+
+**Manual fix** (if needed):
+Add this at the top of the script (after docstring, before other imports):
+```python
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
+```
 
 ### Error: Authentication Failed
 
@@ -230,21 +242,14 @@ python -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.ge
 InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.moata.io'
 ```
 
-**Solution**: Add to your script (e.g., `validate_ari_alarms_rain_gauges.py`):
-
-```python
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-```
-
-**Note**: This warning is safe to suppress in Auckland Council development environment.
+**Solution**: This warning is safe to suppress in Auckland Council development environment. It's already handled in the scripts.
 
 ### Error: Rate Limit Exceeded
 
 ```bash
 # Wait for the specified time (usually 60 seconds)
 sleep 60
-python retrieve_rain_radar.py
+python scripts/gauge/retrieve.py
 ```
 
 **Tip**: Don't run multiple collections simultaneously.
@@ -267,7 +272,7 @@ python retrieve_rain_radar.py
 
 ```bash
 # Use debug mode
-python retrieve_rain_gauges.py --log-level DEBUG
+python scripts/gauge/retrieve.py --log-level DEBUG
 ```
 
 ---
@@ -313,7 +318,7 @@ matplotlib>=3.8.0          # Visualization
 python-dotenv>=1.0.0       # Environment variables
 shapely>=2.0.0             # Geometry (for radar)
 
-# GUI (optional)
+# GUI
 customtkinter>=5.2.0       # Modern GUI interface
 ```
 
@@ -336,25 +341,25 @@ Install all: `pip install -r requirements.txt`
 
 ```bash
 # View all options
-python retrieve_rain_gauges.py --help
+python scripts/gauge/retrieve.py --help
 
 # Custom threshold
-python validate_ari_alarms_rain_gauges.py --threshold 10.0
+python scripts/gauge/validate.py --threshold 10.0
 
 # Custom time window
-python validate_ari_alarms_rain_gauges.py --window-before 2 --window-after 2
+python scripts/gauge/validate.py --window-before 2 --window-after 2
 
 # Debug mode
-python analyze_rain_gauges.py --log-level DEBUG
+python scripts/gauge/analyze.py --log-level DEBUG
 ```
 
 ### Automation with Exit Codes
 
 ```bash
-python retrieve_rain_gauges.py
+python scripts/gauge/retrieve.py
 if [ $? -eq 0 ]; then
   echo "Success!"
-  python analyze_rain_gauges.py
+  python scripts/gauge/analyze.py
 else
   echo "Failed, check logs"
 fi
@@ -376,14 +381,31 @@ Exit codes:
 
 ---
 
+## Changelog
+
+### Version 2.0.0 (January 2026)
+- **Reorganized project structure**: Moved CLI scripts to `scripts/` folder for better organization
+- **Updated GUI**: Fixed script paths to work with new structure
+- **Improved maintainability**: Cleaner root folder with organized scripts
+- **No functional changes**: All features work exactly as before
+
+### Version 1.0.0 (December 2024)
+- Initial release
+- Rain gauge and radar data collection pipelines
+- ARI analysis and alarm validation
+- HTML dashboard generation
+- Modern GUI interface
+
+---
+
 ## License
 
 **Internal Auckland Council Use Only**
 
-Copyright © 2025-2026 Auckland Council. All rights reserved.
+Copyright © 2024-2026 Auckland Council. All rights reserved.
 
 ---
 
-**Last Updated**: January 2025  
-**Version**: 1.0.0  
+**Last Updated**: January 2026  
+**Version**: 2.0.0  
 **Created by**: Muhammad Juang (Healthy Waters and Flood Resilience Intern)
