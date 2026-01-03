@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Radar ARI Alarm Validation Visualization Script
 
@@ -31,16 +31,22 @@ Usage:
 Output:
     outputs/rain_radar/validation_viz/                           (for current)
     outputs/rain_radar/historical/DATE/validation_viz/           (for historical)
-    ├── validation_dashboard.html    # Interactive dashboard with search
-    ├── ari_distribution.png         # ARI value histogram
-    ├── top_catchments.png           # Top 15 catchments bar chart
-    ├── proportion_distribution.png  # Area exceeding histogram
-    └── validation_stats.csv         # Complete statistics
+    +-- validation_dashboard.html    # Interactive dashboard with search
+    +-- ari_distribution.png         # ARI value histogram
+    +-- top_catchments.png           # Top 15 catchments bar chart
+    +-- proportion_distribution.png  # Area exceeding histogram
+    +-- validation_stats.csv         # Complete statistics
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 Version: 1.0.0
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -188,10 +194,10 @@ def find_input_file(args: argparse.Namespace, logger: logging.Logger) -> tuple[P
         if historical_files:
             input_path = historical_files[0]
             data_date = input_path.parent.name
-            logger.info("✓ Found historical validation: %s (date: %s)", input_path, data_date)
+            logger.info("? Found historical validation: %s (date: %s)", input_path, data_date)
         elif current_file.exists():
             input_path = current_file
-            logger.info("✓ Found current validation: %s", input_path)
+            logger.info("? Found current validation: %s", input_path)
         else:
             raise FileNotFoundError(
                 "No validation file found.\n\n"
@@ -223,7 +229,7 @@ def create_ari_distribution_chart(df: pd.DataFrame, out_dir: Path, logger: loggi
     ari_values = df[df["max_ari"] > 0]["max_ari"]
     
     if ari_values.empty:
-        logger.warning("⚠️  No ARI values > 0 to plot")
+        logger.warning("??  No ARI values > 0 to plot")
         return
     
     plt.figure(figsize=(10, 6))
@@ -239,7 +245,7 @@ def create_ari_distribution_chart(df: pd.DataFrame, out_dir: Path, logger: loggi
     plt.tight_layout()
     plt.savefig(out_dir / "ari_distribution.png", dpi=200, bbox_inches='tight')
     plt.close()
-    logger.info("✓ Created ari_distribution.png")
+    logger.info("? Created ari_distribution.png")
 
 
 def create_top_catchments_chart(df: pd.DataFrame, out_dir: Path, logger: logging.Logger) -> None:
@@ -254,7 +260,7 @@ def create_top_catchments_chart(df: pd.DataFrame, out_dir: Path, logger: logging
     top = df.nlargest(15, "max_ari")
     
     if top.empty:
-        logger.warning("⚠️  No data for top catchments chart")
+        logger.warning("??  No data for top catchments chart")
         return
     
     plt.figure(figsize=(12, 8))
@@ -274,7 +280,7 @@ def create_top_catchments_chart(df: pd.DataFrame, out_dir: Path, logger: logging
     plt.tight_layout()
     plt.savefig(out_dir / "top_catchments.png", dpi=200, bbox_inches='tight')
     plt.close()
-    logger.info("✓ Created top_catchments.png")
+    logger.info("? Created top_catchments.png")
 
 
 def create_proportion_chart(df: pd.DataFrame, out_dir: Path, logger: logging.Logger) -> None:
@@ -301,7 +307,7 @@ def create_proportion_chart(df: pd.DataFrame, out_dir: Path, logger: logging.Log
     plt.tight_layout()
     plt.savefig(out_dir / "proportion_distribution.png", dpi=200, bbox_inches='tight')
     plt.close()
-    logger.info("✓ Created proportion_distribution.png")
+    logger.info("? Created proportion_distribution.png")
 
 
 def create_html_dashboard(
@@ -370,7 +376,7 @@ def create_html_dashboard(
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌧️ Rain Radar ARI Validation Dashboard</h1>
+            <h1>??? Rain Radar ARI Validation Dashboard</h1>
             <div class="meta">{date_display} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
         </div>
         
@@ -402,7 +408,7 @@ def create_html_dashboard(
         </div>
         
         <div class="section">
-            <h2>📊 Charts</h2>
+            <h2>?? Charts</h2>
             <div class="charts">
                 <div class="chart"><img src="ari_distribution.png" alt="ARI Distribution"></div>
                 <div class="chart"><img src="proportion_distribution.png" alt="Proportion Distribution"></div>
@@ -411,7 +417,7 @@ def create_html_dashboard(
         </div>
         
         <div class="section">
-            <h2>🚨 Catchments That Would Alarm (≥30% area exceeding)</h2>
+            <h2>?? Catchments That Would Alarm (=30% area exceeding)</h2>
             <table>
                 <thead>
                     <tr><th>Catchment</th><th>Max ARI</th><th>Pixels Total</th><th>Pixels Exceeding</th><th>Proportion</th><th>Peak Duration</th></tr>
@@ -440,8 +446,8 @@ def create_html_dashboard(
         </div>
         
         <div class="section">
-            <h2>📋 All Catchments</h2>
-            <input type="text" id="search" class="search-box" placeholder="🔍 Search catchments...">
+            <h2>?? All Catchments</h2>
+            <input type="text" id="search" class="search-box" placeholder="?? Search catchments...">
             <table id="allTable">
                 <thead>
                     <tr><th>Catchment</th><th>Max ARI</th><th>Pixels</th><th>Exceeding</th><th>Proportion</th><th>Status</th></tr>
@@ -483,7 +489,7 @@ def create_html_dashboard(
     
     output_path = out_dir / "validation_dashboard.html"
     output_path.write_text(html, encoding="utf-8")
-    logger.info("✓ Created validation_dashboard.html")
+    logger.info("? Created validation_dashboard.html")
     return output_path
 
 
@@ -535,7 +541,7 @@ def main() -> int:
         # Load validation data
         logger.info("Loading validation data...")
         df = pd.read_csv(input_path)
-        logger.info("✓ Loaded %d catchment records", len(df))
+        logger.info("? Loaded %d catchment records", len(df))
         
         # Validate required columns
         required_cols = ["catchment_name", "max_ari", "proportion_exceeding", "alarm_status"]
@@ -557,11 +563,11 @@ def main() -> int:
         # Save stats
         stats_path = out_dir / "validation_stats.csv"
         df.to_csv(stats_path, index=False)
-        logger.info("✓ Saved validation_stats.csv")
+        logger.info("? Saved validation_stats.csv")
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Visualization completed successfully")
+        logger.info("? Visualization completed successfully")
         logger.info("=" * 80)
         logger.info(f"Output directory: {out_dir}")
         logger.info("")
@@ -574,21 +580,21 @@ def main() -> int:
         logger.info("=" * 80)
         
         # Print to stdout
-        print(f"\n✅ Done! Open in browser: {dashboard_path.absolute()}")
+        print(f"\n? Done! Open in browser: {dashboard_path.absolute()}")
         
         return 0
         
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("⚠️  Visualization interrupted by user (Ctrl+C)")
+        logger.warning("??  Visualization interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ File Not Found")
+        logger.error("? File Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -596,7 +602,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Data Error")
+        logger.error("? Data Error")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -604,7 +610,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Visualization Failed")
+        logger.error("? Visualization Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Radar Data Analysis Script
 
@@ -31,14 +31,20 @@ Usage:
 Output:
     outputs/rain_radar/analyze/                    (for current data)
     outputs/rain_radar/historical/DATE/analyze/    (for historical data)
-    ├── ari_analysis_summary.csv      # Per-catchment ARI summary
-    ├── ari_exceedances.csv           # Catchments exceeding threshold
-    └── analysis_report.txt           # Detailed text report
+    +-- ari_analysis_summary.csv      # Per-catchment ARI summary
+    +-- ari_exceedances.csv           # Catchments exceeding threshold
+    +-- analysis_report.txt           # Detailed text report
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 Version: 1.0.0
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -187,7 +193,7 @@ def validate_threshold(threshold: float) -> None:
     
     if threshold > 100:
         logging.warning(
-            f"⚠️  Very high ARI threshold: {threshold} years. "
+            f"??  Very high ARI threshold: {threshold} years. "
             f"This may result in very few or no exceedances."
         )
 
@@ -232,7 +238,7 @@ def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> P
             if historical_dirs:
                 radar_data_dir = historical_dirs[-1]  # Most recent
                 date_dir = radar_data_dir.parent.parent.name
-                logger.info("✓ Found historical data: %s (date: %s)", radar_data_dir, date_dir)
+                logger.info("? Found historical data: %s (date: %s)", radar_data_dir, date_dir)
             else:
                 # Fallback to current
                 radar_data_dir = Path("outputs/rain_radar/raw/radar_data")
@@ -259,7 +265,7 @@ def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> P
             f"Directory exists but is empty."
         )
     
-    logger.info(f"✓ Found {len(data_files)} radar data files")
+    logger.info(f"? Found {len(data_files)} radar data files")
     
     return radar_data_dir
 
@@ -285,8 +291,8 @@ def determine_output_dir(
         logger.info("Using custom output directory: %s", output_dir)
     else:
         # Auto-determine: put analyze/ next to raw/
-        # outputs/rain_radar/raw/radar_data → outputs/rain_radar/analyze/
-        # outputs/rain_radar/historical/DATE/raw/radar_data → outputs/rain_radar/historical/DATE/analyze/
+        # outputs/rain_radar/raw/radar_data ? outputs/rain_radar/analyze/
+        # outputs/rain_radar/historical/DATE/raw/radar_data ? outputs/rain_radar/historical/DATE/analyze/
         output_dir = radar_data_dir.parent.parent / "analyze"
         logger.info("Auto-determined output directory: %s", output_dir)
     
@@ -352,7 +358,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Analysis completed successfully")
+        logger.info("? Analysis completed successfully")
         logger.info("=" * 80)
         logger.info(f"Output files saved to: {result['output_dir']}")
         logger.info("")
@@ -367,14 +373,14 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("⚠️  Analysis interrupted by user (Ctrl+C)")
+        logger.warning("??  Analysis interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Data Not Found")
+        logger.error("? Data Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -382,7 +388,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Validation Error")
+        logger.error("? Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -392,7 +398,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Analysis Failed")
+        logger.error("? Analysis Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

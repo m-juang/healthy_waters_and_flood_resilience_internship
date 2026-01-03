@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Radar ARI Alarm Validation Script
 
@@ -7,7 +7,7 @@ Checks which catchments would trigger alarms based on proportion of area
 exceeding the ARI threshold.
 
 Validation Logic:
-    - Alarm triggers if ≥30% of catchment area has ARI ≥ 5 years (configurable)
+    - Alarm triggers if =30% of catchment area has ARI = 5 years (configurable)
     - Uses spatial proportion (areal coverage) not point measurement
     - Different threshold than rain gauges due to spatial nature of radar data
 
@@ -42,6 +42,12 @@ Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 Version: 1.0.0
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -82,8 +88,8 @@ Examples:
   %(prog)s --log-level DEBUG                # Verbose output
 
 Validation Logic:
-  - Alarm triggers if proportion_exceeding ≥ threshold
-  - Default: ≥30%% of catchment area with ARI ≥5 years
+  - Alarm triggers if proportion_exceeding = threshold
+  - Default: =30%% of catchment area with ARI =5 years
   - Radar uses spatial proportion (different from point-based gauges)
 
 Input Requirements:
@@ -177,11 +183,11 @@ def validate_threshold(threshold: float) -> None:
     
     if threshold == 0.0:
         logging.warning(
-            "⚠️  Threshold is 0.0 - ALL catchments will trigger alarms!"
+            "??  Threshold is 0.0 - ALL catchments will trigger alarms!"
         )
     elif threshold == 1.0:
         logging.warning(
-            "⚠️  Threshold is 1.0 - NO catchments will trigger alarms!"
+            "??  Threshold is 1.0 - NO catchments will trigger alarms!"
         )
 
 
@@ -228,10 +234,10 @@ def find_input_file(args: argparse.Namespace, logger: logging.Logger) -> Path:
         if historical_files:
             input_path = historical_files[0]
             date = input_path.parent.parent.name
-            logger.info("✓ Found historical data: %s (date: %s)", input_path, date)
+            logger.info("? Found historical data: %s (date: %s)", input_path, date)
         elif current_file.exists():
             input_path = current_file
-            logger.info("✓ Found current data: %s", input_path)
+            logger.info("? Found current data: %s", input_path)
         else:
             raise FileNotFoundError(
                 "No ARI analysis summary found.\n\n"
@@ -275,7 +281,7 @@ def run_validation(
     """
     logger.info("Loading ARI summary from %s", ari_summary_path)
     df = pd.read_csv(ari_summary_path)
-    logger.info("✓ Loaded %d catchment records", len(df))
+    logger.info("? Loaded %d catchment records", len(df))
     
     # Validate required columns
     required_cols = ["catchment_id", "proportion_exceeding"]
@@ -302,7 +308,7 @@ def run_validation(
     available_cols = [c for c in cols if c in df.columns]
     df[available_cols].to_csv(output_path, index=False)
     
-    logger.info("✓ Saved validation results to %s", output_path)
+    logger.info("? Saved validation results to %s", output_path)
     
     # Generate report
     lines = []
@@ -394,7 +400,7 @@ def main() -> int:
         else:
             # Put validation CSV next to analyze directory
             # e.g., outputs/rain_radar/historical/DATE/analyze/ 
-            #    → outputs/rain_radar/historical/DATE/ari_alarm_validation.csv
+            #    ? outputs/rain_radar/historical/DATE/ari_alarm_validation.csv
             output_path = input_path.parent.parent / "ari_alarm_validation.csv"
             logger.info("Auto-determined output path: %s", output_path)
         
@@ -422,7 +428,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Validation completed successfully")
+        logger.info("? Validation completed successfully")
         logger.info("=" * 80)
         logger.info(f"Results saved to: {result['output_path']}")
         logger.info("")
@@ -437,14 +443,14 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("⚠️  Validation interrupted by user (Ctrl+C)")
+        logger.warning("??  Validation interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ File Not Found")
+        logger.error("? File Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -452,7 +458,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Validation Error")
+        logger.error("? Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -462,7 +468,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Validation Failed")
+        logger.error("? Validation Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

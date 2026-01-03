@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Radar Data Visualization Script
 
@@ -31,14 +31,20 @@ Usage:
 Output:
     outputs/rain_radar/dashboard/                      (for current data)
     outputs/rain_radar/historical/DATE/dashboard/      (for historical data)
-    ├── radar_dashboard.html      # Main interactive dashboard
-    ├── catchment_stats.csv       # Statistical summary
-    └── charts/                   # Generated chart images
+    +-- radar_dashboard.html      # Main interactive dashboard
+    +-- catchment_stats.csv       # Statistical summary
+    +-- charts/                   # Generated chart images
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 Version: 1.0.0
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -194,7 +200,7 @@ def detect_data_dir(args: argparse.Namespace, logger: logging.Logger) -> tuple[P
             if historical_dirs:
                 data_dir = historical_dirs[-1]  # Most recent
                 data_date = data_dir.parent.name
-                logger.info("✓ Found historical data: %s (date: %s)", data_dir, data_date)
+                logger.info("? Found historical data: %s (date: %s)", data_dir, data_date)
             else:
                 # Fallback to current
                 data_dir = Path("outputs/rain_radar/raw")
@@ -233,7 +239,7 @@ def detect_data_dir(args: argparse.Namespace, logger: logging.Logger) -> tuple[P
             f"Directory structure exists but contains no data files."
         )
     
-    logger.info(f"✓ Found {len(radar_files)} radar data files")
+    logger.info(f"? Found {len(radar_files)} radar data files")
     
     return data_dir, data_date
 
@@ -292,7 +298,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Dashboard generated successfully")
+        logger.info("? Dashboard generated successfully")
         logger.info("=" * 80)
         logger.info(f"Dashboard: {report_path}")
         logger.info("")
@@ -302,21 +308,21 @@ def main() -> int:
         logger.info("=" * 80)
         
         # Print to stdout for easy access
-        print(f"\n✅ Done! Open in browser: {report_path.absolute()}")
+        print(f"\n? Done! Open in browser: {report_path.absolute()}")
         
         return 0
         
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("⚠️  Visualization interrupted by user (Ctrl+C)")
+        logger.warning("??  Visualization interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Data Not Found")
+        logger.error("? Data Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -324,7 +330,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Visualization Failed")
+        logger.error("? Visualization Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Radar Data Collection Script
 
@@ -36,6 +36,12 @@ Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 Version: 1.0.0
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -208,7 +214,7 @@ def validate_date_range(start_time: datetime, end_time: datetime) -> None:
     duration = (end_time - start_time).days
     if duration > 31:
         logging.warning(
-            f"⚠️  Large date range: {duration} days. "
+            f"??  Large date range: {duration} days. "
             f"This may take a long time and use significant disk space."
         )
 
@@ -275,9 +281,9 @@ def main() -> int:
         
         # Log processing options
         if args.force_refresh_pixels:
-            logger.info("🔄 Pixel mappings: Force refresh from API")
+            logger.info("?? Pixel mappings: Force refresh from API")
         else:
-            logger.info("💾 Pixel mappings: Use cached (if available)")
+            logger.info("?? Pixel mappings: Use cached (if available)")
         
         logger.info("=" * 80)
         logger.info("")
@@ -293,7 +299,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Radar data collection completed successfully")
+        logger.info("? Radar data collection completed successfully")
         logger.info("=" * 80)
         
         # Log output location
@@ -310,7 +316,7 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("⚠️  Collection interrupted by user (Ctrl+C)")
+        logger.warning("??  Collection interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         logger.warning("Partial data may have been saved.")
         logger.warning("You can resume by running the script again.")
@@ -319,7 +325,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Validation Error")
+        logger.error("? Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -329,7 +335,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ Collection Failed")
+        logger.error("? Collection Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

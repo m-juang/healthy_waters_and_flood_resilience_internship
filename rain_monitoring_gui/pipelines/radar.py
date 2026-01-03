@@ -104,7 +104,7 @@ class RadarPipeline(BasePipeline):
         if not selection:
             return
         
-        script = "retrieve_rain_radar.py"
+        script = "scripts/radar/retrieve.py"
         args = []
         
         if selection == "date":
@@ -190,7 +190,7 @@ class RadarPipeline(BasePipeline):
     
     def _run_retrieve_with_date(self, date_str: str) -> None:
         """Run retrieve with specified date."""
-        script = "retrieve_rain_radar.py"
+        script = "scripts/radar/retrieve.py"
         args = ["--date", date_str]
         self.app.selected_date = date_str
         
@@ -203,7 +203,7 @@ class RadarPipeline(BasePipeline):
     
     def _run_retrieve_with_range(self, start_str: str, end_str: str) -> None:
         """Run retrieve with specified date range."""
-        script = "retrieve_rain_radar.py"
+        script = "scripts/radar/retrieve.py"
         args = ["--start", start_str, "--end", end_str]
         self.app.selected_date = f"{start_str} to {end_str}"
         
@@ -247,7 +247,7 @@ class RadarPipeline(BasePipeline):
         if not selection:
             return
         
-        script = "analyze_rain_radar.py"
+        script = "scripts/radar/analyze.py"
         args = []
         
         if selection == "current":
@@ -340,7 +340,7 @@ class RadarPipeline(BasePipeline):
         if not result:
             return
         
-        script = "visualize_rain_radar.py"
+        script = "scripts/radar/visualize.py"
         args = []
         if date_str:
             args = ["--date", date_str]
@@ -421,7 +421,7 @@ class RadarPipeline(BasePipeline):
             return
         
         self.app.output_dir = output_dir
-        script = "validate_ari_alarms_rain_radar.py"
+        script = "scripts/radar/validate.py"
         args = [
             "--input", input_file,
             "--output", str(Path(output_dir) / "ari_alarm_validation.csv")
@@ -466,7 +466,7 @@ class RadarPipeline(BasePipeline):
             return
         
         self.app.output_dir = output_dir
-        script = "visualize_ari_alarms_rain_radar.py"
+        script = "scripts/radar/visualize_validation.py"
         args = ["--input", input_file, "--output", output_dir]
         
         self.app.executor.execute(

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Rain Gauge ARI Alarm Validation Visualization Script
 
@@ -30,6 +30,12 @@ Output:
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2024-12-28
 """
+
+import sys
+from pathlib import Path
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import argparse
 import logging
@@ -143,7 +149,7 @@ def create_status_chart(df: pd.DataFrame, out_dir: Path, logger) -> None:
     output_path = out_dir / "validation_summary.png"
     plt.savefig(output_path, dpi=200)
     plt.close()
-    logger.info(f"✓ Saved {output_path.name}")
+    logger.info(f"? Saved {output_path.name}")
 
 
 def create_exceedance_chart(df: pd.DataFrame, out_dir: Path, logger) -> None:
@@ -184,7 +190,7 @@ def create_exceedance_chart(df: pd.DataFrame, out_dir: Path, logger) -> None:
     output_path = out_dir / "top_exceedances.png"
     plt.savefig(output_path, dpi=200)
     plt.close()
-    logger.info(f"✓ Saved {output_path.name}")
+    logger.info(f"? Saved {output_path.name}")
 
 
 def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
@@ -251,7 +257,7 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌧️ Rain Gauge ARI Alarm Validation Dashboard</h1>
+            <h1>??? Rain Gauge ARI Alarm Validation Dashboard</h1>
             <div class="meta">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
         </div>
         
@@ -262,11 +268,11 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
             </div>
             <div class="stat-card VALIDATED">
                 <div class="value">{VALIDATED}</div>
-                <div class="label">VALIDATED (✓)</div>
+                <div class="label">VALIDATED (?)</div>
             </div>
             <div class="stat-card not-VALIDATED">
                 <div class="value">{not_VALIDATED}</div>
-                <div class="label">Not VALIDATED (✗)</div>
+                <div class="label">Not VALIDATED (?)</div>
             </div>
             <div class="stat-card UNVALIDATABLE">
                 <div class="value">{UNVALIDATABLE}</div>
@@ -283,7 +289,7 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
         </div>
         
         <div class="section">
-            <h2>📊 Visualizations</h2>
+            <h2>?? Visualizations</h2>
             <div class="charts">
                 <div class="chart">
                     <h3>Validation Status Distribution</h3>
@@ -297,8 +303,8 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
         </div>
         
         <div class="section">
-            <h2>📋 All Validation Results</h2>
-            <input type="text" id="search" class="search-box" placeholder="🔍 Search gauge names, status, or alarm time...">
+            <h2>?? All Validation Results</h2>
+            <input type="text" id="search" class="search-box" placeholder="?? Search gauge names, status, or alarm time...">
             <table id="resultsTable">
                 <thead>
                     <tr>
@@ -355,7 +361,7 @@ def create_html_dashboard(df: pd.DataFrame, out_dir: Path, logger) -> Path:
     
     output_path = out_dir / "validation_dashboard.html"
     output_path.write_text(html, encoding="utf-8")
-    logger.info(f"✓ Saved {output_path.name}")
+    logger.info(f"? Saved {output_path.name}")
     return output_path
 
 
@@ -408,7 +414,7 @@ def main() -> int:
                 f"Found columns: {df.columns.tolist()}"
             )
         
-        logger.info(f"✓ Loaded {len(df)} validation records")
+        logger.info(f"? Loaded {len(df)} validation records")
         logger.info("")
         
         # Quick stats
@@ -427,14 +433,14 @@ def main() -> int:
         # Save stats copy
         stats_path = out_dir / "validation_stats.csv"
         df.to_csv(stats_path, index=False)
-        logger.info(f"✓ Saved {stats_path.name}")
+        logger.info(f"? Saved {stats_path.name}")
         
         # Success message
         logger.info("=" * 80)
-        logger.info("✅ VISUALIZATION COMPLETE!")
+        logger.info("? VISUALIZATION COMPLETE!")
         logger.info("=" * 80)
-        logger.info(f"📂 Output directory: {out_dir}")
-        logger.info(f"📊 Dashboard: {dashboard_path}")
+        logger.info(f"?? Output directory: {out_dir}")
+        logger.info(f"?? Dashboard: {dashboard_path}")
         logger.info("")
         logger.info("To view:")
         logger.info(f"  Open in browser: file://{dashboard_path.absolute()}")
@@ -443,20 +449,20 @@ def main() -> int:
         return 0
         
     except KeyboardInterrupt:
-        logger.warning("\n⚠️  Visualization interrupted by user (Ctrl+C)")
+        logger.warning("\n??  Visualization interrupted by user (Ctrl+C)")
         return 130
         
     except FileNotFoundError as e:
-        logger.error(f"❌ File not found: {e}")
+        logger.error(f"? File not found: {e}")
         return 1
         
     except ValueError as e:
-        logger.error(f"❌ Invalid data: {e}")
+        logger.error(f"? Invalid data: {e}")
         return 1
         
     except Exception as e:
         logger.error("=" * 80)
-        logger.error("❌ VISUALIZATION FAILED")
+        logger.error("? VISUALIZATION FAILED")
         logger.error("=" * 80)
         logger.error(f"Error type: {type(e).__name__}")
         logger.error(f"Error message: {str(e)}")

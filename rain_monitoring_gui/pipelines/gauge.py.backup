@@ -114,7 +114,7 @@ class GaugePipeline(BasePipeline):
         if not selection:
             return
         
-        script = "scripts/gauge/retrieve.py"
+        script = "retrieve_rain_gauges.py"
         args = []
         
         if selection == "date":
@@ -155,7 +155,7 @@ class GaugePipeline(BasePipeline):
     
     def _run_retrieve_with_date(self, date_str: str) -> None:
         """Run retrieve with specified single date."""
-        script = "scripts/gauge/retrieve.py"
+        script = "retrieve_rain_gauges.py"
         args = ["--date", date_str]
         self.app.selected_date = date_str
         
@@ -168,7 +168,7 @@ class GaugePipeline(BasePipeline):
     
     def _run_retrieve_with_range(self, start_str: str, end_str: str) -> None:
         """Run retrieve with specified date range."""
-        script = "scripts/gauge/retrieve.py"
+        script = "retrieve_rain_gauges.py"
         args = ["--start", start_str, "--end", end_str]
         self.app.selected_date = f"{start_str} to {end_str}"
         
@@ -212,7 +212,7 @@ class GaugePipeline(BasePipeline):
         if not selection:
             return
         
-        script = "scripts/gauge/analyze.py"
+        script = "analyze_rain_gauges.py"
         args = []
         
         if selection == "current":
@@ -266,7 +266,7 @@ class GaugePipeline(BasePipeline):
         if not result:
             return
         
-        script = "scripts/gauge/visualize.py"
+        script = "visualize_rain_gauges.py"
         self.app.executor.execute(
             "Step 3: Visualize Results",
             script,
@@ -338,7 +338,7 @@ class GaugePipeline(BasePipeline):
             return
         
         self.app.output_dir = output_dir
-        script = "scripts/gauge/validate.py"
+        script = "validate_ari_alarms_rain_gauges.py"
         args = [
             "--input", input_file,
             "--output", str(Path(output_dir) / "ari_alarm_validation.csv")
@@ -383,7 +383,7 @@ class GaugePipeline(BasePipeline):
             return
         
         self.app.output_dir = output_dir
-        script = "scripts/gauge/visualize_validation.py"
+        script = "visualize_ari_alarms_rain_gauges.py"
         args = ["--input", input_file, "--output", output_dir]
         
         self.app.executor.execute(
