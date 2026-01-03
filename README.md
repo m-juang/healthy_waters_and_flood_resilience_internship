@@ -279,7 +279,7 @@ python scripts/gauge/retrieve.py --log-level DEBUG
 
 ## Key Concepts
 
-### ARI (Annual Recurrence Interval)
+### ARI (Average Recurrence Interval)
 
 ARI indicates how rare a rainfall event is.
 - **5-year ARI** = event occurs on average once per 5 years

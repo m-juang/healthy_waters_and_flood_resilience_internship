@@ -199,7 +199,7 @@ Use this instead of maximum (150) for better reliability.
 """
 
 # ============================================================================
-# ARI (ANNUAL RECURRENCE INTERVAL) CONFIGURATION
+# ARI (Average RECURRENCE INTERVAL) CONFIGURATION
 # ============================================================================
 
 DEFAULT_ARI_THRESHOLD: Final[float] = 5.0

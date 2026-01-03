@@ -8,7 +8,7 @@ Modules:
     runner: High-level analysis entry points
     filtering: Rain gauge filtering logic
     alarm_analysis: Alarm configuration analysis
-    ari_calculator: ARI (Annual Recurrence Interval) calculations
+    ari_calculator: ARI (Average Recurrence Interval) calculations
     reporting: Analysis report generation
     radar_analysis: Radar QPE data analysis
 

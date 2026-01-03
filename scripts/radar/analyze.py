@@ -3,7 +3,7 @@
 Rain Radar Data Analysis Script
 
 Analyzes radar QPE (Quantitative Precipitation Estimation) data for Auckland 
-stormwater catchments and calculates ARI (Annual Recurrence Interval) values.
+stormwater catchments and calculates ARI (Average Recurrence Interval) values.
 
 Features:
     - Automatic data directory detection

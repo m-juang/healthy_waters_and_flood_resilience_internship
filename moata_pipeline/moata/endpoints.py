@@ -91,7 +91,7 @@ Example:
 
 TRACE_ARI: Final[str] = "traces/{trace_id}/ari"
 """
-Get ARI (Annual Recurrence Interval) data for a trace.
+Get ARI (Average Recurrence Interval) data for a trace.
 
 Placeholders:
     - trace_id: Trace ID (int)

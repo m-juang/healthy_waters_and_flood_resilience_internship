@@ -6,7 +6,7 @@ High-level client for the Moata API providing domain-specific methods for:
 - Trace data (timeseries)
 - Radar data (TraceSet collections)
 - Alarms and thresholds
-- ARI (Annual Recurrence Interval) data
+- ARI (Average Recurrence Interval) data
 
 Usage:
     from moata_pipeline.moata.client import MoataClient
@@ -65,7 +65,7 @@ class MoataClient:
     - Radar Data (TraceSet collections, QPE)
     - Alarms (overflow, recency)
     - Thresholds
-    - ARI (Annual Recurrence Interval)
+    - ARI (Average Recurrence Interval)
     
     Attributes:
         _http: HTTP client for making requests
@@ -727,7 +727,7 @@ class MoataClient:
         return out
 
     # ========================================================================
-    # ARI (ANNUAL RECURRENCE INTERVAL)
+    # ARI (Average RECURRENCE INTERVAL)
     # ========================================================================
     
     def get_ari_data(
@@ -738,7 +738,7 @@ class MoataClient:
         ari_type: str = "Tp108",
     ) -> Any:
         """
-        Get ARI (Annual Recurrence Interval) values for a trace.
+        Get ARI (Average Recurrence Interval) values for a trace.
         
         GET /v1/traces/{traceId}/ari
         

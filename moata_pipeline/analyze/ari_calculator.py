@@ -1,5 +1,5 @@
 ﻿"""
-ARI (Annual Recurrence Interval) Calculator Module
+ARI (Average Recurrence Interval) Calculator Module
 
 Calculates ARI values from radar rainfall data using TP108 coefficients.
 
@@ -75,7 +75,7 @@ class ARICalculator:
     """
     Calculate ARI values from radar rainfall data using TP108 coefficients.
     
-    Uses the TP108 methodology to convert rainfall depths to ARI (Annual
+    Uses the TP108 methodology to convert rainfall depths to ARI (Average
     Recurrence Interval) values for various durations (10m, 20m, 30m, 1h, 2h, 6h, 12h, 24h).
     
     Args:
