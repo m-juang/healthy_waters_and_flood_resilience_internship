@@ -28,7 +28,7 @@ MIN_WIDTH = 900
 MIN_HEIGHT = 650
 
 # Timeouts for script execution (seconds)
-TIMEOUT_RETRIEVE = 3600  # 1 hour
+TIMEOUT_RETRIEVE = 10800  # 3 hours
 TIMEOUT_RADAR = 1800     # 30 minutes
 TIMEOUT_DEFAULT = 600    # 10 minutes
 
