@@ -12,8 +12,8 @@ Note:
     including filtering, alarm analysis, and report generation.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-03
+Version: 1.1.0 (Added historical date support)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from .reporting import create_summary_report
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # =============================================================================
@@ -87,7 +87,7 @@ def _validate_input_data(data: Any, source_path: Path) -> None:
         raise InputDataError(
             f"No data found in {source_path}\n\n"
             f"The input file is empty. Run data collection first:\n"
-            f"  python retrieve_rain_gauges.py"
+            f"  python scripts/gauge/retrieve.py"
         )
 
 
@@ -238,6 +238,7 @@ def run_filter_active_gauges(
     out_dir: Optional[Path] = None,
     inactive_months: int = INACTIVE_THRESHOLD_MONTHS,
     exclude_keyword: str = DEFAULT_EXCLUDE_KEYWORD,
+    input_date: str = None,
 ) -> Dict[str, Any]:
     """
     Run offline analysis pipeline for rain gauge data.
@@ -261,6 +262,7 @@ def run_filter_active_gauges(
         out_dir: Output directory (default: outputs/rain_gauges/analyze)
         inactive_months: Inactivity threshold in months (default from constants)
         exclude_keyword: Keyword to exclude from gauge names (default from constants)
+        input_date: Optional date (YYYY-MM-DD) for historical data. If None, uses current.
         
     Returns:
         Dictionary containing:
@@ -276,11 +278,16 @@ def run_filter_active_gauges(
         AnalysisRunnerError: If analysis fails
         
     Example:
+        >>> # Analyze current data
         >>> result = run_filter_active_gauges(
         ...     inactive_months=6,
         ...     exclude_keyword="test"
         ... )
-        >>> print(f"Analyzed {len(result['filtered_data']['active_gauges'])} gauges")
+        
+        >>> # Analyze historical data
+        >>> result = run_filter_active_gauges(
+        ...     input_date="2025-01-01"
+        ... )
     """
     logger = logging.getLogger(__name__)
     
@@ -290,8 +297,18 @@ def run_filter_active_gauges(
     
     # Initialize paths
     paths = PipelinePaths()
-    input_path = input_json or paths.rain_gauges_traces_alarms_json
-    output_dir = out_dir or paths.rain_gauges_analyze_dir
+    
+    # Determine input/output based on date
+    if input_date:
+        # Historical mode
+        input_path = input_json or paths.get_gauge_raw_path(input_date)
+        output_dir = out_dir or paths.get_gauge_analyze_dir(input_date)
+        logger.info(f"Mode: Historical ({input_date})")
+    else:
+        # Current mode
+        input_path = input_json or paths.get_gauge_raw_path()
+        output_dir = out_dir or paths.get_gauge_analyze_dir()
+        logger.info(f"Mode: Current/Latest")
     
     logger.info(f"Input: {input_path}")
     logger.info(f"Output: {output_dir}")
@@ -311,7 +328,7 @@ def run_filter_active_gauges(
             raise InputDataError(
                 f"Input file not found: {input_path}\n\n"
                 f"Run data collection first:\n"
-                f"  python retrieve_rain_gauges.py"
+                f"  python scripts/gauge/retrieve.py"
             )
         
         all_data = read_json_maybe_wrapped(input_path)

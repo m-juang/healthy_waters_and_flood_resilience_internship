@@ -89,12 +89,13 @@ class RainGaugeCollector:
         >>> print(f"Collected {len(data)} gauges")
     """
     
-    def __init__(self, client: MoataClient) -> None:
+    def __init__(self, client: MoataClient, output_dir: Optional[Path] = None) -> None:
         """
         Initialize rain gauge collector.
         
         Args:
             client: Authenticated MoataClient instance
+            output_dir: Optional output directory for atomic writes
         """
         if not isinstance(client, MoataClient):
             raise TypeError(
@@ -103,6 +104,13 @@ class RainGaugeCollector:
         
         self._client = client
         self._logger = logging.getLogger(f"{__name__}.RainGaugeCollector")
+        
+        # Setup for atomic writes (same pattern as RadarDataCollector)
+        self._base_output_dir = Path(output_dir) if output_dir else None
+        self._temp_dir: Optional[Path] = None
+        
+        if self._base_output_dir:
+            self._temp_dir = self._base_output_dir / "_temp_raw"
 
 
     # ============================================================================
@@ -460,6 +468,121 @@ class RainGaugeCollector:
             "thresholds": thresholds,
             "timeseries": timeseries_data,  # ← ADDED
         }
+    
+    def _setup_temp_dir(self) -> None:
+        """Setup temporary directory for atomic writes with robust cleanup."""
+        import time
+        
+        if self._temp_dir is None:
+            # No temp dir configured, skip
+            return
+        
+        if self._temp_dir.exists():
+            self._logger.warning(f"Removing existing temp directory: {self._temp_dir}")
+            
+            # Strategy: Try progressively more aggressive approaches
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # Try normal removal
+                    shutil.rmtree(self._temp_dir)
+                    self._logger.debug(f"✓ Successfully removed temp directory")
+                    break
+                    
+                except PermissionError as e:
+                    self._logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries}: Permission denied - {e}"
+                    )
+                    
+                    if attempt < max_retries - 1:
+                        # Wait and retry (files might be temporarily locked)
+                        time.sleep(2)
+                        continue
+                    
+                    # Last attempt: Try to work around the lock
+                    self._logger.warning("Trying alternative cleanup strategies...")
+                    
+                    # Strategy 1: Rename locked directory and create new one
+                    try:
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        old_dir = self._temp_dir.parent / f"_temp_raw_old_{timestamp}"
+                        
+                        # Try to rename the locked directory
+                        self._temp_dir.rename(old_dir)
+                        self._logger.warning(
+                            f"Could not delete temp directory. Renamed to: {old_dir}"
+                        )
+                        self._logger.warning(
+                            "Please manually delete this folder later when files are released."
+                        )
+                        break
+                        
+                    except Exception as rename_error:
+                        self._logger.error(f"Rename strategy failed: {rename_error}")
+                        
+                        # Last resort: Inform user and continue
+                        self._logger.error(
+                            f"Unable to clean temp directory: {self._temp_dir}\n"
+                            f"Please close any programs accessing this folder and try again.\n"
+                            f"Or manually delete it before running collection."
+                        )
+                        raise PermissionError(
+                            f"Cannot access temp directory: {self._temp_dir}\n"
+                            f"Close File Explorer or other programs using this folder."
+                        ) from e
+        
+        # Create fresh temp directory
+        self._temp_dir.mkdir(parents=True, exist_ok=True)
+        self._logger.debug(f"✓ Temp directory ready: {self._temp_dir}")
+
+    def _cleanup_temp_dir(self) -> None:
+        """Remove temporary directory (on failure or cancellation)."""
+        if self._temp_dir and self._temp_dir.exists():
+            try:
+                shutil.rmtree(self._temp_dir)
+                self._logger.info(f"✓ Cleaned up temp directory: {self._temp_dir}")
+            except Exception as e:
+                self._logger.warning(f"Failed to clean up temp directory: {e}")
+
+    def _finalize_output(self) -> None:
+        """
+        Move data from temp directory to final location.
+        
+        This is called only after successful completion of collection.
+        Existing data in final location is replaced atomically.
+        """
+        if not self._temp_dir or not self._temp_dir.exists():
+            self._logger.warning("No temp directory to finalize")
+            return
+        
+        self._logger.info("Finalizing output (moving from temp to final location)...")
+        
+        # For gauge, we have a single JSON file, so just move the file
+        temp_json = self._temp_dir / "rain_gauges_traces_alarms.json"
+        
+        if not temp_json.exists():
+            self._logger.error(f"Expected file not found in temp: {temp_json}")
+            return
+        
+        # Ensure base directory exists
+        self._base_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Move file to final location (overwrites if exists)
+        final_json = self._base_output_dir / "rain_gauges_traces_alarms.json"
+        
+        if final_json.exists():
+            self._logger.info(f"  Replacing existing file: {final_json}")
+            final_json.unlink()
+        
+        shutil.move(str(temp_json), str(final_json))
+        self._logger.info(f"✓ Moved data to final location: {final_json}")
+        
+        # Clean up temp directory
+        try:
+            shutil.rmtree(self._temp_dir)
+            self._logger.debug(f"✓ Removed temp directory: {self._temp_dir}")
+        except Exception as e:
+            self._logger.warning(f"Failed to remove temp directory: {e}")
 
 
 # =============================================================================

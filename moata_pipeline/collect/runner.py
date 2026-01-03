@@ -9,8 +9,8 @@ Functions:
     run_collect_radar: Collect radar QPE data for stormwater catchments
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-03
+Version: 1.1.0 (Added gauge historical support)
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from moata_pipeline.collect.collector import RainGaugeCollector, RadarDataCollec
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # Default time window for recent vs historical classification
 RECENT_DATA_THRESHOLD_HOURS = 24
@@ -191,9 +191,6 @@ def _determine_radar_output_dir(
     
     return output_dir
 
-# ============================================================================
-# ← ADDED: New helper function for gauge output directory
-# ============================================================================
 
 def _determine_gauge_output_dir(
     start_time: datetime,
@@ -244,37 +241,40 @@ def _determine_gauge_output_dir(
 # Public Runner Functions
 # =============================================================================
 
-# ============================================================================
-# ← MODIFIED: run_collect_rain_gauges() - added time range support
-# ============================================================================
-
 def run_collect_rain_gauges(
     project_id: int = DEFAULT_PROJECT_ID,
     asset_type_id: int = DEFAULT_RAIN_GAUGE_ASSET_TYPE_ID,
-    start_time: Optional[datetime] = None,  # ← ADDED
-    end_time: Optional[datetime] = None,    # ← ADDED
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
     trace_batch_size: int = 100,
     fetch_thresholds: bool = True,
-    output_dir: Optional[Path] = None,      # ← ADDED
+    output_dir: Optional[Path] = None,
 ) -> None:
     """
     Collect rain gauge data with traces, alarms, and thresholds.
     
+    Uses atomic writes - data is written to a temporary folder first,
+    then moved to final location only after successful completion.
+    This ensures existing data is not corrupted if collection fails.
+    
     High-level function that:
         1. Creates authenticated API client
-        2. Collects all rain gauge assets
-        3. Fetches traces for each gauge with time range
-        4. Fetches alarms and thresholds for each trace
-        5. Saves combined JSON output
+        2. Sets up temporary directory for atomic writes
+        3. Collects all rain gauge assets
+        4. Fetches traces for each gauge with time range
+        5. Fetches alarms and thresholds for each trace
+        6. Saves to temporary location
+        7. Moves to final location on success
+        8. Cleans up temp on failure
         
     Args:
         project_id: Moata project ID (default from constants)
         asset_type_id: Rain gauge asset type ID (default from constants)
-        start_time: Start of time range (default: 24 hours ago)  # ← ADDED
-        end_time: End of time range (default: now)               # ← ADDED
+        start_time: Start of time range (default: 24 hours ago)
+        end_time: End of time range (default: now)
         trace_batch_size: Traces to fetch per API batch (default: 100)
         fetch_thresholds: Whether to fetch alarm thresholds (default: True)
-        output_dir: Custom output directory (default: auto based on date)  # ← ADDED
+        output_dir: Custom output directory (default: auto based on date)
         
     Raises:
         CredentialsError: If API credentials missing
@@ -299,7 +299,7 @@ def run_collect_rain_gauges(
     logger.info(f"Project ID: {project_id}")
     logger.info(f"Asset Type ID: {asset_type_id}")
     
-    # ← ADDED: Determine time range
+    # Determine time range
     if end_time is None:
         end_time = datetime.now(timezone.utc)
     if start_time is None:
@@ -312,8 +312,12 @@ def run_collect_rain_gauges(
     
     logger.info(f"Trace Batch Size: {trace_batch_size}")
     logger.info(f"Fetch Thresholds: {fetch_thresholds}")
+    logger.info(f"Using atomic writes (temp folder strategy)")
     logger.info("=" * 80)
     logger.info("")
+    
+    # Determine output directory
+    output_base_dir = _determine_gauge_output_dir(start_time, end_time, output_dir)
     
     try:
         # Create authenticated client
@@ -321,57 +325,116 @@ def run_collect_rain_gauges(
         client = _create_client()
         logger.info("✓ API client ready")
         
-        # ← ADDED: Determine output directory
-        output_path = _determine_gauge_output_dir(start_time, end_time, output_dir)
+        # Create collector with output directory for atomic writes
+        logger.info("")
+        logger.info("Initializing collector with atomic writes...")
+        collector = RainGaugeCollector(client=client, output_dir=output_base_dir)
         
-        # Create collector and collect data
+        # Setup temporary directory
+        collector._setup_temp_dir()
+        logger.info("✓ Temporary directory ready")
+        
+        # Collect data
         logger.info("")
         logger.info("Starting collection...")
-        collector = RainGaugeCollector(client=client)
         
-        # ← MODIFIED: Pass time parameters
         all_data = collector.collect(
             project_id=project_id,
             asset_type_id=asset_type_id,
-            start_time=start_time,      # ← ADDED
-            end_time=end_time,          # ← ADDED
+            start_time=start_time,
+            end_time=end_time,
             trace_batch_size=trace_batch_size,
             fetch_thresholds=fetch_thresholds,
         )
         
-        # Save output
+        # Save to temporary directory
         logger.info("")
-        logger.info("Saving data...")
+        logger.info("Saving data to temporary location...")
         
-        # ← ADDED: Create output directory if it doesn't exist
-        output_path.mkdir(parents=True, exist_ok=True)
+        if collector._temp_dir:
+            # Using atomic writes
+            writer = JsonOutputWriter(out_dir=collector._temp_dir)
+            output_file = writer.write_combined(all_data)
+            logger.info(f"✓ Data written to temp: {output_file}")
+            
+            # Finalize: move temp to final location
+            logger.info("")
+            logger.info("Finalizing (moving from temp to final location)...")
+            collector._finalize_output()
+            
+            # Determine final file location for logging
+            final_file = output_base_dir / "rain_gauges_traces_alarms.json"
+        else:
+            # Fallback: direct write (no atomic writes)
+            logger.warning("No temp directory configured, writing directly")
+            output_base_dir.mkdir(parents=True, exist_ok=True)
+            writer = JsonOutputWriter(out_dir=output_base_dir)
+            output_file = writer.write_combined(all_data)
+            final_file = output_file
         
-        # ← MODIFIED: Use output_path instead of paths.rain_gauges_raw_dir
-        writer = JsonOutputWriter(out_dir=output_path)
-        output_file = writer.write_combined(all_data)
+        # Determine mode for logging
+        now = datetime.now(timezone.utc)
+        hours_since_end = (now - end_time).total_seconds() / 3600
+        is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
         
         logger.info("")
         logger.info("=" * 80)
         logger.info("✓ Collection Complete")
         logger.info("=" * 80)
         logger.info(f"Gauges collected: {len(all_data)}")
-        logger.info(f"Output file: {output_file}")
-        logger.info(f"Output directory: {output_path}")  # ← ADDED
+        logger.info(f"Output file: {final_file}")
+        logger.info(f"Output directory: {output_base_dir}")
+        
+        if is_recent:
+            logger.info(f"Mode: Current (within last 24h)")
+        else:
+            date_str = start_time.strftime('%Y-%m-%d')
+            logger.info(f"Mode: Historical ({date_str})")
+        
         logger.info("=" * 80)
+        
+    except KeyboardInterrupt:
+        # User cancelled - clean up temp dir, keep existing data
+        logger.warning("")
+        logger.warning("=" * 80)
+        logger.warning("⚠️  Collection cancelled by user")
+        logger.warning("=" * 80)
+        
+        if 'collector' in locals():
+            logger.warning("Cleaning up temporary files...")
+            collector._cleanup_temp_dir()
+            logger.warning("✓ Existing data preserved (no changes made)")
+        
+        raise
         
     except CredentialsError as e:
         logger.error("Credentials error:")
         logger.error(str(e))
+        
+        if 'collector' in locals():
+            collector._cleanup_temp_dir()
+        
         raise
         
     except ClientCreationError as e:
         logger.error("Client creation error:")
         logger.error(str(e))
+        
+        if 'collector' in locals():
+            collector._cleanup_temp_dir()
+        
         raise
         
     except Exception as e:
         logger.error(f"Collection failed: {e}")
         logger.exception("Full traceback:")
+        
+        # Clean up temp directory on any error
+        if 'collector' in locals():
+            logger.error("Cleaning up temporary files...")
+            collector._cleanup_temp_dir()
+            logger.error("✓ Existing data preserved (no changes made)")
+        
         raise CollectionRunnerError(
             f"Rain gauge collection failed: {e}\n\n"
             f"Check logs above for details."

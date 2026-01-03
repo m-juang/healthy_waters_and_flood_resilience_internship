@@ -7,8 +7,8 @@ Functions:
     run_visual_report: Generate complete HTML visualization report from CSV data
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-03
+Version: 1.1.0 (Added historical date support)
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from .report import build_report
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # =============================================================================
@@ -44,6 +44,7 @@ class VisualizationError(Exception):
 def run_visual_report(
     csv_path: Optional[Path] = None,
     out_dir: Optional[Path] = None,
+    input_date: str = None,
 ) -> Path:
     """
     Generate complete HTML visualization report from alarm CSV data.
@@ -57,6 +58,7 @@ def run_visual_report(
     Args:
         csv_path: Path to alarm summary CSV (default: auto-detect)
         out_dir: Output directory (default: outputs/rain_gauges/visualizations)
+        input_date: Optional date (YYYY-MM-DD) for historical data. If None, uses current.
         
     Returns:
         Path to generated report.html
@@ -66,9 +68,15 @@ def run_visual_report(
         VisualizationError: If visualization generation fails
         
     Example:
+        >>> # Visualize current data
         >>> report_path = run_visual_report()
         >>> print(f"Report: {report_path}")
         Report: outputs/rain_gauges/visualizations/report.html
+        
+        >>> # Visualize historical data
+        >>> report_path = run_visual_report(input_date="2025-01-01")
+        >>> print(f"Report: {report_path}")
+        Report: outputs/rain_gauges/historical/2025-01-01/visualizations/report.html
     """
     logger = logging.getLogger(__name__)
     
@@ -78,8 +86,18 @@ def run_visual_report(
     
     # Initialize paths
     paths = PipelinePaths()
-    csv_path = Path(csv_path) if csv_path else paths.alarm_summary_csv
-    out_dir = Path(out_dir) if out_dir else paths.rain_gauges_viz_dir
+    
+    # Determine paths based on date
+    if input_date:
+        # Historical mode
+        csv_path = Path(csv_path) if csv_path else (paths.get_gauge_analyze_dir(input_date) / "alarm_summary.csv")
+        out_dir = Path(out_dir) if out_dir else paths.get_gauge_viz_dir(input_date)
+        logger.info(f"Mode: Historical ({input_date})")
+    else:
+        # Current mode
+        csv_path = Path(csv_path) if csv_path else paths.alarm_summary_csv
+        out_dir = Path(out_dir) if out_dir else paths.rain_gauges_viz_dir
+        logger.info(f"Mode: Current/Latest")
     
     logger.info(f"Input CSV: {csv_path}")
     logger.info(f"Output directory: {out_dir}")
@@ -92,7 +110,7 @@ def run_visual_report(
             raise FileNotFoundError(
                 f"Alarm summary CSV not found: {csv_path}\n\n"
                 f"Run analysis first:\n"
-                f"  python analyze_rain_gauges.py"
+                f"  python scripts/gauge/analyze.py"
             )
         
         # Ensure output directory exists

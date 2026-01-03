@@ -11,7 +11,8 @@ Directory Structure:
     ├── rain_gauges/
     │   ├── raw/              # Raw collected data
     │   ├── analyze/          # Analysis outputs
-    │   └── visualizations/   # HTML dashboards, charts
+    │   ├── visualizations/   # HTML dashboards, charts
+    │   └── historical/       # Historical data by date (NEW!)
     └── rain_radar/
         ├── raw/              # Raw radar data
         │   └── radar_data/   # Per-catchment CSVs
@@ -21,8 +22,8 @@ Directory Structure:
         └── visualizations/   # Radar dashboards
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-03
+Version: 1.1.0 (Added gauge historical support)
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from typing import Optional
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # =============================================================================
@@ -103,6 +104,11 @@ class PipelinePaths:
     def rain_gauges_viz_dir(self) -> Path:
         """Visualization outputs directory for rain gauges."""
         return self.rain_gauges_dir / "visualizations"
+    
+    @property
+    def rain_gauges_historical_dir(self) -> Path:
+        """Historical rain gauge data directory (organized by date)."""
+        return self.rain_gauges_dir / "historical"
     
     # =========================================================================
     # Rain Radar - Directories
@@ -274,6 +280,7 @@ class PipelinePaths:
             self.rain_gauges_raw_dir,
             self.rain_gauges_analyze_dir,
             self.rain_gauges_viz_dir,
+            self.rain_gauges_historical_dir,
             
             # Rain Radar
             self.rain_radar_raw_dir,
@@ -344,6 +351,111 @@ class PipelinePaths:
         """
         filename = f"ari_{catchment_id}_{catchment_name}.csv"
         return self.rain_radar_ari_dir / filename
+    
+    # =========================================================================
+    # Rain Gauge Historical Helper Methods (NEW!)
+    # =========================================================================
+    
+    def get_historical_gauge_dir(self, date_str: str) -> Path:
+        """
+        Get historical gauge data directory for a specific date.
+        
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Path to historical data directory for the date
+            
+        Example:
+            >>> paths = PipelinePaths()
+            >>> historical_dir = paths.get_historical_gauge_dir("2025-01-01")
+            >>> print(historical_dir)
+            outputs/rain_gauges/historical/2025-01-01
+        """
+        return self.rain_gauges_historical_dir / date_str
+    
+    def get_gauge_raw_path(self, date_str: str = None) -> Path:
+        """
+        Get raw gauge data path (current or historical).
+        
+        Args:
+            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
+            
+        Returns:
+            Path to raw data file
+            
+        Example:
+            >>> paths = PipelinePaths()
+            >>> # Current
+            >>> current = paths.get_gauge_raw_path()
+            >>> print(current)
+            outputs/rain_gauges/raw/rain_gauges_traces_alarms.json
+            
+            >>> # Historical
+            >>> historical = paths.get_gauge_raw_path("2025-01-01")
+            >>> print(historical)
+            outputs/rain_gauges/historical/2025-01-01/raw/rain_gauges_traces_alarms.json
+        """
+        if date_str:
+            # Historical
+            return self.get_historical_gauge_dir(date_str) / "raw" / "rain_gauges_traces_alarms.json"
+        else:
+            # Current
+            return self.rain_gauges_raw_dir / "rain_gauges_traces_alarms.json"
+    
+    def get_gauge_analyze_dir(self, date_str: str = None) -> Path:
+        """
+        Get gauge analysis directory (current or historical).
+        
+        Args:
+            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
+            
+        Returns:
+            Path to analysis directory
+            
+        Example:
+            >>> paths = PipelinePaths()
+            >>> # Current
+            >>> current = paths.get_gauge_analyze_dir()
+            >>> print(current)
+            outputs/rain_gauges/analyze
+            
+            >>> # Historical
+            >>> historical = paths.get_gauge_analyze_dir("2025-01-01")
+            >>> print(historical)
+            outputs/rain_gauges/historical/2025-01-01/analyze
+        """
+        if date_str:
+            return self.get_historical_gauge_dir(date_str) / "analyze"
+        else:
+            return self.rain_gauges_analyze_dir
+    
+    def get_gauge_viz_dir(self, date_str: str = None) -> Path:
+        """
+        Get gauge visualization directory (current or historical).
+        
+        Args:
+            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
+            
+        Returns:
+            Path to visualization directory
+            
+        Example:
+            >>> paths = PipelinePaths()
+            >>> # Current
+            >>> current = paths.get_gauge_viz_dir()
+            >>> print(current)
+            outputs/rain_gauges/visualizations
+            
+            >>> # Historical
+            >>> historical = paths.get_gauge_viz_dir("2025-01-01")
+            >>> print(historical)
+            outputs/rain_gauges/historical/2025-01-01/visualizations
+        """
+        if date_str:
+            return self.get_historical_gauge_dir(date_str) / "visualizations"
+        else:
+            return self.rain_gauges_viz_dir
     
     def __repr__(self) -> str:
         """String representation showing root directory."""

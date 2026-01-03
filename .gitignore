@@ -6,10 +6,6 @@ __pycache__/
 
 # Generated outputs / reports
 outputs/
-*_output/
-*.log
-
-# Data exports
 *.csv
 *.json
 *.png
