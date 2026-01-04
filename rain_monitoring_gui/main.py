@@ -160,7 +160,7 @@ class ModernApp(ctk.CTk):
         # Header
         header = create_header(
             main_frame,
-            title="🌧 MOATA-RETRIEVER",
+            title="🌧 MOATA AlertLab",
             subtitle=APP_SUBTITLE,
             colors=self.colors,
             height=80,

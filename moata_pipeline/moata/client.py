@@ -727,7 +727,7 @@ class MoataClient:
         return out
 
     # ========================================================================
-    # ARI (Average RECURRENCE INTERVAL)
+    # ARI (AVERAGE RECURRENCE INTERVAL)
     # ========================================================================
     
     def get_ari_data(
