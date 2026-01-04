@@ -351,27 +351,23 @@ class RadarPipeline(BasePipeline):
             args,
             self._on_visualize_complete
         )
-    
+
     def _on_visualize_complete(self, success: bool) -> None:
         """Handle visualize completion."""
         if success:
-            # Find output directory based on date
-            if self.app.selected_date:
-                base_dir = (Path.cwd() / "outputs" / "rain_radar" / 
-                           "historical" / self.app.selected_date / "dashboard")
-            else:
-                base_dir = Path.cwd() / "outputs" / "rain_radar" / "historical"
-            
+            # Search broadly for any HTML produced by radar pipeline
+            search_root = Path.cwd() / "outputs" / "rain_radar"
+
             html_files = []
-            if base_dir.exists():
-                html_files = list(base_dir.glob("**/*.html"))
-            
+            if search_root.exists():
+                html_files = list(search_root.glob("**/*.html"))
+
             if html_files:
                 most_recent = max(html_files, key=lambda p: p.stat().st_mtime)
                 self.app.output_dir = str(most_recent.parent)
             else:
-                self.app.output_dir = str(base_dir)
-            
+                self.app.output_dir = str(search_root)
+
             result = messagebox.askyesno(
                 "Success",
                 f"✅ Visualization complete!\n\n"
@@ -386,6 +382,7 @@ class RadarPipeline(BasePipeline):
                 "❌ Visualization failed!\n\nCheck the logs for details."
             )
         self.app.show_pipeline_steps()
+
     
     def _open_dashboard(self) -> None:
         """Open the generated dashboard."""

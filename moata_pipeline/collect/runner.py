@@ -347,30 +347,8 @@ def run_collect_rain_gauges(
             fetch_thresholds=fetch_thresholds,
         )
         
-        # Save to temporary directory
-        logger.info("")
-        logger.info("Saving data to temporary location...")
         
-        if collector._temp_dir:
-            # Using atomic writes
-            writer = JsonOutputWriter(out_dir=collector._temp_dir)
-            output_file = writer.write_combined(all_data)
-            logger.info(f"✓ Data written to temp: {output_file}")
-            
-            # Finalize: move temp to final location
-            logger.info("")
-            logger.info("Finalizing (moving from temp to final location)...")
-            collector.finalize_output()
-            
-            # Determine final file location for logging
-            final_file = output_base_dir / "rain_gauges_traces_alarms.json"
-        else:
-            # Fallback: direct write (no atomic writes)
-            logger.warning("No temp directory configured, writing directly")
-            output_base_dir.mkdir(parents=True, exist_ok=True)
-            writer = JsonOutputWriter(out_dir=output_base_dir)
-            output_file = writer.write_combined(all_data)
-            final_file = output_file
+        final_file = output_base_dir / "rain_gauges_traces_alarms.json"
         
         # Determine mode for logging
         now = datetime.now(timezone.utc)
