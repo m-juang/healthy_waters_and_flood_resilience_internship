@@ -91,7 +91,7 @@ def create_header(
     header = ctk.CTkFrame(
         parent,
         fg_color=fg_color or colors["primary"],
-        corner_radius=12,
+        corner_radius=0,
         height=height
     )
     header.grid(row=0, column=0, sticky="ew")

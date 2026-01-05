@@ -45,7 +45,7 @@ LIGHT_COLORS: Dict[str, str] = {
     "warning": "#F59E0B",
     "danger": "#EF4444",
     "surface": "#FFFFFF",
-    "background": "#F8FAFC",
+    "background": "#CDD7E2",
     "text": "#1E293B",
     "text_secondary": "#64748B",
     "border": "#E2E8F0",
