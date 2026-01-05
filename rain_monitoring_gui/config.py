@@ -16,7 +16,7 @@ from typing import Dict
 # Application Constants
 # =============================================================================
 
-APP_TITLE = "Auckland Council - Rain Monitoring System"
+APP_TITLE = "Auckland Council - Moata AlertLab"
 APP_VERSION = "1.0.0"
 APP_SUBTITLE = "Auckland Council  •  Healthy Waters & Flood Resilience"
 APP_FOOTER = "COMPSCI 778 Internship"
