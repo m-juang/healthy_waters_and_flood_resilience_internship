@@ -91,7 +91,7 @@ def create_header(
     header = ctk.CTkFrame(
         parent,
         fg_color=fg_color or colors["primary"],
-        corner_radius=0,
+        corner_radius=12,
         height=height
     )
     header.grid(row=0, column=0, sticky="ew")
@@ -149,7 +149,7 @@ def create_theme_toggle(
         fg_color="transparent",
         hover_color=hover_color or colors["primary_light"],
         text_color="white",
-        corner_radius=8,
+        corner_radius=12,
         width=90,
         height=32,
         command=command
@@ -195,7 +195,7 @@ def create_pipeline_card(
     card.grid(row=0, column=column, sticky="nsew", padx=10, pady=5)
     
     # Color strip at top
-    strip = ctk.CTkFrame(card, fg_color=color, corner_radius=0, height=4)
+    strip = ctk.CTkFrame(card, fg_color=color, corner_radius=12, height=4)
     strip.pack(fill="x")
     
     # Content
@@ -255,7 +255,7 @@ def create_pipeline_card(
         font=ctk.CTkFont(size=13, weight="bold"),
         fg_color=color,
         hover_color=darken_color(color),
-        corner_radius=8,
+        corner_radius=12,
         height=38,
         command=command
     )
@@ -298,7 +298,7 @@ def create_step_row(
     row_frame.pack(fill="x", padx=20, pady=10)
     
     # Number badge
-    badge = ctk.CTkFrame(row_frame, fg_color=color, corner_radius=25, width=50, height=50)
+    badge = ctk.CTkFrame(row_frame, fg_color=color, corner_radius=12, width=50, height=50)
     badge.pack(side="left", padx=(5, 20))
     badge.pack_propagate(False)
     
@@ -339,7 +339,7 @@ def create_step_row(
         font=ctk.CTkFont(size=13, weight="bold"),
         fg_color=color,
         hover_color=darken_color(color),
-        corner_radius=8,
+        corner_radius=12,
         width=80,
         height=36,
         command=command
@@ -416,7 +416,7 @@ def show_date_selection_dialog(
     
     # Option buttons
     for btn_text, btn_value, btn_desc in options:
-        btn_frame = ctk.CTkFrame(options_frame, fg_color=colors["surface"], corner_radius=10)
+        btn_frame = ctk.CTkFrame(options_frame, fg_color=colors["surface"], corner_radius=12)
         btn_frame.pack(fill="x", pady=6)
         
         # Make the frame clickable
@@ -475,7 +475,7 @@ def show_date_selection_dialog(
         fg_color="transparent",
         hover_color=colors["border"],
         text_color=colors["text_secondary"],
-        corner_radius=8,
+        corner_radius=12,
         height=35,
         command=dialog.destroy
     )

@@ -4,8 +4,8 @@ Rain Monitoring System GUI - Main Module
 Main application window and entry point with CLI arguments support.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-03
-Version: 2.1.0 (Added CLI arguments support)
+Last Modified: 2025-01-05
+Version: 2.1.1 (Fixed card spacing)
 """
 
 from __future__ import annotations
@@ -177,7 +177,8 @@ class ModernApp(ctk.CTk):
         
         # Welcome message (with date info if pre-filled)
         welcome_frame = ctk.CTkFrame(content, fg_color=self.colors["surface"], corner_radius=10)
-        welcome_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 15))
+        welcome_frame.grid(row=0,column=0,columnspan=2,sticky="ew",padx=10, pady=(10, 10))
+    
         
         welcome_title = ctk.CTkLabel(
             welcome_frame,
@@ -205,11 +206,11 @@ class ModernApp(ctk.CTk):
         )
         welcome_desc.pack(pady=(0, 15))
         
-        # Pipeline cards container
+        # Pipeline cards container - MODIFIED: Changed to pack instead of grid
         cards_frame = ctk.CTkFrame(content, fg_color="transparent")
-        cards_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        cards_frame.grid(row=1, column=0, columnspan=2, sticky="new")  # Changed from "nsew" to "new"
         cards_frame.grid_columnconfigure((0, 1), weight=1)
-        cards_frame.grid_rowconfigure(0, weight=1)
+        # REMOVED: cards_frame.grid_rowconfigure(0, weight=1)
         
         # Rain Gauge Card
         gauge = self.pipelines["gauge"]
