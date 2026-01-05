@@ -5,10 +5,10 @@ Rain Monitoring System GUI - Entry Point
 Simple entry point script for running the Rain Monitoring GUI.
 
 Usage:
-    python rain_monitoring_gui_modern.py
+    python moata_alert_lab_gui.py
 
 Or as module:
-    python -m rain_monitoring_gui
+    python -m moata_alert_lab_gui
 
 Author: Auckland Council Internship Team (COMPSCI 778)
 Last Modified: 2025-01-02
