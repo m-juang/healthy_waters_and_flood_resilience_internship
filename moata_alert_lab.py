@@ -15,7 +15,7 @@ Last Modified: 2025-01-02
 Version: 2.0.0 (Modular architecture)
 """
 
-from rain_monitoring_gui import main
+from moata_alert_lab_gui import main
 
 if __name__ == "__main__":
     main()
