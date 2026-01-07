@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.paths import get_paths
 from moata_pipeline.common.file_utils import ensure_dir
 from .cleaning import load_and_clean
 from .pages import build_gauge_pages
@@ -85,7 +85,8 @@ def run_visual_report(
     logger.info("=" * 80)
     
     # Initialize paths
-    paths = PipelinePaths()
+    # Initialize paths
+    paths = get_paths()  
     
     # Determine paths based on date
     if input_date:

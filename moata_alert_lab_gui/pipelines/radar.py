@@ -9,7 +9,6 @@ Version: 1.2.0 (Added date range support with warnings) (Added CLI date argument
 """
 
 from __future__ import annotations
-
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from pathlib import Path
@@ -275,7 +274,7 @@ class RadarPipeline(BasePipeline):
     def _on_analyze_complete(self, success: bool) -> None:
         """Handle analyze completion."""
         if success:
-            output_dir = str(Path.cwd() / "outputs" / "rain_radar" / "analyze")
+            output_dir = str(self.paths.rain_radar_analyze_dir)
             messagebox.showinfo(
                 "Success",
                 f"✅ Analysis complete!\n\nResults saved to:\n{output_dir}"
@@ -356,7 +355,7 @@ class RadarPipeline(BasePipeline):
         """Handle visualize completion."""
         if success:
             # Search broadly for any HTML produced by radar pipeline
-            search_root = Path.cwd() / "outputs" / "rain_radar"
+            search_root = self.paths.rain_radar_dir
 
             html_files = []
             if search_root.exists():
@@ -412,7 +411,7 @@ class RadarPipeline(BasePipeline):
         
         output_dir = filedialog.askdirectory(
             title="Select output directory for validation results",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
         )
         if not output_dir:
             return
@@ -449,7 +448,7 @@ class RadarPipeline(BasePipeline):
         """Run visualize validation step."""
         input_file = filedialog.askopenfilename(
             title="Select validation results CSV",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
         if not input_file:
@@ -457,7 +456,7 @@ class RadarPipeline(BasePipeline):
         
         output_dir = filedialog.askdirectory(
             title="Select output directory for validation visualization",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
         )
         if not output_dir:
             return

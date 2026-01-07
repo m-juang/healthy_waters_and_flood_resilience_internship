@@ -240,7 +240,7 @@ class GaugePipeline(BasePipeline):
     def _on_analyze_complete(self, success: bool) -> None:
         """Handle analyze completion."""
         if success:
-            output_dir = str(Path.cwd() / "outputs" / "rain_gauges" / "analyze")
+            output_dir = str(self.paths.rain_gauges_analyze_dir)
             messagebox.showinfo(
                 "Success",
                 f"✅ Analysis complete!\n\nResults saved to:\n{output_dir}"
@@ -277,7 +277,7 @@ class GaugePipeline(BasePipeline):
     def _on_visualize_complete(self, success: bool) -> None:
         """Handle visualize completion."""
         if success:
-            base_dir = Path.cwd() / "outputs" / "rain_gauges" / "visualizations"
+            base_dir = self.paths.rain_gauges_viz_dir
             
             html_files = []
             if base_dir.exists():
@@ -332,7 +332,7 @@ class GaugePipeline(BasePipeline):
         
         output_dir = filedialog.askdirectory(
             title="Select output directory for validation results",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
         )
         if not output_dir:
             return
@@ -369,7 +369,7 @@ class GaugePipeline(BasePipeline):
         """Run visualize validation step."""
         input_file = filedialog.askopenfilename(
             title="Select validation results CSV",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
         if not input_file:
@@ -377,7 +377,7 @@ class GaugePipeline(BasePipeline):
         
         output_dir = filedialog.askdirectory(
             title="Select output directory for validation visualization",
-            initialdir=str(Path.cwd() / "outputs"),
+            initialdir=str(self.paths.outputs_root),
         )
         if not output_dir:
             return

@@ -44,6 +44,8 @@ from moata_pipeline.collect.runner import (
     ClientCreationError,
 )
 
+from moata_pipeline.common.paths import PipelinePaths, get_paths
+
 # Version info
 __version__ = "1.0.0"
 __author__ = "Auckland Council Internship Team (COMPSCI 778)"
@@ -71,4 +73,6 @@ __all__ = [
     # Metadata
     "__version__",
     "__author__",
+
+    'PipelinePaths', 'get_paths'
 ]

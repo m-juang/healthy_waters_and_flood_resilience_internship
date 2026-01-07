@@ -25,14 +25,24 @@ from moata_pipeline.viz.runner import (
     VisualizationError,
 )
 
+from moata_pipeline.common.paths import PipelinePaths, get_paths
+
 # Version info
 __version__ = "1.0.0"
 __author__ = "Auckland Council Internship Team (COMPSCI 778)"
 
 # Public API
 __all__ = [
+
+    # Runner
     "run_visual_report",
     "VisualizationError",
+
+    # Paths
+    "PipelinePaths",
+    "get_paths",
+
+    # Version info
     "__version__",
     "__author__",
 ]

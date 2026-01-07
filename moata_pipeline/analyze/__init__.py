@@ -72,6 +72,8 @@ from moata_pipeline.analyze.radar_analysis import (
     NoRadarDataError,
 )
 
+from moata_pipeline.common.paths import PipelinePaths, get_paths
+
 
 # Version info
 __version__ = "1.0.0"
@@ -115,6 +117,8 @@ __all__ = [
     # Exceptions - Radar
     "RadarAnalysisError",
     "NoRadarDataError",
+
+    "PipelinePaths", "get_paths",
     
     # Metadata
     "__version__",

@@ -25,7 +25,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from moata_pipeline.common.json_io import read_json_maybe_wrapped, write_json
-from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.paths import PipelinePaths, get_paths
 from moata_pipeline.common.constants import (
     INACTIVE_THRESHOLD_MONTHS,
     DEFAULT_EXCLUDE_KEYWORD,
@@ -296,7 +296,7 @@ def run_filter_active_gauges(
     logger.info("=" * 80)
     
     # Initialize paths
-    paths = PipelinePaths()
+    paths = get_paths()  
     
     # Determine input/output based on date
     if input_date:

@@ -33,7 +33,7 @@ from moata_pipeline.common.constants import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     DEFAULT_REQUESTS_PER_SECOND,
 )
-from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.paths import PipelinePaths, get_paths
 from moata_pipeline.common.output_writer import JsonOutputWriter
 from moata_pipeline.moata.auth import MoataAuth
 from moata_pipeline.moata.http import MoataHttp
@@ -152,27 +152,15 @@ def _determine_radar_output_dir(
     end_time: datetime,
     custom_dir: Optional[Path] = None,
 ) -> Path:
-    """
-    Determine output directory for radar data based on time range.
-    
-    Logic:
-        - If custom_dir provided: use it
-        - If data is recent (within 24h of now): outputs/rain_radar/raw
-        - If data is historical: outputs/rain_radar/historical/YYYY-MM-DD/raw
-        
-    Args:
-        start_time: Data start time (UTC)
-        end_time: Data end time (UTC)
-        custom_dir: Optional custom directory
-        
-    Returns:
-        Path to output directory
-    """
+    """..."""
     logger = logging.getLogger(__name__)
     
     if custom_dir is not None:
         logger.info(f"Using custom output directory: {custom_dir}")
         return custom_dir
+    
+    # Get paths instance
+    paths = get_paths()
     
     # Check if data is recent (within last 24 hours)
     now = datetime.now(timezone.utc)
@@ -181,12 +169,12 @@ def _determine_radar_output_dir(
     is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
     
     if is_recent:
-        output_dir = Path("outputs/rain_radar/raw")
+        output_dir = paths.rain_radar_raw_dir  # ← FIXED
         logger.info("Recent data (within 24h) - output to: %s", output_dir)
     else:
         # Historical data - use date-based directory
         date_str = start_time.strftime("%Y-%m-%d")
-        output_dir = Path(f"outputs/rain_radar/historical/{date_str}/raw")
+        output_dir = paths.get_historical_radar_dir(date_str)  # ← FIXED
         logger.info("Historical data (%s) - output to: %s", date_str, output_dir)
     
     return output_dir
@@ -197,27 +185,15 @@ def _determine_gauge_output_dir(
     end_time: datetime,
     custom_dir: Optional[Path] = None,
 ) -> Path:
-    """
-    Determine output directory for gauge data based on time range.
-    
-    Logic:
-        - If custom_dir provided: use it
-        - If data is recent (within 24h of now): outputs/rain_gauges/raw
-        - If data is historical: outputs/rain_gauges/historical/YYYY-MM-DD/raw
-        
-    Args:
-        start_time: Data start time (UTC)
-        end_time: Data end time (UTC)
-        custom_dir: Optional custom directory
-        
-    Returns:
-        Path to output directory
-    """
+    """..."""
     logger = logging.getLogger(__name__)
     
     if custom_dir is not None:
         logger.info(f"Using custom output directory: {custom_dir}")
         return custom_dir
+    
+    # Get paths instance
+    paths = get_paths()
     
     # Check if data is recent (within last 24 hours)
     now = datetime.now(timezone.utc)
@@ -226,12 +202,12 @@ def _determine_gauge_output_dir(
     is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
     
     if is_recent:
-        output_dir = Path("outputs/rain_gauges/raw")
+        output_dir = paths.rain_gauges_raw_dir  # ← FIXED
         logger.info("Recent data (within 24h) - output to: %s", output_dir)
     else:
         # Historical data - use date-based directory
         date_str = start_time.strftime("%Y-%m-%d")
-        output_dir = Path(f"outputs/rain_gauges/historical/{date_str}/raw")
+        output_dir = paths.get_historical_gauge_dir(date_str) / "raw"  # ← FIXED
         logger.info("Historical data (%s) - output to: %s", date_str, output_dir)
     
     return output_dir

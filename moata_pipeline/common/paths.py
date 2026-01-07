@@ -460,3 +460,56 @@ class PipelinePaths:
     def __repr__(self) -> str:
         """String representation showing root directory."""
         return f"PipelinePaths(outputs_root='{self.outputs_root}')"
+    
+
+# =============================================================================
+# Singleton Support
+# =============================================================================
+
+_global_paths_instance: Optional[PipelinePaths] = None
+
+
+def get_paths(
+    outputs_root: Optional[Path] = None,
+    force_new: bool = False
+) -> PipelinePaths:
+    """
+    Get PipelinePaths instance (singleton by default).
+    
+    Args:
+        outputs_root: Optional custom root directory
+        force_new: If True, create new instance instead of singleton
+        
+    Returns:
+        PipelinePaths instance
+        
+    Example:
+        >>> from moata_pipeline.common.paths import get_paths
+        >>> paths = get_paths()
+        >>> print(paths.rain_gauges_raw_dir)
+        outputs/rain_gauges/raw
+    """
+    global _global_paths_instance
+    
+    if force_new:
+        return PipelinePaths(outputs_root=outputs_root or Path("outputs"))
+    
+    if _global_paths_instance is None:
+        _global_paths_instance = PipelinePaths(
+            outputs_root=outputs_root or Path("outputs")
+        )
+    
+    return _global_paths_instance
+
+
+def set_global_paths(paths: PipelinePaths) -> None:
+    """
+    Set the global paths instance.
+    
+    Useful for custom configurations or testing.
+    
+    Args:
+        paths: PipelinePaths instance to use as global
+    """
+    global _global_paths_instance
+    _global_paths_instance = paths

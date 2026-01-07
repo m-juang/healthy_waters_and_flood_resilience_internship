@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Tuple, TYPE_CHECKING
+from moata_pipeline.common.paths import get_paths
 
 if TYPE_CHECKING:
     from ..__main__ import ModernApp
@@ -41,6 +42,7 @@ class BasePipeline(ABC):
         self.app = app
         self.initial_start_time = initial_start_time
         self.initial_end_time = initial_end_time
+        self.paths = get_paths()
     
     @property
     @abstractmethod

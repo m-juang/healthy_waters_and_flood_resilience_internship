@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from moata_pipeline.moata.client import MoataClient
+from moata_pipeline.common.paths import PipelinePaths, get_paths
 from moata_pipeline.common.typing_utils import safe_int
 from moata_pipeline.common.time_utils import iso_z
 from moata_pipeline.common.text_utils import safe_filename
@@ -716,8 +717,7 @@ class RadarDataCollector:
         pixel_batch_size: int = 50,
         max_hours_per_request: int = 24,
     ) -> None:
-        """
-        Initialize radar data collector.
+        """ Initialize radar data collector.
 
         Args:
             client: Authenticated MoataClient instance
@@ -727,8 +727,7 @@ class RadarDataCollector:
 
         Raises:
             TypeError: If client is not MoataClient
-            ValueError: If batch_size or max_hours are out of range
-        """
+            ValueError: If batch_size or max_hours are out of range"""
         if not isinstance(client, MoataClient):
             raise TypeError(
                 f"client must be MoataClient instance, got {type(client).__name__}"
@@ -745,7 +744,11 @@ class RadarDataCollector:
             )
 
         self._client = client
-        self._base_output_dir = Path(output_dir) if output_dir else Path("outputs/rain_radar/raw")
+        # Use get_paths() for smart default
+        if output_dir is None:
+            paths = get_paths()
+            output_dir = paths.rain_radar_raw_dir
+        self._base_output_dir = Path(output_dir)  
         self._pixel_batch_size = pixel_batch_size
         self._max_hours_per_request = max_hours_per_request
         self._logger = logging.getLogger(f"{__name__}.RadarDataCollector")
