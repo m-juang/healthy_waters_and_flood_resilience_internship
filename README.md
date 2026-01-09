@@ -100,7 +100,7 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 │  RAIN RADAR PIPELINE (Spatial Coverage)             │
 ├─────────────────────────────────────────────────────┤
 │  1. RETRIEVE  → Collect radar data for catchments   │
-│                 (~60 minutes)    │
+│                 (~60 minutes)                       |
 │                                                     │
 │  2. ANALYZE   → Calculate ARI using TP108           │
 │                 (~10-15 minutes)                    │
