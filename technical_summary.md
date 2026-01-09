@@ -1,4 +1,4 @@
-# 📘 **AUCKLAND COUNCIL RAIN MONITORING SYSTEM - TECHNICAL SUMMARY**
+# 📘 **MOATA AlertLab - TECHNICAL SUMMARY**
 
 **Version**: 2.0.0  
 **Last Updated**: January 2026  

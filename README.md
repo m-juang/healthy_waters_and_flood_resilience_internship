@@ -1,4 +1,4 @@
-﻿# Auckland Council Rain Monitoring System
+﻿# Auckland Council MOATA AlertLab
 
 Pipeline for collecting, analyzing, and visualizing rain monitoring data from Moata API.
 
