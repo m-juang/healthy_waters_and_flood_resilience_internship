@@ -604,8 +604,12 @@ Copyright © 2025-2026 Auckland Council. All rights reserved.
 
 ---
 
-**Last Updated**: January 2026  
+**Last Updated**: January 2026 
+
 **Version**: 2.0.0  
-**Created by**: Muhammad Juang (Healthy Waters and Flood Resilience Intern) 
-**Supervisor**: Yu-Cheng Tu 
+
+**Created by**: Muhammad Juang (Healthy Waters and Flood Resilience Intern)
+
+**Supervisor**: Dr. Yu-Cheng Tu
+
 **Institution**: University of Auckland (COMPSCI 778: Internship)

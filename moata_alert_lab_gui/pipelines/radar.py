@@ -53,7 +53,7 @@ class RadarPipeline(BasePipeline):
     def features(self) -> List[str]:
         return [
             "Pixel-level rainfall data",
-            "ARI calcuation",
+            "ARI calculation",
             "Alarm validation",
             "Dashboards"
         ]
