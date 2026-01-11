@@ -81,7 +81,7 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 │  RAIN GAUGE PIPELINE (Point Measurements)           │
 ├─────────────────────────────────────────────────────┤
 │  1. RETRIEVE  → Collect gauge data from API         │
-│                 (~120 minutes)          │
+│                 (~120 minutes)                      │
 │                                                     │
 │  2. ANALYZE   → Filter & analyze configurations     │
 │                 (~2-3 minutes)                      │
