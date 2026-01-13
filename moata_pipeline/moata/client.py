@@ -545,6 +545,97 @@ class MoataClient:
         )
         
         return all_results
+    
+    def get_pixel_mappings_metadata(
+    self,
+    collection_id: int,
+    pixel_indices: List[int],
+    batch_size: int = 150,
+) -> List[Dict[str, Any]]:
+        """
+        Get pixel metadata (geometries, bounds) for specified pixels.
+        
+        GET /v1/trace-set-collections/{id}/pixel-mappings/metadata
+        
+        Args:
+            collection_id: TraceSet collection ID (e.g., 1 for radar QPE)
+            pixel_indices: List of pixel indices (auto-batched if > 150)
+            batch_size: Pixels per request (max 150)
+            
+        Returns:
+            List of pixel metadata:
+            [{
+                "pixelIndex": int,
+                "geometry": {...},  # GeoJSON or similar
+                "bounds": {...},    # Bounding box
+                ...
+            }, ...]
+            
+        Notes:
+            - API limit: max 150 pixels per request
+            - Automatically batches for larger lists
+            
+        Example:
+            >>> metadata = client.get_pixel_mappings_metadata(
+            ...     collection_id=1,
+            ...     pixel_indices=[100, 101, 102, 103]
+            ... )
+            >>> for item in metadata:
+            ...     print(item['pixelIndex'], item['geometry'])
+        """
+        self._validate_id(collection_id, "collection_id")
+        
+        if not pixel_indices:
+            raise ValidationError("pixel_indices cannot be empty")
+        
+        if batch_size > MAX_RADAR_BATCH_SIZE:
+            raise ValidationError(
+                f"batch_size cannot exceed {MAX_RADAR_BATCH_SIZE}, got {batch_size}"
+            )
+        if batch_size <= 0:
+            raise ValidationError(f"batch_size must be positive, got {batch_size}")
+        
+        path = ep.TRACESET_PIXEL_METADATA.format(collection_id=int(collection_id))
+        
+        # Single batch if within limit
+        if len(pixel_indices) <= batch_size:
+            params = {"Pi": [int(x) for x in pixel_indices]}
+            data = self._http.get(path, params=params, allow_404=True)
+            
+            if data is None:
+                return []
+            
+            return self._extract_items(data)
+        
+        # Multiple batches
+        all_results: List[Dict[str, Any]] = []
+        total_batches = (len(pixel_indices) + batch_size - 1) // batch_size
+        
+        self._logger.debug(
+            f"Batching {len(pixel_indices)} pixels into {total_batches} batches "
+            f"of {batch_size}"
+        )
+        
+        for i in range(0, len(pixel_indices), batch_size):
+            batch = pixel_indices[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            
+            self._logger.debug(
+                f"Fetching metadata batch {batch_num}/{total_batches} ({len(batch)} pixels)"
+            )
+            
+            params = {"Pi": [int(x) for x in batch]}
+            data = self._http.get(path, params=params, allow_404=True)
+            
+            if data is not None:
+                results = self._extract_items(data)
+                all_results.extend(results)
+        
+        self._logger.info(
+            f"Retrieved metadata for {len(all_results)} pixels across {total_batches} batches"
+        )
+        
+        return all_results
 
     # ========================================================================
     # ALARMS

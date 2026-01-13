@@ -46,6 +46,15 @@ from .typing_utils import (
     GaugeEntry,
 )
 
+# ========== NEW: Spatial utilities for pixel weighting ==========
+from .spatial_utils import (
+    calculate_pixel_overlap_weights,
+    estimate_pixel_area_weights_simple,
+    save_pixel_weights,
+    load_pixel_weights,
+)
+# =================================================================
+
 __all__ = [
     # constants
     "TOKEN_URL",
@@ -78,4 +87,10 @@ __all__ = [
     # typing (optional)
     "JsonList",
     "GaugeEntry",
+    # ========== NEW: Spatial utilities ==========
+    "calculate_pixel_overlap_weights",
+    "estimate_pixel_area_weights_simple",
+    "save_pixel_weights",
+    "load_pixel_weights",
+    # ============================================
 ]

@@ -184,6 +184,24 @@ Example:
     >>> # "trace-set-collections/1/pixel-mappings/intersects-geometry?wkt=POLYGON(...)&srId=4326"
 """
 
+TRACESET_PIXEL_METADATA: Final[str] = "trace-set-collections/{collection_id}/pixel-mappings/metadata"
+"""
+Get pixel metadata (geometries, bounds) for specified pixels.
+
+Placeholders:
+    - collection_id: TraceSet collection ID (int, e.g., 1 for QPE)
+
+Query params typically include:
+    - Pi: List of pixel indices (max 150 per request)
+
+Returns:
+    List of pixel metadata with geometries
+
+Example:
+    >>> path = TRACESET_PIXEL_METADATA.format(collection_id=1)
+    >>> # "trace-set-collections/1/pixel-mappings/metadata?Pi=100&Pi=101&..."
+"""
+
 # ============================================================================
 # ENDPOINT REGISTRY
 # ============================================================================
@@ -199,6 +217,7 @@ ALL_ENDPOINTS: Final[dict[str, str]] = {
     "ALARMS_DETAILED_BY_PROJECT": ALARMS_DETAILED_BY_PROJECT,
     "TRACESET_COLLECTION_DATA": TRACESET_COLLECTION_DATA,
     "TRACESET_PIXEL_MAPPINGS": TRACESET_PIXEL_MAPPINGS,
+    "TRACESET_PIXEL_METADATA": TRACESET_PIXEL_METADATA,
 }
 """
 Registry of all endpoint definitions.

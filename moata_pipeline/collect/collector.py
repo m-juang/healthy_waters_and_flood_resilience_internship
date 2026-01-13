@@ -32,6 +32,10 @@ from moata_pipeline.common.typing_utils import safe_int
 from moata_pipeline.common.time_utils import iso_z
 from moata_pipeline.common.text_utils import safe_filename
 from moata_pipeline.common.iter_utils import chunk
+from moata_pipeline.common.spatial_utils import (
+    estimate_pixel_area_weights_simple,
+    save_pixel_weights
+)
 
 # Optional: shapely for geometry simplification
 try:
@@ -1564,13 +1568,16 @@ class RadarDataCollector:
         self,
         catchment: Dict[str, Any],
         data: List[Dict[str, Any]],
+        pixel_weights: Optional[Dict[Tuple[int, int], float]] = None,  # ← ADD PARAMETER
     ) -> Optional[Path]:
         """
-        Save radar data for a single catchment to CSV.
+        Save radar data for a single catchment to CSV with optional area weighting.
 
         Args:
             catchment: Catchment dictionary
             data: Radar data from API
+            pixel_weights: Dict mapping (catchment_id, pixel_index) -> weight
+                          If None, no weighting applied (original behavior)
 
         Returns:
             Path to saved CSV, or None if no data
@@ -1595,6 +1602,12 @@ class RadarDataCollector:
             if not values:
                 continue
 
+            # ========== NEW: Get weight for this pixel ==========
+            weight = 1.0
+            if pixel_weights is not None:
+                weight = pixel_weights.get((catchment_id, pixel_index), 1.0)
+            # ====================================================
+
             # Parse start time
             try:
                 if start_time:
@@ -1617,12 +1630,19 @@ class RadarDataCollector:
                 if start_dt and offset_seconds:
                     timestamp = start_dt + timedelta(seconds=i * offset_seconds)
 
+                # ========== MODIFIED: Apply weight and keep original ==========
+                original_value = value
+                weighted_value = value * weight
+                
                 rows.append({
                     "pixel_index": pixel_index,
                     "value_index": i,
                     "timestamp": timestamp.isoformat() if timestamp else None,
-                    "value": value,
+                    "value": weighted_value,        # ← Weighted value
+                    "weight": weight,               # ← NEW: Include weight for transparency
+                    "original_value": original_value  # ← NEW: Keep original for reference
                 })
+                # ==============================================================
 
         if not rows:
             self._logger.debug("  No valid rows after processing")
@@ -1632,7 +1652,20 @@ class RadarDataCollector:
         out_path = self._radar_data_dir / filename
         df.to_csv(out_path, index=False)
 
-        self._logger.info(f"  ✓ Saved radar data to {filename} ({len(rows)} rows)")
+        # ========== MODIFIED: Log weighting info ==========
+        if pixel_weights is not None:
+            weighted_rows = sum(1 for r in rows if r['weight'] < 1.0)
+            if weighted_rows > 0:
+                self._logger.info(
+                    f"  ✓ Saved radar data to {filename} "
+                    f"({len(rows)} rows, {weighted_rows} weighted)"
+                )
+            else:
+                self._logger.info(f"  ✓ Saved radar data to {filename} ({len(rows)} rows)")
+        else:
+            self._logger.info(f"  ✓ Saved radar data to {filename} ({len(rows)} rows)")
+        # ==================================================
+
         return out_path
 
     # -------------------------------------------------------------------------
@@ -1647,6 +1680,7 @@ class RadarDataCollector:
         collection_id: int = DEFAULT_COLLECTION_ID,
         traceset_id: int = DEFAULT_TRACESET_ID,
         save_csv: bool = True,
+        pixel_weights: Optional[Dict[Tuple[int, int], float]] = None,
     ) -> Dict[str, Any]:
         """
         Collect radar data for a single catchment.
@@ -1696,7 +1730,13 @@ class RadarDataCollector:
             # Save to CSV
             csv_path = None
             if save_csv and data:
-                csv_path = self.save_catchment_radar_data(catchment, data)
+                # ========== MODIFIED: Pass pixel weights ==========
+                csv_path = self.save_catchment_radar_data(
+                    catchment, 
+                    data,
+                    pixel_weights=pixel_weights  # ← ADD THIS
+                )
+                # ==================================================
 
             return {
                 "catchment_id": catchment_id,
@@ -1760,6 +1800,74 @@ class RadarDataCollector:
 
             self.save_catchments_csv()
 
+            # ========== NEW: Ensure pixel mappings are built ==========
+            self._logger.info("")
+            self._logger.info("Building pixel mappings for all catchments...")
+            
+            mappings_to_build = []
+            for catchment in catchments:
+                catchment_id = safe_int(catchment.get("id"))
+                if catchment_id not in self._pixel_cache:
+                    mappings_to_build.append(catchment)
+            
+            if mappings_to_build:
+                self._logger.info(f"  Need to fetch mappings for {len(mappings_to_build)} catchments")
+                for idx, catchment in enumerate(mappings_to_build, start=1):
+                    catchment_id = safe_int(catchment.get("id"))
+                    catchment_name = catchment.get("name", "Unknown")
+                    
+                    self._logger.debug(
+                        f"  [{idx}/{len(mappings_to_build)}] {catchment_name}: Getting pixel mappings..."
+                    )
+                    
+                    # This populates self._pixel_cache
+                    pixel_indices = self.get_pixel_indices_for_catchment(catchment)
+            else:
+                self._logger.info("  All pixel mappings already cached")
+            
+            self._logger.info(f"✓ Pixel mappings ready for {len(self._pixel_cache)} catchments")
+            # ==========================================================
+
+            # ========== NEW: Calculate pixel area weights ==========
+            self._logger.info("")
+            self._logger.info("Calculating pixel area weights for de-duplication...")
+            
+            # Try geometric weights from API, fallback to simple if fails
+            from moata_pipeline.common.spatial_utils import calculate_geometric_pixel_weights_from_api
+            
+            try:
+                self._logger.info("Using geometric intersection (API pixel metadata)...")
+                pixel_weights = calculate_geometric_pixel_weights_from_api(
+                    catchments=catchments,
+                    pixel_mappings=self._pixel_cache,
+                    client=self._client,
+                    collection_id=self.DEFAULT_COLLECTION_ID
+                )
+                self._logger.info("✓ Geometric weights calculated successfully")
+            except Exception as e:
+                self._logger.warning(
+                    f"Geometric weighting failed: {e}\n"
+                    f"Falling back to simple equal-split method"
+                )
+                pixel_weights = estimate_pixel_area_weights_simple(
+                    catchments=catchments,
+                    pixel_mappings=self._pixel_cache
+                )
+            
+            # Save weights for inspection
+            weights_file = (self._temp_dir if self._temp_dir else self._base_output_dir) / "pixel_weights.json"
+            save_pixel_weights(pixel_weights, weights_file)
+            self._logger.info(f"✓ Pixel weights saved to: {weights_file}")
+            
+            # Log statistics
+            weighted_pixels = sum(1 for w in pixel_weights.values() if w < 1.0)
+            total_pixel_catchment_pairs = len(pixel_weights)
+            self._logger.info(
+                f"✓ Weighted {weighted_pixels}/{total_pixel_catchment_pairs} "
+                f"pixel-catchment pairs ({100*weighted_pixels/total_pixel_catchment_pairs:.1f}%)"
+            )
+            # =======================================================
+
             # Filter to specific catchments if requested
             if catchment_ids:
                 catchments = [
@@ -1769,19 +1877,24 @@ class RadarDataCollector:
                 self._logger.info(f"Filtered to {len(catchments)} specified catchments")
 
             # Collect data for each catchment
+
             results: List[Dict[str, Any]] = []
 
             for idx, catchment in enumerate(catchments, start=1):
                 name = catchment.get("name", "Unknown")
                 self._logger.info(f"\n[{idx}/{len(catchments)}] {name}")
 
+                # ========== MODIFIED: Pass pixel weights ==========
                 result = self.collect_catchment_data(
                     catchment=catchment,
                     start_time=start_time,
                     end_time=end_time,
                     save_csv=save_csvs,
+                    pixel_weights=pixel_weights,  # ← ADD THIS
                 )
+                # ==================================================
                 results.append(result)
+            
 
             # Save pixel cache and summary (to temp dir)
             self._save_pixel_cache()
