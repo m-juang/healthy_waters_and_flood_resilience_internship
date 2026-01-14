@@ -388,7 +388,7 @@ class RadarPipeline(BasePipeline):
         dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
         abs_path = str(dashboard_path.resolve())
         
-        print(f"DEBUG: Attempting to open: {abs_path}")
+        # print(f"DEBUG: Attempting to open: {abs_path}")
         
         # Try multiple methods in order
         success = False
@@ -397,47 +397,48 @@ class RadarPipeline(BasePipeline):
         # Method 1: os.startfile (Windows - most reliable)
         if sys.platform == 'win32':
             try:
-                print("DEBUG: Trying os.startfile...")
+                # print("DEBUG: Trying os.startfile...")
                 os.startfile(abs_path)
                 success = True
-                print("DEBUG: os.startfile SUCCESS")
+                # print("DEBUG: os.startfile SUCCESS")
                 return
             except Exception as e:
                 error_msg += f"os.startfile: {e}\n"
-                print(f"DEBUG: os.startfile failed: {e}")
+                # print(f"DEBUG: os.startfile failed: {e}")
         
         # Method 2: webbrowser.open
         if not success:
             try:
-                print("DEBUG: Trying webbrowser.open...")
+                # print("DEBUG: Trying webbrowser.open...")
                 webbrowser.open(dashboard_path.as_uri())
                 success = True
-                print("DEBUG: webbrowser.open SUCCESS")
+                # print("DEBUG: webbrowser.open SUCCESS")
                 return
             except Exception as e:
                 error_msg += f"webbrowser: {e}\n"
-                print(f"DEBUG: webbrowser.open failed: {e}")
+                # print(f"DEBUG: webbrowser.open failed: {e}")
         
         # Method 3: subprocess (platform-specific)
         if not success:
             try:
                 if sys.platform == 'win32':
-                    print("DEBUG: Trying subprocess with cmd /c start...")
+                    # print("DEBUG: Trying subprocess with cmd /c start...")
                     subprocess.run(['cmd', '/c', 'start', '', abs_path], shell=True)
                     success = True
                 elif sys.platform == 'darwin':
-                    print("DEBUG: Trying subprocess with open...")
+                    # print("DEBUG: Trying subprocess with open...")
                     subprocess.run(['open', abs_path])
                     success = True
                 else:
-                    print("DEBUG: Trying subprocess with xdg-open...")
+                    # print("DEBUG: Trying subprocess with xdg-open...")
                     subprocess.run(['xdg-open', abs_path])
                     success = True
-                print("DEBUG: subprocess SUCCESS")
+                # print("DEBUG: subprocess SUCCESS")
                 return
             except Exception as e:
                 error_msg += f"subprocess: {e}\n"
-                print(f"DEBUG: subprocess failed: {e}")
+                # print(f"DEBUG: subproces
+                # s failed: {e}")
         
         # All methods failed
         if not success:

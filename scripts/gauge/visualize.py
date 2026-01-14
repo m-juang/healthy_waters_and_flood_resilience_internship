@@ -161,7 +161,7 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
         logger: Logger instance
         
     Returns:
-        Path to analysis CSV file
+        Path to analysis CSV file (alarm_summary.csv)
         
     Raises:
         FileNotFoundError: If CSV file not found
@@ -180,19 +180,20 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
             raise FileNotFoundError(
                 f"Analysis directory not found: {analyze_dir}\n\n"
                 f"Have you run analysis first?\n"
-                f"  python analyze_rain_gauges.py --current"
+                f"  python scripts/gauge/analyze.py"
             )
         
-        csv_files = list(analyze_dir.glob("rain_gauge_analysis_*.csv"))
-        if not csv_files:
+        # Look for alarm_summary.csv (the file that visualizer actually uses)
+        csv_path = analyze_dir / "alarm_summary.csv"
+        
+        if not csv_path.exists():
             raise FileNotFoundError(
-                f"No analysis CSV found in: {analyze_dir}\n\n"
+                f"No alarm_summary.csv found in: {analyze_dir}\n\n"
                 f"Have you run analysis first?\n"
-                f"  python analyze_rain_gauges.py --current"
+                f"  python scripts/gauge/analyze.py"
             )
         
-        csv_path = max(csv_files, key=lambda p: p.stat().st_mtime)
-        logger.info("✓ Found current analysis: %s", csv_path.name)
+        logger.info("✓ Found alarm summary: %s", csv_path.name)
         
     # Option 3: Specific date (historical)
     elif args.date:
@@ -203,23 +204,24 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
             raise FileNotFoundError(
                 f"Analysis directory not found: {analyze_dir}\n\n"
                 f"Have you run analysis first?\n"
-                f"  python analyze_rain_gauges.py --date {args.date}"
+                f"  python scripts/gauge/analyze.py --date {args.date}"
             )
         
-        csv_files = list(analyze_dir.glob("rain_gauge_analysis_*.csv"))
-        if not csv_files:
+        # Look for alarm_summary.csv
+        csv_path = analyze_dir / "alarm_summary.csv"
+        
+        if not csv_path.exists():
             raise FileNotFoundError(
-                f"No analysis CSV found in: {analyze_dir}\n\n"
+                f"No alarm_summary.csv found in: {analyze_dir}\n\n"
                 f"Have you run analysis first?\n"
-                f"  python analyze_rain_gauges.py --date {args.date}"
+                f"  python scripts/gauge/analyze.py --date {args.date}"
             )
         
-        csv_path = max(csv_files, key=lambda p: p.stat().st_mtime)
-        logger.info("✓ Found historical analysis: %s", csv_path.name)
+        logger.info("✓ Found alarm summary: %s", csv_path.name)
         
     # Option 4: Auto-detect (prefer historical)
     else:
-        logger.info("Auto-detecting analysis CSV (prefers historical)...")
+        logger.info("Auto-detecting alarm summary CSV (prefers historical)...")
         
         # Check historical directories (most recent first)
         historical_base = Path("outputs/rain_gauges/historical")
@@ -227,32 +229,28 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
         
         if historical_base.exists():
             historical_files = sorted(
-                historical_base.glob("*/analyze/rain_gauge_analysis_*.csv"),
+                historical_base.glob("*/analyze/alarm_summary.csv"),
                 reverse=True
             )
         
         # Check current directory
-        current_dir = Path("outputs/rain_gauges/analyze")
-        current_files = []
-        
-        if current_dir.exists():
-            current_files = list(current_dir.glob("rain_gauge_analysis_*.csv"))
+        current_file = Path("outputs/rain_gauges/analyze/alarm_summary.csv")
         
         # Prefer most recent historical
         if historical_files:
             csv_path = historical_files[0]
             date = csv_path.parent.parent.name
-            logger.info("✓ Found historical analysis: %s (date: %s)", csv_path.name, date)
-        elif current_files:
-            csv_path = max(current_files, key=lambda p: p.stat().st_mtime)
-            logger.info("✓ Found current analysis: %s", csv_path.name)
+            logger.info("✓ Found historical alarm summary: %s (date: %s)", csv_path.name, date)
+        elif current_file.exists():
+            csv_path = current_file
+            logger.info("✓ Found current alarm summary: %s", csv_path.name)
         else:
             raise FileNotFoundError(
-                "No analysis CSV found.\n\n"
+                "No alarm_summary.csv found.\n\n"
                 "Have you run analysis first?\n"
-                "  For current:       python analyze_rain_gauges.py --current\n"
-                "  For specific date: python analyze_rain_gauges.py --date 2025-05-09\n"
-                "  For auto-detect:   python analyze_rain_gauges.py"
+                "  For current:       python scripts/gauge/analyze.py\n"
+                "  For specific date: python scripts/gauge/analyze.py --date 2025-05-09\n"
+                "  For auto-detect:   python scripts/gauge/analyze.py"
             )
     
     # Validate file exists
@@ -321,17 +319,35 @@ def main() -> int:
         # Determine output directory
         out_dir = determine_output_dir(csv_path, args, logger)
         
+        # Extract date for historical data
+        input_date = None
+        if args.date:
+            input_date = args.date
+        elif not args.current and "historical" in str(csv_path):
+            # Auto-detected historical - extract date from path
+            parts = csv_path.parts
+            if "historical" in parts:
+                idx = parts.index("historical")
+                if idx + 1 < len(parts):
+                    input_date = parts[idx + 1]
+        
         logger.info("")
         logger.info("Configuration:")
         logger.info(f"  Input:  {csv_path}")
         logger.info(f"  Output: {out_dir}")
         logger.info(f"  Size:   {csv_path.stat().st_size:,} bytes")
+        if input_date:
+            logger.info(f"  Date:   {input_date}")
         logger.info("=" * 80)
         logger.info("")
         
-        # Run visualization
+        # Run visualization with correct parameters
         logger.info("Generating visualizations...")
-        report_path = run_visual_report(csv_path=csv_path, out_dir=out_dir)
+        report_path = run_visual_report(
+            csv_path=csv_path,
+            out_dir=out_dir,
+            input_date=input_date
+        )
         
         # Success message
         logger.info("")
