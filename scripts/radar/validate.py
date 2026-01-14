@@ -7,13 +7,16 @@ Checks which catchments would trigger alarms based on proportion of area
 exceeding the ARI threshold.
 
 Validation Logic:
-    - Alarm triggers if =30% of catchment area has ARI = 5 years (configurable)
+    - Alarm triggers if ≥30% of catchment area has ARI ≥ 5 years (configurable)
     - Uses spatial proportion (areal coverage) not point measurement
     - Different threshold than rain gauges due to spatial nature of radar data
 
 Usage:
-    # Auto-detect most recent analysis
+    # Auto-detect most recent analysis (prefers historical)
     python validate_ari_alarms_rain_radar.py
+    
+    # Validate current (last 24h) data explicitly
+    python validate_ari_alarms_rain_radar.py --current
     
     # Validate specific historical date
     python validate_ari_alarms_rain_radar.py --date 2025-05-09
@@ -39,8 +42,8 @@ Output:
     - peak_duration, peak_depth_mm, peak_timestamp
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-14
+Version: 1.1.0 - Added --current flag for explicit current data validation
 """
 
 import sys
@@ -62,7 +65,7 @@ from moata_pipeline.logging_setup import setup_logging
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # Default settings
 DEFAULT_PROPORTION_THRESHOLD = 0.30  # 30% of catchment area
@@ -81,15 +84,16 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                                  # Auto-detect most recent
+  %(prog)s                                  # Auto-detect most recent (prefers historical)
+  %(prog)s --current                        # Validate current (last 24h) data
   %(prog)s --date 2025-05-09                # Specific date
   %(prog)s --input custom/ari_summary.csv   # Custom input
   %(prog)s --threshold 0.50                 # 50%% area threshold
   %(prog)s --log-level DEBUG                # Verbose output
 
 Validation Logic:
-  - Alarm triggers if proportion_exceeding = threshold
-  - Default: =30%% of catchment area with ARI =5 years
+  - Alarm triggers if proportion_exceeding ≥ threshold
+  - Default: ≥30%% of catchment area with ARI ≥5 years
   - Radar uses spatial proportion (different from point-based gauges)
 
 Input Requirements:
@@ -106,20 +110,28 @@ Duration:
         """
     )
     
-    # Input options
-    input_group = parser.add_argument_group('Input Options')
+    # Input options (mutually exclusive)
+    input_group = parser.add_argument_group('Input Options (choose one)')
+    input_mutex = input_group.add_mutually_exclusive_group()
     
-    input_group.add_argument(
+    input_mutex.add_argument(
+        "--current",
+        action="store_true",
+        help="Validate current (last 24h) data explicitly. "
+             "Uses outputs/rain_radar/analyze/ari_analysis_summary.csv"
+    )
+    
+    input_mutex.add_argument(
         "--date",
         metavar="YYYY-MM-DD",
         help="Validate historical data for specific date. "
              "Example: --date 2025-05-09"
     )
     
-    input_group.add_argument(
+    input_mutex.add_argument(
         "--input",
         metavar="PATH",
-        help="Path to ari_analysis_summary.csv (overrides --date and auto-detect). "
+        help="Path to ari_analysis_summary.csv (overrides other options). "
              "Example: --input outputs/rain_radar/analyze/ari_analysis_summary.csv"
     )
     
@@ -183,11 +195,11 @@ def validate_threshold(threshold: float) -> None:
     
     if threshold == 0.0:
         logging.warning(
-            "??  Threshold is 0.0 - ALL catchments will trigger alarms!"
+            "⚠️  Threshold is 0.0 - ALL catchments will trigger alarms!"
         )
     elif threshold == 1.0:
         logging.warning(
-            "??  Threshold is 1.0 - NO catchments will trigger alarms!"
+            "⚠️  Threshold is 1.0 - NO catchments will trigger alarms!"
         )
 
 
@@ -209,17 +221,22 @@ def find_input_file(args: argparse.Namespace, logger: logging.Logger) -> Path:
     if args.input:
         input_path = Path(args.input)
         logger.info("Using custom input: %s", input_path)
+    
+    # Option 2: Current data (explicit)
+    elif args.current:
+        input_path = Path("outputs/rain_radar/analyze/ari_analysis_summary.csv")
+        logger.info("Using current (last 24h) data")
         
-    # Option 2: Specific date (historical)
+    # Option 3: Specific date (historical)
     elif args.date:
         input_path = Path(
             f"outputs/rain_radar/historical/{args.date}/analyze/ari_analysis_summary.csv"
         )
         logger.info("Using historical data for date: %s", args.date)
         
-    # Option 3: Auto-detect (prefer historical)
+    # Option 4: Auto-detect (prefer historical)
     else:
-        logger.info("Auto-detecting ARI analysis summary...")
+        logger.info("Auto-detecting ARI analysis summary (prefers historical)...")
         
         # Check historical directories (most recent first)
         historical_files = sorted(
@@ -234,25 +251,27 @@ def find_input_file(args: argparse.Namespace, logger: logging.Logger) -> Path:
         if historical_files:
             input_path = historical_files[0]
             date = input_path.parent.parent.name
-            logger.info("? Found historical data: %s (date: %s)", input_path, date)
+            logger.info("✓ Found historical data: %s (date: %s)", input_path, date)
         elif current_file.exists():
             input_path = current_file
-            logger.info("? Found current data: %s", input_path)
+            logger.info("✓ Found current data: %s", input_path)
         else:
             raise FileNotFoundError(
                 "No ARI analysis summary found.\n\n"
                 "Have you run analysis first?\n"
-                "  For current data:    python analyze_rain_radar.py\n"
-                "  For specific date:   python analyze_rain_radar.py --date 2025-05-09"
+                "  For current data:    python analyze_rain_radar.py --current\n"
+                "  For specific date:   python analyze_rain_radar.py --date 2025-05-09\n"
+                "  For auto-detect:     python analyze_rain_radar.py"
             )
     
     # Validate file exists
     if not input_path.exists():
         raise FileNotFoundError(
             f"Input file not found: {input_path}\n\n"
-            f"Have you run analysis first?\n"
-            f"  python analyze_rain_radar.py" + 
-            (f" --date {args.date}" if args.date else "")
+            f"Have you run analysis first?\n" +
+            (f"  python analyze_rain_radar.py --current" if args.current else
+             f"  python analyze_rain_radar.py --date {args.date}" if args.date else
+             f"  python analyze_rain_radar.py")
         )
     
     return input_path
@@ -281,7 +300,7 @@ def run_validation(
     """
     logger.info("Loading ARI summary from %s", ari_summary_path)
     df = pd.read_csv(ari_summary_path)
-    logger.info("? Loaded %d catchment records", len(df))
+    logger.info("✓ Loaded %d catchment records", len(df))
     
     # Validate required columns
     required_cols = ["catchment_id", "proportion_exceeding"]
@@ -308,7 +327,7 @@ def run_validation(
     available_cols = [c for c in cols if c in df.columns]
     df[available_cols].to_csv(output_path, index=False)
     
-    logger.info("? Saved validation results to %s", output_path)
+    logger.info("✓ Saved validation results to %s", output_path)
     
     # Generate report
     lines = []
@@ -400,7 +419,9 @@ def main() -> int:
         else:
             # Put validation CSV next to analyze directory
             # e.g., outputs/rain_radar/historical/DATE/analyze/ 
-            #    ? outputs/rain_radar/historical/DATE/ari_alarm_validation.csv
+            #    → outputs/rain_radar/historical/DATE/ari_alarm_validation.csv
+            # e.g., outputs/rain_radar/analyze/
+            #    → outputs/rain_radar/ari_alarm_validation.csv
             output_path = input_path.parent.parent / "ari_alarm_validation.csv"
             logger.info("Auto-determined output path: %s", output_path)
         
@@ -428,7 +449,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("? Validation completed successfully")
+        logger.info("✓ Validation completed successfully")
         logger.info("=" * 80)
         logger.info(f"Results saved to: {result['output_path']}")
         logger.info("")
@@ -443,14 +464,14 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("??  Validation interrupted by user (Ctrl+C)")
+        logger.warning("⚠️  Validation interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? File Not Found")
+        logger.error("❌ File Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -458,7 +479,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Validation Error")
+        logger.error("❌ Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -468,7 +489,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Validation Failed")
+        logger.error("❌ Validation Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

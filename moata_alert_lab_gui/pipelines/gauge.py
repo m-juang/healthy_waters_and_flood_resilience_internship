@@ -4,8 +4,8 @@ Rain Gauge Pipeline Module
 Implements the rain gauge data processing pipeline.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
-Version: 1.1.0 (Added CLI date arguments support)
+Last Modified: 2026-01-14
+Version: 1.2.0 - Added robust browser opening and updated validation dashboard method
 """
 
 from __future__ import annotations
@@ -199,9 +199,9 @@ class GaugePipeline(BasePipeline):
             self.app,
             title="Select Data to Analyze",
             options=[
-                ("🔍  Auto-Detect Most Recent Historical", "auto",
-                 "Automatically find the latest historical data"),
-                ("📅  Current Data (Real-time Last 24h)", "current",
+                ("🔍  Auto-Detect Most Recent", "auto",
+                 "Automatically find the latest data (prefers historical)"),
+                ("📅  Current (Last 24h)", "current",
                  "Analyze real-time data from outputs/rain_gauges/raw/"),
                 ("📆  Specific Historical Date", "date",
                  "Choose a specific date to analyze"),
@@ -253,24 +253,48 @@ class GaugePipeline(BasePipeline):
         self.app.show_pipeline_steps()
     
     def run_visualize(self) -> None:
-        """Run visualize step."""
-        msg = (
-            "The visualize script will automatically:\n\n"
-            "• Find the latest analyzed data\n"
-            "• Generate HTML dashboard\n"
-            "• Save to outputs folder\n\n"
-            "Continue?"
+        """Run visualize step with date selection."""
+        selection = show_date_selection_dialog(
+            self.app,
+            title="Select Data to Visualize",
+            options=[
+                ("🔍  Auto-Detect Most Recent", "auto",
+                "Automatically find the latest data (prefers historical)"),
+                
+                ("📅  Current (Last 24h)", "current",
+                "Visualize real-time data from outputs/rain_gauges/analyze/"),
+                
+                ("📆  Specific Historical Date", "date",
+                "Choose a specific date to visualize"),
+            ],
+            colors=self.app.colors,
         )
         
-        result = messagebox.askokcancel("Visualization", msg)
-        if not result:
+        if not selection:
             return
         
         script = "scripts/gauge/visualize.py"
+        args = []
+        
+        if selection == "current":
+            args = ["--current"]
+            self.app.selected_date = None
+        elif selection == "date":
+            date_str = ctk.CTkInputDialog(
+                text="Enter date in YYYY-MM-DD format:",
+                title="Enter Date"
+            ).get_input()
+            if not date_str:
+                return
+            args = ["--date", date_str]
+            self.app.selected_date = date_str
+        else:  # auto
+            self.app.selected_date = None
+        
         self.app.executor.execute(
             "Step 3: Visualize Results",
             script,
-            [],
+            args,
             self._on_visualize_complete
         )
     
@@ -307,17 +331,81 @@ class GaugePipeline(BasePipeline):
     def _open_dashboard(self) -> None:
         """Open the generated dashboard."""
         import webbrowser
+        import os
+        import sys
+        import subprocess
         
         dashboard_dir = Path(self.app.output_dir)
         html_files = list(dashboard_dir.glob("**/*.html"))
         
-        if html_files:
-            dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
-            webbrowser.open(dashboard_path.as_uri())
-        else:
+        if not html_files:
             messagebox.showwarning(
                 "Not Found",
                 f"No dashboard HTML files found in:\n{dashboard_dir}"
+            )
+            return
+        
+        dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
+        abs_path = str(dashboard_path.resolve())
+        
+        print(f"DEBUG: Attempting to open: {abs_path}")
+        
+        # Try multiple methods in order
+        success = False
+        error_msg = ""
+        
+        # Method 1: os.startfile (Windows - most reliable)
+        if sys.platform == 'win32':
+            try:
+                print("DEBUG: Trying os.startfile...")
+                os.startfile(abs_path)
+                success = True
+                print("DEBUG: os.startfile SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"os.startfile: {e}\n"
+                print(f"DEBUG: os.startfile failed: {e}")
+        
+        # Method 2: webbrowser.open
+        if not success:
+            try:
+                print("DEBUG: Trying webbrowser.open...")
+                webbrowser.open(dashboard_path.as_uri())
+                success = True
+                print("DEBUG: webbrowser.open SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"webbrowser: {e}\n"
+                print(f"DEBUG: webbrowser.open failed: {e}")
+        
+        # Method 3: subprocess (platform-specific)
+        if not success:
+            try:
+                if sys.platform == 'win32':
+                    print("DEBUG: Trying subprocess with cmd /c start...")
+                    subprocess.run(['cmd', '/c', 'start', '', abs_path], shell=True)
+                    success = True
+                elif sys.platform == 'darwin':
+                    print("DEBUG: Trying subprocess with open...")
+                    subprocess.run(['open', abs_path])
+                    success = True
+                else:
+                    print("DEBUG: Trying subprocess with xdg-open...")
+                    subprocess.run(['xdg-open', abs_path])
+                    success = True
+                print("DEBUG: subprocess SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"subprocess: {e}\n"
+                print(f"DEBUG: subprocess failed: {e}")
+        
+        # All methods failed
+        if not success:
+            messagebox.showerror(
+                "Cannot Open Browser",
+                f"Could not open dashboard automatically.\n\n"
+                f"Please open manually:\n{abs_path}\n\n"
+                f"Errors:\n{error_msg}"
             )
     
     def run_validate(self) -> None:
@@ -393,6 +481,45 @@ class GaugePipeline(BasePipeline):
             self._on_visualize_validation_complete
         )
     
+    def _open_validation_dashboard(self) -> None:
+        """Open the validation dashboard."""
+        import webbrowser
+        import os
+        import sys
+        import subprocess
+        
+        dashboard_dir = Path(self.app.output_dir)
+        html_files = list(dashboard_dir.glob("**/*.html"))
+        
+        if not html_files:
+            messagebox.showwarning(
+                "Not Found",
+                f"No dashboard HTML files found in:\n{dashboard_dir}"
+            )
+            return
+        
+        dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
+        abs_path = str(dashboard_path.resolve())
+        
+        # Try os.startfile first (most reliable on Windows)
+        if sys.platform == 'win32':
+            try:
+                os.startfile(abs_path)
+                return
+            except Exception:
+                pass
+        
+        # Fallback to webbrowser
+        try:
+            webbrowser.open(dashboard_path.as_uri())
+        except Exception as e:
+            messagebox.showerror(
+                "Cannot Open Browser",
+                f"Could not open dashboard automatically.\n\n"
+                f"Please open manually:\n{abs_path}\n\n"
+                f"Error: {e}"
+            )
+    
     def _on_visualize_validation_complete(self, success: bool) -> None:
         """Handle visualize validation completion."""
         if success:
@@ -402,12 +529,12 @@ class GaugePipeline(BasePipeline):
                 f"Dashboard saved to:\n{self.app.output_dir}\n\n"
                 f"Open dashboard now?"
             )
-            if result:
-                import webbrowser
-                dashboard_path = Path(self.app.output_dir) / "validation_dashboard.html"
-                if dashboard_path.exists():
-                    webbrowser.open(dashboard_path.as_uri())
             
+            if result:
+                # Use the robust method
+                self._open_validation_dashboard()
+            
+            # Show completion message AFTER dashboard interaction
             messagebox.showinfo(
                 "Pipeline Complete!",
                 "🎉 All steps completed!\n\nGauge pipeline finished successfully."
@@ -417,4 +544,5 @@ class GaugePipeline(BasePipeline):
                 "Error",
                 "❌ Validation visualization failed!\n\nCheck the logs for details."
             )
+        
         self.app.show_pipeline_steps()

@@ -6,28 +6,33 @@ Generates interactive HTML dashboards from analyzed rain gauge data.
 Creates main dashboard with summary charts and individual pages for each gauge.
 
 Usage:
-    python visualize_rain_gauges.py [options]
-
-Examples:
-    # Auto-detect latest analysis data
+    # Auto-detect most recent data (prefers historical)
     python visualize_rain_gauges.py
     
+    # Visualize current (last 24h) data
+    python visualize_rain_gauges.py --current
+    
+    # Visualize specific historical date
+    python visualize_rain_gauges.py --date 2025-05-09
+    
     # Specify custom input CSV
-    python visualize_rain_gauges.py --csv outputs/rain_gauges/analyze/rain_gauge_analysis_20241228.csv
+    python visualize_rain_gauges.py --csv path/to/analysis.csv
     
     # Specify custom output directory
-    python visualize_rain_gauges.py --out outputs/rain_gauges/custom_viz/
+    python visualize_rain_gauges.py --out custom/viz/
     
     # Enable debug logging
     python visualize_rain_gauges.py --log-level DEBUG
 
 Output:
-    - Main dashboard: outputs/rain_gauges/visualizations/dashboard.html
-    - Per-gauge pages: outputs/rain_gauges/visualizations/gauges/GAUGE_XXX.html
-    - Embedded charts: matplotlib charts embedded in HTML
+    outputs/rain_gauges/visualizations/                    (for current)
+    outputs/rain_gauges/historical/DATE/visualizations/    (for historical)
+    - Main dashboard: dashboard.html
+    - Per-gauge pages: gauges/GAUGE_XXX.html
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
+Last Modified: 2026-01-14
+Version: 1.1.0 - Added --current and --date flags for date-specific visualization
 """
 
 import sys
@@ -45,6 +50,10 @@ from moata_pipeline.logging_setup import setup_logging
 from moata_pipeline.viz.runner import run_visual_report
 
 
+# Version info
+__version__ = "1.1.0"
+
+
 def parse_args() -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -57,92 +66,235 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                                      # Auto-detect latest data
-  %(prog)s --csv path/to/analysis.csv           # Custom input CSV
-  %(prog)s --out custom/output/dir/             # Custom output directory
-  %(prog)s --log-level DEBUG                    # Verbose logging
+  %(prog)s                          # Auto-detect most recent (prefers historical)
+  %(prog)s --current                # Visualize current (last 24h) data
+  %(prog)s --date 2025-05-09        # Visualize specific historical date
+  %(prog)s --csv path/to/file.csv   # Custom input CSV
+  %(prog)s --out custom/dir/        # Custom output directory
+  %(prog)s --log-level DEBUG        # Verbose logging
 
-Auto-Detection:
-  If --csv is not specified, the script searches for the most recent
-  rain_gauge_analysis_*.csv file in outputs/rain_gauges/analyze/
+Auto-Detection (no flags):
+  Searches for most recent rain_gauge_analysis_*.csv in:
+  1. outputs/rain_gauges/historical/*/analyze/ (prefers historical)
+  2. outputs/rain_gauges/analyze/ (fallback to current)
+
+Current Mode (--current):
+  Uses: outputs/rain_gauges/analyze/rain_gauge_analysis_*.csv
+  Output: outputs/rain_gauges/visualizations/
+
+Historical Mode (--date YYYY-MM-DD):
+  Uses: outputs/rain_gauges/historical/DATE/analyze/rain_gauge_analysis_*.csv
+  Output: outputs/rain_gauges/historical/DATE/visualizations/
 
 Input Requirements:
-  - CSV file must contain columns: gauge_id, gauge_name, latitude, longitude
+  - CSV file must contain: gauge_id, gauge_name, latitude, longitude
   - Data should be from analyze_rain_gauges.py output
 
-Output:
-  - Main dashboard: dashboard.html (summary charts, gauge list)
-  - Per-gauge pages: gauges/GAUGE_XXX.html (detailed timeseries)
-  - All charts embedded as base64 images in HTML
-
 Duration:
-  Typically 3-5 minutes depending on number of gauges (~200 gauges).
+  Typically 3-5 minutes for ~200 gauges
         """
     )
     
-    parser.add_argument(
+    # Data source options (mutually exclusive)
+    source_group = parser.add_argument_group('Data Source (choose one or auto-detect)')
+    source_mutex = source_group.add_mutually_exclusive_group()
+    
+    source_mutex.add_argument(
+        "--current",
+        action="store_true",
+        help="Visualize current (last 24h) data explicitly. "
+             "Uses outputs/rain_gauges/analyze/"
+    )
+    
+    source_mutex.add_argument(
+        "--date",
+        metavar="YYYY-MM-DD",
+        help="Visualize specific historical date. "
+             "Example: --date 2025-05-09"
+    )
+    
+    source_mutex.add_argument(
         "--csv",
         type=str,
-        default="",
         metavar="PATH",
-        help="Path to analysis CSV file (auto-detects if not specified)"
+        help="Path to specific analysis CSV file (overrides other options). "
+             "Example: --csv path/to/analysis.csv"
     )
     
-    parser.add_argument(
+    # Output options
+    output_group = parser.add_argument_group('Output Options')
+    
+    output_group.add_argument(
         "--out",
         type=str,
-        default="",
         metavar="DIR",
-        help="Output directory for visualizations (auto-detects if not specified)"
+        help="Custom output directory (auto-determined if not specified). "
+             "Example: --out custom/output/"
     )
     
-    parser.add_argument(
+    # Logging options
+    log_group = parser.add_argument_group('Logging Options')
+    
+    log_group.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
         help="Set logging level (default: INFO)"
     )
     
+    # Metadata
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 1.0.0"
+        version=f"%(prog)s {__version__}"
     )
     
     return parser.parse_args()
 
 
-def validate_csv_path(csv_path: Path | None) -> None:
+def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Path:
     """
-    Validate that CSV file exists and is readable.
+    Detect analysis CSV file based on arguments.
     
     Args:
-        csv_path: Path to CSV file (None if auto-detecting)
+        args: Parsed command-line arguments
+        logger: Logger instance
+        
+    Returns:
+        Path to analysis CSV file
         
     Raises:
-        FileNotFoundError: If CSV file doesn't exist
-        ValueError: If path is not a CSV file
+        FileNotFoundError: If CSV file not found
     """
-    if csv_path is None:
-        return  # Auto-detection will handle this
+    # Option 1: Custom CSV path
+    if args.csv:
+        csv_path = Path(args.csv)
+        logger.info("Using custom CSV: %s", csv_path)
+        
+    # Option 2: Current data (explicit)
+    elif args.current:
+        analyze_dir = Path("outputs/rain_gauges/analyze")
+        logger.info("Using current (last 24h) data")
+        
+        if not analyze_dir.exists():
+            raise FileNotFoundError(
+                f"Analysis directory not found: {analyze_dir}\n\n"
+                f"Have you run analysis first?\n"
+                f"  python analyze_rain_gauges.py --current"
+            )
+        
+        csv_files = list(analyze_dir.glob("rain_gauge_analysis_*.csv"))
+        if not csv_files:
+            raise FileNotFoundError(
+                f"No analysis CSV found in: {analyze_dir}\n\n"
+                f"Have you run analysis first?\n"
+                f"  python analyze_rain_gauges.py --current"
+            )
+        
+        csv_path = max(csv_files, key=lambda p: p.stat().st_mtime)
+        logger.info("✓ Found current analysis: %s", csv_path.name)
+        
+    # Option 3: Specific date (historical)
+    elif args.date:
+        analyze_dir = Path(f"outputs/rain_gauges/historical/{args.date}/analyze")
+        logger.info("Using historical data for date: %s", args.date)
+        
+        if not analyze_dir.exists():
+            raise FileNotFoundError(
+                f"Analysis directory not found: {analyze_dir}\n\n"
+                f"Have you run analysis first?\n"
+                f"  python analyze_rain_gauges.py --date {args.date}"
+            )
+        
+        csv_files = list(analyze_dir.glob("rain_gauge_analysis_*.csv"))
+        if not csv_files:
+            raise FileNotFoundError(
+                f"No analysis CSV found in: {analyze_dir}\n\n"
+                f"Have you run analysis first?\n"
+                f"  python analyze_rain_gauges.py --date {args.date}"
+            )
+        
+        csv_path = max(csv_files, key=lambda p: p.stat().st_mtime)
+        logger.info("✓ Found historical analysis: %s", csv_path.name)
+        
+    # Option 4: Auto-detect (prefer historical)
+    else:
+        logger.info("Auto-detecting analysis CSV (prefers historical)...")
+        
+        # Check historical directories (most recent first)
+        historical_base = Path("outputs/rain_gauges/historical")
+        historical_files = []
+        
+        if historical_base.exists():
+            historical_files = sorted(
+                historical_base.glob("*/analyze/rain_gauge_analysis_*.csv"),
+                reverse=True
+            )
+        
+        # Check current directory
+        current_dir = Path("outputs/rain_gauges/analyze")
+        current_files = []
+        
+        if current_dir.exists():
+            current_files = list(current_dir.glob("rain_gauge_analysis_*.csv"))
+        
+        # Prefer most recent historical
+        if historical_files:
+            csv_path = historical_files[0]
+            date = csv_path.parent.parent.name
+            logger.info("✓ Found historical analysis: %s (date: %s)", csv_path.name, date)
+        elif current_files:
+            csv_path = max(current_files, key=lambda p: p.stat().st_mtime)
+            logger.info("✓ Found current analysis: %s", csv_path.name)
+        else:
+            raise FileNotFoundError(
+                "No analysis CSV found.\n\n"
+                "Have you run analysis first?\n"
+                "  For current:       python analyze_rain_gauges.py --current\n"
+                "  For specific date: python analyze_rain_gauges.py --date 2025-05-09\n"
+                "  For auto-detect:   python analyze_rain_gauges.py"
+            )
     
+    # Validate file exists
     if not csv_path.exists():
         raise FileNotFoundError(
-            f"CSV file not found: {csv_path}\n"
-            f"Please run analyze_rain_gauges.py first to generate analysis data."
+            f"CSV file not found: {csv_path}\n\n"
+            f"Please run analyze_rain_gauges.py first."
         )
     
-    if csv_path.suffix.lower() != '.csv':
-        raise ValueError(
-            f"Invalid file type: {csv_path.suffix}\n"
-            f"Expected .csv file, got: {csv_path}"
-        )
-    
+    # Validate file is not empty
     if csv_path.stat().st_size == 0:
         raise ValueError(
-            f"CSV file is empty: {csv_path}\n"
+            f"CSV file is empty: {csv_path}\n\n"
             f"Please check that analyze_rain_gauges.py completed successfully."
         )
+    
+    return csv_path
+
+
+def determine_output_dir(csv_path: Path, args: argparse.Namespace, logger: logging.Logger) -> Path:
+    """
+    Determine output directory based on input location.
+    
+    Args:
+        csv_path: Path to input CSV
+        args: Parsed arguments
+        logger: Logger instance
+        
+    Returns:
+        Path to output directory
+    """
+    if args.out:
+        out_dir = Path(args.out)
+        logger.info("Using custom output directory: %s", out_dir)
+    else:
+        # Auto-determine: put visualizations/ next to analyze/
+        # outputs/rain_gauges/analyze/ → outputs/rain_gauges/visualizations/
+        # outputs/rain_gauges/historical/DATE/analyze/ → outputs/rain_gauges/historical/DATE/visualizations/
+        out_dir = csv_path.parent.parent / "visualizations"
+        logger.info("Auto-determined output directory: %s", out_dir)
+    
+    return out_dir
 
 
 def main() -> int:
@@ -150,100 +302,99 @@ def main() -> int:
     Main entry point for rain gauge visualization.
     
     Returns:
-        Exit code (0 for success, 1 for failure)
+        Exit code (0 for success, 1 for failure, 130 for interrupt)
     """
     args = parse_args()
     
-    # Setup logging with user-specified level
+    # Setup logging
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
     
     try:
         logger.info("=" * 80)
-        logger.info("Starting Rain Gauge Visualization")
+        logger.info("Rain Gauge Visualization - v%s", __version__)
         logger.info("=" * 80)
         
-        # Parse paths
-        csv_path = Path(args.csv) if args.csv else None
-        out_dir = Path(args.out) if args.out else None
+        # Detect analysis CSV
+        csv_path = detect_analysis_csv(args, logger)
         
-        # Log configuration
-        if csv_path:
-            logger.info(f"Input CSV: {csv_path}")
-        else:
-            logger.info("Input CSV: Auto-detecting latest analysis file")
+        # Determine output directory
+        out_dir = determine_output_dir(csv_path, args, logger)
         
-        if out_dir:
-            logger.info(f"Output directory: {out_dir}")
-        else:
-            logger.info("Output directory: Auto-detecting (outputs/rain_gauges/visualizations/)")
-        
+        logger.info("")
+        logger.info("Configuration:")
+        logger.info(f"  Input:  {csv_path}")
+        logger.info(f"  Output: {out_dir}")
+        logger.info(f"  Size:   {csv_path.stat().st_size:,} bytes")
         logger.info("=" * 80)
-        
-        # Validate CSV path if provided
-        if csv_path:
-            validate_csv_path(csv_path)
-            logger.info(f"✓ CSV file validated: {csv_path.name} ({csv_path.stat().st_size:,} bytes)")
+        logger.info("")
         
         # Run visualization
         logger.info("Generating visualizations...")
         report_path = run_visual_report(csv_path=csv_path, out_dir=out_dir)
         
         # Success message
+        logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ VISUALIZATION COMPLETE!")
+        logger.info("✅ Visualization Complete!")
         logger.info("=" * 80)
-        logger.info(f"📊 Dashboard created: {report_path}")
+        logger.info(f"Dashboard: {report_path}")
         logger.info("")
         logger.info("To view:")
-        logger.info(f"  1. Open in browser: file://{report_path.absolute()}")
-        logger.info(f"  2. Or double-click: {report_path}")
+        logger.info(f"  Open in browser: {report_path.absolute()}")
+        logger.info("  Or double-click the file in File Explorer")
         logger.info("=" * 80)
+        
+        # Print to stdout
+        print(f"\n✓ Done! Open in browser: {report_path.absolute()}")
         
         return 0
         
     except KeyboardInterrupt:
-        logger.warning("\n⚠️  Visualization interrupted by user (Ctrl+C)")
-        logger.info("Partial visualizations may have been created")
-        return 130  # Standard exit code for SIGINT
+        logger.warning("")
+        logger.warning("=" * 80)
+        logger.warning("⚠️  Visualization interrupted by user (Ctrl+C)")
+        logger.warning("=" * 80)
+        return 130
         
     except FileNotFoundError as e:
-        logger.error(f"❌ File not found: {e}")
-        logger.error("\nPossible causes:")
-        logger.error("1. Analysis data not generated yet - run analyze_rain_gauges.py first")
-        logger.error("2. Incorrect --csv path specified")
-        logger.error("3. Missing outputs/rain_gauges/analyze/ directory")
-        logger.error("\nTo generate analysis data:")
-        logger.error("  python analyze_rain_gauges.py")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ File Not Found")
+        logger.error("=" * 80)
+        logger.error(str(e))
         return 1
         
     except ValueError as e:
-        logger.error(f"❌ Invalid input: {e}")
-        logger.error("\nCheck that:")
-        logger.error("1. CSV file is valid and not corrupted")
-        logger.error("2. CSV contains required columns (gauge_id, gauge_name, etc.)")
-        logger.error("3. File is from analyze_rain_gauges.py output")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Invalid Input")
+        logger.error("=" * 80)
+        logger.error(str(e))
         return 1
         
     except PermissionError as e:
-        logger.error(f"❌ Permission denied: {e}")
-        logger.error("Check file/directory permissions for outputs/rain_gauges/visualizations/")
+        logger.error("")
+        logger.error("=" * 80)
+        logger.error("❌ Permission Denied")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("Check file/directory permissions")
         return 1
         
     except Exception as e:
+        logger.error("")
         logger.error("=" * 80)
-        logger.error("❌ VISUALIZATION FAILED")
+        logger.error("❌ Visualization Failed")
         logger.error("=" * 80)
-        logger.error(f"Error type: {type(e).__name__}")
-        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Error: {e}")
         logger.exception("Full traceback:")
         logger.error("")
-        logger.error("Troubleshooting tips:")
-        logger.error("1. Ensure analyze_rain_gauges.py completed successfully")
-        logger.error("2. Check that CSV file contains valid gauge data")
-        logger.error("3. Verify matplotlib and pandas are installed correctly")
-        logger.error("4. Try running with --log-level DEBUG for more information")
-        logger.error("5. Check available disk space in outputs/ directory")
+        logger.error("Troubleshooting:")
+        logger.error("1. Verify analyze_rain_gauges.py completed successfully")
+        logger.error("2. Check CSV file is valid and not corrupted")
+        logger.error("3. Ensure matplotlib and pandas are installed")
+        logger.error("4. Try with --log-level DEBUG for more details")
         return 1
 
 

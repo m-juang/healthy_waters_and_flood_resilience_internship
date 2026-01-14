@@ -371,17 +371,81 @@ class RadarPipeline(BasePipeline):
     def _open_dashboard(self) -> None:
         """Open the generated dashboard."""
         import webbrowser
+        import os
+        import sys
+        import subprocess
         
         dashboard_dir = Path(self.app.output_dir)
         html_files = list(dashboard_dir.glob("**/*.html"))
         
-        if html_files:
-            dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
-            webbrowser.open(dashboard_path.as_uri())
-        else:
+        if not html_files:
             messagebox.showwarning(
                 "Not Found",
                 f"No dashboard HTML files found in:\n{dashboard_dir}"
+            )
+            return
+        
+        dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
+        abs_path = str(dashboard_path.resolve())
+        
+        print(f"DEBUG: Attempting to open: {abs_path}")
+        
+        # Try multiple methods in order
+        success = False
+        error_msg = ""
+        
+        # Method 1: os.startfile (Windows - most reliable)
+        if sys.platform == 'win32':
+            try:
+                print("DEBUG: Trying os.startfile...")
+                os.startfile(abs_path)
+                success = True
+                print("DEBUG: os.startfile SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"os.startfile: {e}\n"
+                print(f"DEBUG: os.startfile failed: {e}")
+        
+        # Method 2: webbrowser.open
+        if not success:
+            try:
+                print("DEBUG: Trying webbrowser.open...")
+                webbrowser.open(dashboard_path.as_uri())
+                success = True
+                print("DEBUG: webbrowser.open SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"webbrowser: {e}\n"
+                print(f"DEBUG: webbrowser.open failed: {e}")
+        
+        # Method 3: subprocess (platform-specific)
+        if not success:
+            try:
+                if sys.platform == 'win32':
+                    print("DEBUG: Trying subprocess with cmd /c start...")
+                    subprocess.run(['cmd', '/c', 'start', '', abs_path], shell=True)
+                    success = True
+                elif sys.platform == 'darwin':
+                    print("DEBUG: Trying subprocess with open...")
+                    subprocess.run(['open', abs_path])
+                    success = True
+                else:
+                    print("DEBUG: Trying subprocess with xdg-open...")
+                    subprocess.run(['xdg-open', abs_path])
+                    success = True
+                print("DEBUG: subprocess SUCCESS")
+                return
+            except Exception as e:
+                error_msg += f"subprocess: {e}\n"
+                print(f"DEBUG: subprocess failed: {e}")
+        
+        # All methods failed
+        if not success:
+            messagebox.showerror(
+                "Cannot Open Browser",
+                f"Could not open dashboard automatically.\n\n"
+                f"Please open manually:\n{abs_path}\n\n"
+                f"Errors:\n{error_msg}"
             )
     
     def run_validate(self) -> None:
@@ -490,6 +554,45 @@ class RadarPipeline(BasePipeline):
             self._on_visualize_validation_complete
         )
     
+    def _open_validation_dashboard(self) -> None:
+        """Open the validation dashboard."""
+        import webbrowser
+        import os
+        import sys
+        import subprocess
+        
+        dashboard_dir = Path(self.app.output_dir)
+        html_files = list(dashboard_dir.glob("**/*.html"))
+        
+        if not html_files:
+            messagebox.showwarning(
+                "Not Found",
+                f"No dashboard HTML files found in:\n{dashboard_dir}"
+            )
+            return
+        
+        dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
+        abs_path = str(dashboard_path.resolve())
+        
+        # Try os.startfile first (most reliable on Windows)
+        if sys.platform == 'win32':
+            try:
+                os.startfile(abs_path)
+                return
+            except Exception:
+                pass
+        
+        # Fallback to webbrowser
+        try:
+            webbrowser.open(dashboard_path.as_uri())
+        except Exception as e:
+            messagebox.showerror(
+                "Cannot Open Browser",
+                f"Could not open dashboard automatically.\n\n"
+                f"Please open manually:\n{abs_path}\n\n"
+                f"Error: {e}"
+            )
+    
     def _on_visualize_validation_complete(self, success: bool) -> None:
         """Handle visualize validation completion."""
         if success:
@@ -516,21 +619,12 @@ class RadarPipeline(BasePipeline):
                 f"Dashboard saved to:\n{self.app.output_dir}\n\n"
                 f"Open dashboard now?"
             )
-            if result:
-                import webbrowser
-                dashboard_dir = Path(self.app.output_dir)
-                html_files = list(dashboard_dir.glob("**/*.html"))
-                
-                if html_files:
-                    dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
-                    webbrowser.open(dashboard_path.as_uri())
-                else:
-                    messagebox.showwarning(
-                        "Not Found",
-                        f"No dashboard HTML files found in:\n{dashboard_dir}"
-                    )
             
-            # Show completion message
+            if result:
+                # Use the same robust method
+                self._open_validation_dashboard()
+            
+            # Show completion message AFTER dashboard interaction
             messagebox.showinfo(
                 "Pipeline Complete!",
                 "🎉 All steps completed!\n\nRadar pipeline finished successfully."
@@ -540,4 +634,5 @@ class RadarPipeline(BasePipeline):
                 "Error",
                 "❌ Validation visualization failed!\n\nCheck the logs for details."
             )
+        
         self.app.show_pipeline_steps()
