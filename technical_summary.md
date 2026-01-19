@@ -211,7 +211,7 @@ moata_pipeline/
 │ • collect(project_id, asset_type_id)                        │
 │                                                             │
 │ PROCESS:                                                    │
-│ 1. Fetch all rain gauges (60 gauges)                        │
+│ 1. Fetch all rain gauges (264 gauges)                        │
 │ 2. For each gauge:                                          │
 │    a) Fetch traces                                          │
 │    b) Fetch alarms/thresholds                               │
@@ -460,7 +460,7 @@ moata_pipeline/
 │ └── gauges/                                                 │
 │     ├── GAUGE_1234.html                                     │
 │     ├── GAUGE_1235.html                                     │
-│     └── ... (~60 files)                                     │
+│     └── ... (~76 files)                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -661,7 +661,7 @@ moata_pipeline/
 │                                                             │
 │ STEP 1: Fetch Catchments                                    │
 │   client.get_catchments(594, 3541)                          │
-│   → 157 stormwater catchments                               │
+│   → 233 stormwater catchments                               │
 │   Save: catchments.json                                     │
 └─────────────────────────────────────────────────────────────┘
                            ↓
@@ -679,7 +679,7 @@ moata_pipeline/
 │                                                             │
 │ CACHING:                                                    │
 │ • Prevents redundant API calls                              │
-│ • 157 cache files (~50-200 pixels each)                     │
+│ • 233 cache files (~50-200 pixels each)                     │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -702,9 +702,8 @@ moata_pipeline/
 │ 5. Save CSV: {catchment_id}_{name}.csv                      │
 │                                                             │
 │ DATA VOLUME:                                                │
-│ • ~15,700 pixels total                                      │
-│ • ~2.26M data points (24h @ 10min intervals)                │
-│ • ~500 MB - 2 GB total                                      │
+│ • ~25,000 pixels total                                      │
+│ • ~2 GB total                                              │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -712,9 +711,9 @@ moata_pipeline/
 │ outputs/rain_radar/raw/                                     │
 │ ├── catchments.json                                         │
 │ ├── pixel_mappings/                                         │
-│ │   └── catchment_XXX_pixels.json (~157 files)              │
+│ │   └── catchment_XXX_pixels.json (~233 files)              │
 │ └── radar_data/                                             │
-│     └── XXXX_CatchmentName.csv (~157 files)                 │
+│     └── XXXX_CatchmentName.csv (~233 files)                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1018,9 +1017,9 @@ from moata_pipeline.logging_setup import setup_logging
        ▼
 ┌────────────────────────────────────────────────┐
 │          DATA COLLECTION                       │
-│  • Rain Gauges (60)                            │
-│  • Stormwater Catchments (157)                 │
-│  • Radar Pixels (~15,700)                      │
+│  • Rain Gauges (76)                            │
+│  • Stormwater Catchments (233)                 │
+│  • Radar Pixels (~25,000)                      │
 └────────┬───────────────────────────────────────┘
          │ JSON
          ▼
