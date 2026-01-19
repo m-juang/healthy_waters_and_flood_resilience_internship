@@ -276,6 +276,7 @@ internship-project/
 │       ├── text_utils.py           # Text processing utilities
 │       ├── dataframe_utils.py      # Pandas helper functions
 │       ├── output_writer.py        # Output file writers
+|       ├── spatial_util.py         # pixels proportion witihn catchments
 │       ├── typing_utils.py         # Type conversion utilities
 │       └── iter_utils.py           # Iterator utilities
 │

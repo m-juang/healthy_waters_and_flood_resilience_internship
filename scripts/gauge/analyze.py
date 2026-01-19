@@ -68,8 +68,9 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                                    # Default settings
-  %(prog)s --current                          # Alias (no effect); analyze latest raw data
+  %(prog)s                                    # Auto-detect (prefers historical)
+  %(prog)s --current                          # Analyze current (last 24h) data
+  %(prog)s --date 2025-05-09                  # Analyze specific historical date
   %(prog)s --inactive-months 6                # Consider 6-month inactivity
   %(prog)s --exclude-keyword "backup"         # Exclude gauges with "backup"
   %(prog)s --log-level DEBUG                  # Verbose output
@@ -81,26 +82,40 @@ Filters Applied:
   - Name filter: Exclude gauges matching keyword (default: "test")
 
 Input:
-  Reads from: outputs/rain_gauges/raw/
+  Current mode: outputs/rain_gauges/raw/
+  Historical mode: outputs/rain_gauges/historical/DATE/raw/
 
 Output:
-  Filtered data: outputs/rain_gauges/analyze/rain_gauge_analysis_YYYYMMDD.csv
-  Summary: outputs/rain_gauges/analyze/analysis_summary.json
+  Current mode: outputs/rain_gauges/analyze/
+  Historical mode: outputs/rain_gauges/historical/DATE/analyze/
 
 Duration:
   Typically 2-3 minutes depending on dataset size.
         """
     )
     
-    # NOTE: --current is a NO-OP alias for CLI consistency with radar scripts
-    # Rain gauge analyzer always reads from outputs/rain_gauges/raw/
-    parser.add_argument(
+    # Data source options (mutually exclusive)
+    source_group = parser.add_argument_group('Data Source (choose one or auto-detect)')
+    source_mutex = source_group.add_mutually_exclusive_group()
+    
+    source_mutex.add_argument(
         "--current",
         action="store_true",
-        help="Alias for convenience (no effect). Analyze latest raw data."
+        help="Analyze current (last 24h) data explicitly. "
+             "Uses outputs/rain_gauges/raw/"
     )
     
-    parser.add_argument(
+    source_mutex.add_argument(
+        "--date",
+        metavar="YYYY-MM-DD",
+        help="Analyze specific historical date. "
+             "Example: --date 2025-05-09"
+    )
+    
+    # Filter options
+    filter_group = parser.add_argument_group('Filter Options')
+    
+    filter_group.add_argument(
         "--inactive-months",
         type=int,
         default=INACTIVE_THRESHOLD_MONTHS,
@@ -108,7 +123,7 @@ Duration:
         help=f"Consider gauge inactive if no data in last N months (default: {INACTIVE_THRESHOLD_MONTHS})"
     )
     
-    parser.add_argument(
+    filter_group.add_argument(
         "--exclude-keyword",
         type=str,
         default=DEFAULT_EXCLUDE_KEYWORD,
@@ -116,17 +131,21 @@ Duration:
         help=f'Exclude gauges with KEYWORD in name (default: "{DEFAULT_EXCLUDE_KEYWORD}")'
     )
     
-    parser.add_argument(
+    # Logging options
+    log_group = parser.add_argument_group('Logging Options')
+    
+    log_group.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
         help="Set logging level (default: INFO)"
     )
     
+    # Metadata
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 1.0.1"
+        version="%(prog)s 1.1.0"
     )
     
     return parser.parse_args()
@@ -177,14 +196,27 @@ def main() -> int:
         logger.info("=" * 80)
         logger.info("Starting Rain Gauge Data Filtering and Analysis")
         logger.info("=" * 80)
+        
+        # Determine mode
+        if args.date:
+            logger.info(f"Mode: Historical ({args.date})")
+            input_date = args.date
+        elif args.current:
+            logger.info("Mode: Current (last 24h)")
+            input_date = None
+        else:
+            logger.info("Mode: Auto-detect (prefers historical)")
+            input_date = None
+        
         logger.info(f"Inactive threshold: {args.inactive_months} months")
         logger.info(f"Exclude keyword: '{args.exclude_keyword}'")
         logger.info("=" * 80)
         
-        # Run analysis
+        # Run analysis with date parameter
         result = run_filter_active_gauges(
             inactive_months=args.inactive_months,
-            exclude_keyword=args.exclude_keyword
+            exclude_keyword=args.exclude_keyword,
+            input_date=input_date
         )
         
         # Display analysis report
@@ -211,7 +243,7 @@ def main() -> int:
         logger.error(f"❌ File not found: {e}")
         logger.error("\nPossible causes:")
         logger.error("1. Raw gauge data not collected yet - run retrieve_rain_gauges.py first")
-        logger.error("2. Missing outputs/rain_gauges/raw/ directory")
+        logger.error("2. Missing outputs/rain_gauges/raw/ or historical directory")
         logger.error("3. No JSON files in raw data directory")
         return 1
         
@@ -226,6 +258,7 @@ def main() -> int:
         logger.error("1. Corrupted raw data files")
         logger.error("2. Invalid filter parameters (check --inactive-months)")
         logger.error("3. Empty or malformed JSON files")
+        logger.error("4. Invalid date format (use YYYY-MM-DD)")
         return 1
         
     except Exception as e:
@@ -247,3 +280,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

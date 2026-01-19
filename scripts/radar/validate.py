@@ -68,7 +68,7 @@ from moata_pipeline.logging_setup import setup_logging
 __version__ = "1.1.0"
 
 # Default settings
-DEFAULT_PROPORTION_THRESHOLD = 0.30  # 30% of catchment area
+DEFAULT_PROPORTION_THRESHOLD = 0.25  # 30% of catchment area
 DEFAULT_ARI_THRESHOLD = 5.0  # years (used in analysis)
 
 
