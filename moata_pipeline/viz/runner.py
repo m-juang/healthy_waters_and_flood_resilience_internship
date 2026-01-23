@@ -145,7 +145,24 @@ def run_visual_report(
         # Step 5: Build main report
         logger.info("")
         logger.info("Step 4: Building main report...")
-        build_report(df, out_dir)
+        
+        # Determine data period from directory name (format: YYYYMMDD-YYYYMMDD)
+        data_period = None
+        try:
+            # Try to extract from path like outputs/rain_gauges/20260120-20260121/...
+            parent_parts = csv_path.parts
+            for part in parent_parts:
+                if len(part) == 17 and part[8] == "-":  # YYYYMMDD-YYYYMMDD
+                    start_str = part[:8]
+                    end_str = part[9:]
+                    start_date = f"{start_str[:4]}-{start_str[4:6]}-{start_str[6:8]}"
+                    end_date = f"{end_str[:4]}-{end_str[4:6]}-{end_str[6:8]}"
+                    data_period = (start_date, end_date)
+                    break
+        except Exception:
+            pass
+        
+        build_report(df, out_dir, data_period=data_period, input_date=input_date)
         logger.info("✓ Main report complete")
         
         # Final output path

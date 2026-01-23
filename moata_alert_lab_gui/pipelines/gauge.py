@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Callable, List, Tuple, TYPE_CHECKING
 
 from .base import BasePipeline
-from ..components import show_date_selection_dialog
 
 if TYPE_CHECKING:
     from ..main import ModernApp
@@ -72,6 +71,8 @@ class GaugePipeline(BasePipeline):
              self.run_validate, self.app.colors["step4"]),
             ("5", "Visualize Validation", "Create validation dashboard (Optional)",
              self.run_visualize_validation, self.app.colors["step5"]),
+            ("6", "Check Alarms", "Check rainfall alarms in last 24 hours with verification",
+             self.run_check_alarms, self.app.colors["step1"]),
         ]
     
     # =========================================================================
@@ -79,103 +80,16 @@ class GaugePipeline(BasePipeline):
     # =========================================================================
     
     def run_retrieve(self) -> None:
-        """Run retrieve step with date selection."""
-        # If dates were pre-filled from CLI, use them directly
-        if self.initial_start_time and self.initial_end_time:
-            duration_days = (self.initial_end_time - self.initial_start_time).days
-            if duration_days == 1:
-                # Single date
-                self._run_retrieve_with_date(
-                    self.initial_start_time.strftime('%Y-%m-%d')
-                )
-            else:
-                # Date range
-                self._run_retrieve_with_range(
-                    self.initial_start_time.strftime('%Y-%m-%d'),
-                    self.initial_end_time.strftime('%Y-%m-%d')
-                )
+        """Run retrieve step - simple date picker."""
+        date_str = self._get_date_from_user("Select Date to Retrieve")
+        if not date_str:
             return
         
-        # Otherwise show date selection dialog
-        selection = show_date_selection_dialog(
-            self.app,
-            title="Select Data to Retrieve",
-            options=[
-                ("📅  Current (Real-time Last 24h)", "current",
-                 "Retrieve gauge data from past 24 hours"),
-                ("📆  Specific Historical Date", "date",
-                 "Retrieve gauge data for a specific 24h period"),
-                ("📊  Date Range", "range",
-                 "Retrieve gauge data for multiple days"),
-            ],
-            colors=self.app.colors,
-        )
-        
-        if not selection:
-            return
-        
-        script = "scripts/gauge/retrieve.py"
-        args = []
-        
-        if selection == "date":
-            date_str = ctk.CTkInputDialog(
-                text="Enter date in YYYY-MM-DD format:",
-                title="Enter Date"
-            ).get_input()
-            if not date_str:
-                return
-            self._run_retrieve_with_date(date_str)
-            return
-        
-        elif selection == "range":
-            start_str = ctk.CTkInputDialog(
-                text="Enter START date in YYYY-MM-DD format:",
-                title="Enter Start Date"
-            ).get_input()
-            if not start_str:
-                return
-            
-            end_str = ctk.CTkInputDialog(
-                text="Enter END date in YYYY-MM-DD format:",
-                title="Enter End Date"
-            ).get_input()
-            if not end_str:
-                return
-            
-            self._run_retrieve_with_range(start_str, end_str)
-            return
-        
-        # selection == "current" - no args (default: last 24h)
-        self.app.executor.execute(
-            "Step 1: Retrieve Data",
-            script,
-            args,
-            self._on_retrieve_complete
-        )
-    
-    def _run_retrieve_with_date(self, date_str: str) -> None:
-        """Run retrieve with specified single date."""
-        script = "scripts/gauge/retrieve.py"
-        args = ["--date", date_str]
         self.app.selected_date = date_str
-        
         self.app.executor.execute(
             "Step 1: Retrieve Data",
-            script,
-            args,
-            self._on_retrieve_complete
-        )
-    
-    def _run_retrieve_with_range(self, start_str: str, end_str: str) -> None:
-        """Run retrieve with specified date range."""
-        script = "scripts/gauge/retrieve.py"
-        args = ["--start", start_str, "--end", end_str]
-        self.app.selected_date = f"{start_str} to {end_str}"
-        
-        self.app.executor.execute(
-            "Step 1: Retrieve Data",
-            script,
-            args,
+            "scripts/gauge/retrieve.py",
+            ["--date", date_str],
             self._on_retrieve_complete
         )
     
@@ -194,56 +108,25 @@ class GaugePipeline(BasePipeline):
         self.app.show_pipeline_steps()
     
     def run_analyze(self) -> None:
-        """Run analyze step with date selection."""
-        selection = show_date_selection_dialog(
-            self.app,
-            title="Select Data to Analyze",
-            options=[
-                ("🔍  Auto-Detect Most Recent", "auto",
-                 "Automatically find the latest data (prefers historical)"),
-                ("📅  Current (Last 24h)", "current",
-                 "Analyze real-time data from outputs/rain_gauges/raw/"),
-                ("📆  Specific Historical Date", "date",
-                 "Choose a specific date to analyze"),
-            ],
-            colors=self.app.colors,
-        )
-        
-        if not selection:
+        """Run analyze step - simple date picker."""
+        date_str = self._get_date_from_user("Select Date to Analyze")
+        if not date_str:
             return
         
-        script = "scripts/gauge/analyze.py"
-        args = []
-        
-        if selection == "current":
-            args = ["--current"]
-            self.app.selected_date = None
-        elif selection == "date":
-            date_str = ctk.CTkInputDialog(
-                text="Enter date in YYYY-MM-DD format:",
-                title="Enter Date"
-            ).get_input()
-            if not date_str:
-                return
-            args = ["--date", date_str]
-            self.app.selected_date = date_str
-        else:
-            self.app.selected_date = None
-        
+        self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 2: Analyze Data",
-            script,
-            args,
+            "scripts/gauge/analyze.py",
+            ["--date", date_str],
             self._on_analyze_complete
         )
     
     def _on_analyze_complete(self, success: bool) -> None:
         """Handle analyze completion."""
         if success:
-            output_dir = str(self.paths.rain_gauges_analyze_dir)
             messagebox.showinfo(
                 "Success",
-                f"✅ Analysis complete!\n\nResults saved to:\n{output_dir}"
+                "✅ Analysis complete!\n\nReady to proceed to Visualization."
             )
         else:
             messagebox.showerror(
@@ -253,71 +136,35 @@ class GaugePipeline(BasePipeline):
         self.app.show_pipeline_steps()
     
     def run_visualize(self) -> None:
-        """Run visualize step with date selection."""
-        selection = show_date_selection_dialog(
-            self.app,
-            title="Select Data to Visualize",
-            options=[
-                ("🔍  Auto-Detect Most Recent", "auto",
-                "Automatically find the latest data (prefers historical)"),
-                
-                ("📅  Current (Last 24h)", "current",
-                "Visualize real-time data from outputs/rain_gauges/analyze/"),
-                
-                ("📆  Specific Historical Date", "date",
-                "Choose a specific date to visualize"),
-            ],
-            colors=self.app.colors,
-        )
-        
-        if not selection:
+        """Run visualize step - simple date picker."""
+        date_str = self._get_date_from_user("Select Date to Visualize")
+        if not date_str:
             return
         
-        script = "scripts/gauge/visualize.py"
-        args = []
-        
-        if selection == "current":
-            args = ["--current"]
-            self.app.selected_date = None
-        elif selection == "date":
-            date_str = ctk.CTkInputDialog(
-                text="Enter date in YYYY-MM-DD format:",
-                title="Enter Date"
-            ).get_input()
-            if not date_str:
-                return
-            args = ["--date", date_str]
-            self.app.selected_date = date_str
-        else:  # auto
-            self.app.selected_date = None
-        
+        self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 3: Visualize Results",
-            script,
-            args,
+            "scripts/gauge/visualize.py",
+            ["--date", date_str],
             self._on_visualize_complete
         )
     
     def _on_visualize_complete(self, success: bool) -> None:
         """Handle visualize completion."""
         if success:
-            base_dir = self.paths.rain_gauges_viz_dir
-            
-            html_files = []
-            if base_dir.exists():
-                html_files = list(base_dir.glob("**/*.html"))
-            
-            if html_files:
-                most_recent = max(html_files, key=lambda p: p.stat().st_mtime)
-                self.app.output_dir = str(most_recent.parent)
-            else:
-                self.app.output_dir = str(base_dir)
+            # Update output_dir to the visualization directory
+            from moata_pipeline.common.paths import get_paths
+            paths = get_paths()
+            if self.app.selected_date:
+                viz_dir = paths.get_gauge_viz_dir(self.app.selected_date)
+                if viz_dir.exists():
+                    self.app.output_dir = str(viz_dir)
+                    print(f"Updated output_dir to: {self.app.output_dir}")
             
             result = messagebox.askyesno(
                 "Success",
-                f"✅ Visualization complete!\n\n"
-                f"Dashboard saved to:\n{self.app.output_dir}\n\n"
-                f"Open dashboard now?"
+                "✅ Visualization complete!\n\n"
+                "Open dashboard now?"
             )
             if result:
                 self._open_dashboard()
@@ -348,94 +195,87 @@ class GaugePipeline(BasePipeline):
         dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
         abs_path = str(dashboard_path.resolve())
         
-        # print(f"DEBUG: Attempting to open: {abs_path}")
+        print(f"[DEBUG] Attempting to open dashboard: {abs_path}")
         
         # Try multiple methods in order
-        success = False
         error_msg = ""
         
         # Method 1: os.startfile (Windows - most reliable)
         if sys.platform == 'win32':
             try:
-                # print("DEBUG: Trying os.startfile...")
+                print("[DEBUG] Trying os.startfile...")
                 os.startfile(abs_path)
-                success = True
-                # print("DEBUG: os.startfile SUCCESS")
+                print("[DEBUG] os.startfile called successfully")
                 return
             except Exception as e:
                 error_msg += f"os.startfile: {e}\n"
-                # print(f"DEBUG: os.startfile failed: {e}")
+                print(f"[DEBUG] os.startfile failed: {e}")
         
-        # Method 2: webbrowser.open
-        if not success:
-            try:
-                # print("DEBUG: Trying webbrowser.open...")
-                webbrowser.open(dashboard_path.as_uri())
-                success = True
-                # print("DEBUG: webbrowser.open SUCCESS")
+        # Method 2: webbrowser.open with file URI
+        try:
+            print("[DEBUG] Trying webbrowser.open with file URI...")
+            file_uri = dashboard_path.as_uri()
+            print(f"File URI: {file_uri}")
+            result = webbrowser.open(file_uri)
+            print(f"[DEBUG] webbrowser.open returned: {result}")
+            if result:
                 return
-            except Exception as e:
-                error_msg += f"webbrowser: {e}\n"
-                # print(f"DEBUG: webbrowser.open failed: {e}")
+        except Exception as e:
+            error_msg += f"webbrowser (uri): {e}\n"
+            print(f"[DEBUG] webbrowser.open (uri) failed: {e}")
         
-        # Method 3: subprocess (platform-specific)
-        if not success:
-            try:
-                if sys.platform == 'win32':
-                    # print("DEBUG: Trying subprocess with cmd /c start...")
-                    subprocess.run(['cmd', '/c', 'start', '', abs_path], shell=True)
-                    success = True
-                elif sys.platform == 'darwin':
-                    # print("DEBUG: Trying subprocess with open...")
-                    subprocess.run(['open', abs_path])
-                    success = True
-                else:
-                    # print("DEBUG: Trying subprocess with xdg-open...")
-                    subprocess.run(['xdg-open', abs_path])
-                    success = True
-                # print("DEBUG: subprocess SUCCESS")
+        # Method 3: webbrowser.open with file path directly
+        try:
+            print("[DEBUG] Trying webbrowser.open with path...")
+            result = webbrowser.open(abs_path)
+            print(f"[DEBUG] webbrowser.open (path) returned: {result}")
+            if result:
                 return
-            except Exception as e:
-                error_msg += f"subprocess: {e}\n"
-                # print(f"DEBUG: subprocess failed: {e}")
+        except Exception as e:
+            error_msg += f"webbrowser (path): {e}\n"
+            print(f"[DEBUG] webbrowser.open (path) failed: {e}")
         
-        # All methods failed
-        if not success:
-            messagebox.showerror(
-                "Cannot Open Browser",
-                f"Could not open dashboard automatically.\n\n"
-                f"Please open manually:\n{abs_path}\n\n"
-                f"Errors:\n{error_msg}"
-            )
+        # Method 4: subprocess (platform-specific)
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying subprocess with explorer...")
+                subprocess.Popen(['explorer', abs_path])
+                print("[DEBUG] subprocess explorer called successfully")
+                return
+        except Exception as e:
+            error_msg += f"subprocess explorer: {e}\n"
+            print(f"[DEBUG] subprocess explorer failed: {e}")
+        
+        # Method 5: cmd /c start
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying cmd /c start...")
+                subprocess.Popen(f'cmd /c start "" "{abs_path}"', shell=True)
+                print("[DEBUG] cmd /c start called successfully")
+                return
+        except Exception as e:
+            error_msg += f"subprocess cmd: {e}\n"
+            print(f"[DEBUG] subprocess cmd failed: {e}")
+        
+        # All methods failed - show path to user
+        messagebox.showerror(
+            "Cannot Open Browser",
+            f"Could not open dashboard automatically.\n\n"
+            f"Please open manually:\n{abs_path}\n\n"
+            f"Errors:\n{error_msg}"
+        )
     
     def run_validate(self) -> None:
-        """Run validate step with file selection."""
-        input_file = filedialog.askopenfilename(
-            title="Select historical alarm events CSV",
-            initialdir=str(Path.cwd() / "data" / "inputs"),
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-        )
-        if not input_file:
+        """Run validate step - simple date picker."""
+        date_str = self._get_date_from_user("Select Date to Validate")
+        if not date_str:
             return
         
-        output_dir = filedialog.askdirectory(
-            title="Select output directory for validation results",
-            initialdir=str(self.paths.outputs_root),
-        )
-        if not output_dir:
-            return
-        
-        self.app.output_dir = output_dir
-        script = "scripts/gauge/validate.py"
-        args = [
-            "--input", input_file,
-            "--output", str(Path(output_dir) / "ari_alarm_validation.csv")
-        ]
-        
+        self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 4: Validate Alarms",
-            script,
-            args,
+            "scripts/gauge/validate.py",
+            ["--date", date_str],
             self._on_validate_complete
         )
     
@@ -444,7 +284,7 @@ class GaugePipeline(BasePipeline):
         if success:
             messagebox.showinfo(
                 "Success",
-                f"✅ Validation complete!\n\nResults saved to:\n{self.app.output_dir}"
+                "✅ Validation complete!\n\nReady to proceed to Visualization."
             )
         else:
             messagebox.showerror(
@@ -454,30 +294,16 @@ class GaugePipeline(BasePipeline):
         self.app.show_pipeline_steps()
     
     def run_visualize_validation(self) -> None:
-        """Run visualize validation step."""
-        input_file = filedialog.askopenfilename(
-            title="Select validation results CSV",
-            initialdir=str(self.paths.outputs_root),
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-        )
-        if not input_file:
+        """Run visualize validation step - simple date picker."""
+        date_str = self._get_date_from_user("Select Date to Visualize Validation")
+        if not date_str:
             return
         
-        output_dir = filedialog.askdirectory(
-            title="Select output directory for validation visualization",
-            initialdir=str(self.paths.outputs_root),
-        )
-        if not output_dir:
-            return
-        
-        self.app.output_dir = output_dir
-        script = "scripts/gauge/visualize_validation.py"
-        args = ["--input", input_file, "--output", output_dir]
-        
+        self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 5: Visualize Validation",
-            script,
-            args,
+            "scripts/gauge/visualize_validation.py",
+            [],
             self._on_visualize_validation_complete
         )
     
@@ -487,62 +313,272 @@ class GaugePipeline(BasePipeline):
         import os
         import sys
         import subprocess
+        from moata_pipeline.common.paths import get_paths
+        paths = get_paths()
         
-        dashboard_dir = Path(self.app.output_dir)
-        html_files = list(dashboard_dir.glob("**/*.html"))
+        dashboard_dir = Path(self.app.output_dir) if self.app.output_dir else None
+        
+        # If no output_dir, try to find it from selected_date
+        if not dashboard_dir or not dashboard_dir.exists():
+            if self.app.selected_date:
+                # Look for validation files in analysis directory
+                analyze_dir = paths.get_gauge_analyze_dir(self.app.selected_date)
+                if analyze_dir.exists():
+                    dashboard_dir = analyze_dir
+                    self.app.output_dir = str(dashboard_dir)
+        
+        # Always look for validation dashboard in outputs/rain_gauges/validation
+        validation_dir = paths.outputs_root / "rain_gauges" / "validation"
+        html_files = []
+        if validation_dir.exists():
+            html_files = list(validation_dir.glob("**/*.html"))
+        # If not found, search all validation subfolders in outputs/rain_gauges
+        if not html_files:
+            rg_dir = paths.outputs_root / "rain_gauges"
+            html_files = list(rg_dir.glob("**/validation/*.html"))
+        if not html_files:
+            messagebox.showwarning(
+                "Not Found",
+                f"No dashboard HTML files found in any validation folder under:\n{paths.outputs_root / 'rain_gauges'}"
+            )
+            return
+        dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
+        abs_path = str(dashboard_path.resolve())
+        
+        print(f"[DEBUG] Attempting to open validation dashboard: {abs_path}")
+        
+        # Try os.startfile first (most reliable on Windows)
+        if sys.platform == 'win32':
+            try:
+                print("[DEBUG] Trying os.startfile...")
+                os.startfile(abs_path)
+                print("[DEBUG] os.startfile called successfully")
+                return
+            except Exception as e:
+                print(f"os.startfile failed: {e}")
+        
+        # Fallback to webbrowser with file URI
+        try:
+            print("[DEBUG] Trying webbrowser.open...")
+            result = webbrowser.open(dashboard_path.as_uri())
+            print(f"[DEBUG] webbrowser.open returned: {result}")
+            if result:
+                return
+        except Exception as e:
+            print(f"webbrowser.open failed: {e}")
+        
+        # Fallback to subprocess explorer
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying subprocess explorer...")
+                subprocess.Popen(['explorer', abs_path])
+                print("[DEBUG] subprocess explorer called successfully")
+                return
+        except Exception as e:
+            print(f"subprocess explorer failed: {e}")
+        
+        # Fallback to cmd /c start
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying cmd /c start...")
+                subprocess.Popen(f'cmd /c start "" "{abs_path}"', shell=True)
+                print("[DEBUG] cmd /c start called successfully")
+                return
+        except Exception as e:
+            print(f"cmd /c start failed: {e}")
+        
+        messagebox.showerror(
+            "Cannot Open Browser",
+            f"Could not open dashboard automatically.\n\n"
+            f"Please open manually:\n{abs_path}"
+        )
+    
+    def _on_visualize_validation_complete(self, success: bool) -> None:
+        """Handle visualize validation completion."""
+        if success:
+            # Update output_dir to the analysis directory (where validation outputs go)
+            from moata_pipeline.common.paths import get_paths
+            paths = get_paths()
+            if self.app.selected_date:
+                analyze_dir = paths.get_gauge_analyze_dir(self.app.selected_date)
+                if analyze_dir.exists():
+                    self.app.output_dir = str(analyze_dir)
+                    print(f"Updated output_dir to: {self.app.output_dir}")
+            
+            result = messagebox.askyesno(
+                "Success",
+                "✅ Validation visualization complete!\n\n"
+                "Open dashboard now?"
+            )
+            if result:
+                self._open_validation_dashboard()
+        else:
+            messagebox.showerror(
+                "Error",
+                "❌ Validation visualization failed!\n\nCheck the logs for details."
+            )
+        self.app.show_pipeline_steps()
+    
+    def run_check_alarms(self) -> None:
+        """Run check alarms step - datetime picker for end time."""
+        datetime_str = self._get_datetime_from_user("Select End Time for Alarm Check")
+        if not datetime_str:
+            return
+        
+        self.app.executor.execute(
+            "Step 6: Check Alarms",
+            "scripts/gauge/check_alarms.py",
+            ["--datetime", datetime_str],
+            self._on_check_alarms_complete
+        )
+    
+    def _get_datetime_from_user(self, title: str) -> str:
+        """Show datetime picker dialog and return datetime string."""
+        from datetime import datetime
+        
+        dialog = ctk.CTkToplevel(self.app)
+        dialog.title(title)
+        dialog.geometry("350x200")
+        dialog.transient(self.app)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (175)
+        y = (dialog.winfo_screenheight() // 2) - (100)
+        dialog.geometry(f"+{x}+{y}")
+        
+        result = {"value": None}
+        
+        # Date frame
+        date_frame = ctk.CTkFrame(dialog)
+        date_frame.pack(pady=10, padx=20, fill="x")
+        
+        ctk.CTkLabel(date_frame, text="Date (YYYY-MM-DD):").pack(side="left")
+        date_entry = ctk.CTkEntry(date_frame, width=120)
+        date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        date_entry.pack(side="right")
+        
+        # Time frame
+        time_frame = ctk.CTkFrame(dialog)
+        time_frame.pack(pady=10, padx=20, fill="x")
+        
+        ctk.CTkLabel(time_frame, text="Time (HH:MM) NZDT:").pack(side="left")
+        time_entry = ctk.CTkEntry(time_frame, width=120)
+        time_entry.insert(0, datetime.now().strftime("%H:%M"))
+        time_entry.pack(side="right")
+        
+        def on_ok():
+            date_val = date_entry.get().strip()
+            time_val = time_entry.get().strip()
+            result["value"] = f"{date_val} {time_val}"
+            dialog.destroy()
+        
+        def on_cancel():
+            dialog.destroy()
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(dialog)
+        btn_frame.pack(pady=20)
+        
+        ctk.CTkButton(btn_frame, text="OK", command=on_ok, width=80).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Cancel", command=on_cancel, width=80).pack(side="left", padx=10)
+        
+        dialog.wait_window()
+        return result["value"]
+    
+    def _on_check_alarms_complete(self, success: bool) -> None:
+        """Handle check alarms completion."""
+        if success:
+            result = messagebox.askyesno(
+                "Success",
+                "✅ Alarm check complete!\n\n"
+                "Open alarm dashboard now?"
+            )
+            if result:
+                self._open_alarm_dashboard()
+        else:
+            messagebox.showerror(
+                "Error",
+                "❌ Alarm check failed!\n\nCheck the logs for details."
+            )
+        self.app.show_pipeline_steps()
+    
+    def _open_alarm_dashboard(self) -> None:
+        """Open the alarm dashboard."""
+        import webbrowser
+        import os
+        import sys
+        import subprocess
+        
+        # Look for most recent alarm dashboard
+        from moata_pipeline.common.paths import get_paths
+        paths = get_paths()
+        
+        # Try outputs/rain_gauges/alarms first
+        dashboard_dir = paths.outputs_root / "rain_gauges" / "alarms"
+        html_files = list(dashboard_dir.glob("**/alarm_dashboard.html"))
+        
+        if not html_files:
+            # Try broader search in rain_gauges
+            dashboard_dir = paths.outputs_root / "rain_gauges"
+            html_files = list(dashboard_dir.glob("**/alarm_dashboard.html"))
         
         if not html_files:
             messagebox.showwarning(
                 "Not Found",
-                f"No dashboard HTML files found in:\n{dashboard_dir}"
+                f"No alarm dashboard found in:\n{dashboard_dir}\n\n"
+                f"Run Check Alarms step first."
             )
             return
         
         dashboard_path = max(html_files, key=lambda p: p.stat().st_mtime)
         abs_path = str(dashboard_path.resolve())
         
+        print(f"[DEBUG] Attempting to open alarm dashboard: {abs_path}")
+        
         # Try os.startfile first (most reliable on Windows)
         if sys.platform == 'win32':
             try:
+                print("[DEBUG] Trying os.startfile...")
                 os.startfile(abs_path)
+                print("[DEBUG] os.startfile called successfully")
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"os.startfile failed: {e}")
         
         # Fallback to webbrowser
         try:
-            webbrowser.open(dashboard_path.as_uri())
-        except Exception as e:
-            messagebox.showerror(
-                "Cannot Open Browser",
-                f"Could not open dashboard automatically.\n\n"
-                f"Please open manually:\n{abs_path}\n\n"
-                f"Error: {e}"
-            )
-    
-    def _on_visualize_validation_complete(self, success: bool) -> None:
-        """Handle visualize validation completion."""
-        if success:
-            result = messagebox.askyesno(
-                "Success",
-                f"✅ Validation visualization complete!\n\n"
-                f"Dashboard saved to:\n{self.app.output_dir}\n\n"
-                f"Open dashboard now?"
-            )
-            
+            print("[DEBUG] Trying webbrowser.open...")
+            result = webbrowser.open(dashboard_path.as_uri())
+            print(f"[DEBUG] webbrowser.open returned: {result}")
             if result:
-                # Use the robust method
-                self._open_validation_dashboard()
-            
-            # Show completion message AFTER dashboard interaction
-            messagebox.showinfo(
-                "Pipeline Complete!",
-                "🎉 All steps completed!\n\nGauge pipeline finished successfully."
-            )
-        else:
-            messagebox.showerror(
-                "Error",
-                "❌ Validation visualization failed!\n\nCheck the logs for details."
-            )
+                return
+        except Exception as e:
+            print(f"webbrowser.open failed: {e}")
         
-        self.app.show_pipeline_steps()
+        # Fallback to subprocess explorer
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying subprocess explorer...")
+                subprocess.Popen(['explorer', abs_path])
+                print("[DEBUG] subprocess explorer called successfully")
+                return
+        except Exception as e:
+            print(f"subprocess explorer failed: {e}")
+        
+        # Fallback to cmd /c start
+        try:
+            if sys.platform == 'win32':
+                print("[DEBUG] Trying cmd /c start...")
+                subprocess.Popen(f'cmd /c start "" "{abs_path}"', shell=True)
+                print("[DEBUG] cmd /c start called successfully")
+                return
+        except Exception as e:
+            print(f"cmd /c start failed: {e}")
+        
+        messagebox.showerror(
+            "Cannot Open Browser",
+            f"Could not open dashboard automatically.\n\n"
+            f"Please open manually:\n{abs_path}"
+        )

@@ -1,6 +1,12 @@
 ﻿# Auckland Council MOATA AlertLab
 
-Pipeline for collecting, analyzing, and visualizing rain monitoring data from Moata API.
+An automated pipeline for monitoring rainfall across Auckland region using data from Moata API. The system collects rain gauge measurements and rain radar data, calculates Average Recurrence Intervals (ARI) based on TP108 standards, validates alarm configurations, and generates interactive HTML dashboards for analysis.
+
+**Key Features:**
+- 🌧️ **Rain Gauge Pipeline** - Point-based rainfall measurements with alarm validation
+- 📡 **Rain Radar Pipeline** - Spatial rainfall coverage across catchment areas
+- 📊 **ARI Calculation** - Intensity-Duration-Frequency analysis using TP108 standards
+- 📈 **Interactive Dashboards** - HTML visualizations with charts and maps
 
 > **Internship Project**: Auckland Council (COMPSCI 778)  
 > **Version**: 2.0.0 (Updated Jan 2026)
@@ -81,38 +87,20 @@ MOATA_CLIENT_SECRET=xxxxxxxxx
 │  RAIN GAUGE PIPELINE (Point Measurements)           │
 ├─────────────────────────────────────────────────────┤
 │  1. RETRIEVE  → Collect gauge data from API         │
-│                 (~120 minutes)                      │
-│                                                     │
 │  2. ANALYZE   → Filter & analyze configurations     │
-│                 (~2-3 minutes)                      │
-│                                                     │
 │  3. VISUALIZE → Generate HTML dashboard             │
-│                 (~3-5 minutes)                      │
-│                                                     │
-│  4. VALIDATE  → Validate ARI alarm events           │
-│                 (optional, ~5-10 minutes)           │
-│                                                     │
-│  5. VIZ VAL   → Validation dashboard                │
-│                 (optional, <1 minute)               │
+│  4. VALIDATE  → Validate ARI alarm events (opt)     │
+│  5. VIZ VAL   → Validation dashboard (opt)          │
 └─────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
 │  RAIN RADAR PIPELINE (Spatial Coverage)             │
 ├─────────────────────────────────────────────────────┤
-│  1. RETRIEVE  → Collect radar data for catchments   │
-│                 (~60 minutes)                       |
-│                                                     │
-│  2. ANALYZE   → Calculate ARI using TP108           │
-│                 (~10-15 minutes)                    │
-│                                                     │
-│  3. VISUALIZE → Generate HTML dashboard             │
-│                 (~5-7 minutes)                      │
-│                                                     │
-│  4. VALIDATE  → Validate spatial alarm thresholds   │
-│                 (optional, <1 minute)               │
-│                                                     │
-│  5. VIZ VAL   → Validation dashboard                │
-│                 (optional, <1 minute)               │
+│  1. RETRIEVE     → Collect radar data for catchments│
+│  2. ANALYZE      → Calculate ARI using TP108        │
+│  3. VISUALIZE    → Generate HTML dashboard          │
+│  4. CHECK ALARMS → Check alarm trigger status (opt) │
+│  5. VIZ ALARMS   → Alarm status visualization (opt) │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -133,27 +121,30 @@ python scripts/gauge/analyze.py
 python scripts/gauge/visualize.py
 
 # 4. Open dashboard
-# outputs/rain_gauges/visualizations/dashboard.html
+# outputs/rain_gauges/YYYYMMDD-YYYYMMDD/visualizations/dashboard.html
 ```
 
-### 📊 Daily Usage Pattern
+### 📊 Daily Usage
 
-**Recommended workflow:**
+**Simple daily workflow (no date argument needed):**
 
 ```bash
-# Morning: Collect yesterday's data
-python scripts/gauge/retrieve.py --date 2025-01-09
+# Rain Gauge Pipeline - automatically uses last 24 hours
+python scripts/gauge/retrieve.py
 python scripts/gauge/analyze.py
 python scripts/gauge/visualize.py
+python scripts/gauge/validate.py              # optional
+python scripts/gauge/visualize_validation.py  # optional
 
-# Check dashboard for any issues
-# outputs/rain_gauges/visualizations/dashboard.html
-
-# Weekly: Run radar analysis
-python scripts/radar/retrieve.py --date 2025-01-09
-python scripts/radar/analyze.py --date 2025-01-09
-python scripts/radar/visualize.py --date 2025-01-09
+# Rain Radar Pipeline - automatically uses last 24 hours
+python scripts/radar/retrieve.py
+python scripts/radar/analyze.py
+python scripts/radar/visualize.py
+python scripts/alarms/check_radar_alarms.py   # optional
+python scripts/alarms/visualize_alarms.py     # optional
 ```
+
+Data is stored in folder format `YYYYMMDD-YYYYMMDD` based on script execution time.
 
 ---
 
@@ -188,17 +179,19 @@ python moata_alert_lab.py
 ### Rain Gauge Pipeline
 
 ```bash
-# 1. Retrieve data from API (~5-10 minutes)
+# 1. Retrieve data from API
 python scripts/gauge/retrieve.py
 
-# 2. Analyze data (~2-3 minutes)
+# 2. Analyze data
 python scripts/gauge/analyze.py
 
-# 3. Generate HTML dashboard (~3-5 minutes)
+# 3. Generate HTML dashboard
 python scripts/gauge/visualize.py
 
 # 4. [Optional] Validate alarms
 python scripts/gauge/validate.py
+
+# 5. [Optional] Validation dashboard
 python scripts/gauge/visualize_validation.py
 ```
 
@@ -211,16 +204,27 @@ python scripts/gauge/retrieve.py --help
 
 **Current Data (Last 24 hours):**
 ```bash
+# 1. Retrieve radar data
 python scripts/radar/retrieve.py
-python scripts/radar/analyze.py --current
+
+# 2. Analyze with TP108 ARI
+python scripts/radar/analyze.py
+
+# 3. Generate HTML dashboard
 python scripts/radar/visualize.py
+
+# 4. [Optional] Check alarm triggers
+python scripts/alarms/check_radar_alarms.py
+
+# 5. [Optional] Alarm visualization
+python scripts/alarms/visualize_alarms.py
 ```
 
-**Historical Data (Specific date):**
+**Historical Data (Specific date range):**
 ```bash
-python scripts/radar/retrieve.py --date 2025-05-09
-python scripts/radar/analyze.py --date 2025-05-09
-python scripts/radar/visualize.py --date 2025-05-09
+python scripts/radar/retrieve.py --start 2025-05-09 --end 2025-05-10
+python scripts/radar/analyze.py --date 20250509-20250510
+python scripts/radar/visualize.py --date 20250509-20250510
 ```
 
 ---
@@ -265,9 +269,10 @@ internship-project/
 │   │   ├── radar_cleaning.py       # Radar data cleaning
 │   │   └── radar_report.py         # Radar dashboard HTML
 │   │
-│   └── 📁 common/                  # Shared Utilities (12 files)
+│   └── 📁 common/                  # Shared Utilities (18 files)
 │       ├── __init__.py
-│       ├── paths.py                # Singleton path management
+│       ├── paths.py                # Centralized path management
+│       ├── config.py               # Configuration settings
 │       ├── constants.py            # Configuration constants
 │       ├── time_utils.py           # Datetime utilities
 │       ├── file_utils.py           # File operations
@@ -276,9 +281,14 @@ internship-project/
 │       ├── text_utils.py           # Text processing utilities
 │       ├── dataframe_utils.py      # Pandas helper functions
 │       ├── output_writer.py        # Output file writers
-|       ├── spatial_util.py         # pixels proportion witihn catchments
+│       ├── spatial_utils.py        # Pixel proportion within catchments
 │       ├── typing_utils.py         # Type conversion utilities
-│       └── iter_utils.py           # Iterator utilities
+│       ├── iter_utils.py           # Iterator utilities
+│       ├── validation.py           # Input validation utilities
+│       ├── script_utils.py         # CLI script utilities
+│       ├── error_handling.py       # Error handling utilities
+│       ├── exceptions.py           # Custom exception classes
+│       └── protocols.py            # Type protocols/interfaces
 │
 ├── 📁 moata_alert_lab_gui/         # GUI Application (10 files)
 │   ├── __init__.py                 # Package init
@@ -293,7 +303,7 @@ internship-project/
 │       ├── gauge.py                # Rain Gauge pipeline implementation
 │       └── radar.py                # Rain Radar pipeline implementation
 │
-├── 📁 scripts/                     # CLI Scripts (10 files)
+├── 📁 scripts/                     # CLI Scripts
 │   ├── 📁 gauge/                   # Rain Gauge scripts (5 files)
 │   │   ├── retrieve.py             # Data collection from API
 │   │   ├── analyze.py              # Data analysis & filtering
@@ -301,12 +311,15 @@ internship-project/
 │   │   ├── validate.py             # ARI alarm validation
 │   │   └── visualize_validation.py # Validation dashboard
 │   │
-│   └── 📁 radar/                   # Rain Radar scripts (5 files)
-│       ├── retrieve.py             # Radar data collection
-│       ├── analyze.py              # ARI analysis using TP108
-│       ├── visualize.py            # Radar dashboard generation
-│       ├── validate.py             # Spatial alarm validation
-│       └── visualize_validation.py # Validation dashboard
+│   ├── 📁 radar/                   # Rain Radar scripts (4 files)
+│   │   ├── retrieve.py             # Radar data collection
+│   │   ├── analyze.py              # ARI analysis using TP108
+│   │   ├── visualize.py            # Radar dashboard generation
+│   │   └── visualize_alarms.py     # Alarm visualization
+│   │
+│   └── 📁 alarms/                  # Alarm analysis scripts (2 files)
+│       ├── check_radar_alarms.py   # Check radar alarm status
+│       └── check_alarm_timeline.py # Alarm timeline analysis
 │
 ├── 📁 data/                        # Input data (static)
 │   └── 📁 inputs/
@@ -315,65 +328,44 @@ internship-project/
 │
 ├── 📁 outputs/                     # Generated outputs (Git-ignored)
 │   ├── 📁 rain_gauges/
-│   │   ├── 📁 raw/                 # Raw API data (JSON)
-│   │   │   ├── rain_gauges.json
-│   │   │   └── rain_gauges_traces_alarms.json
-│   │   ├── 📁 analyzed/            # Analysis results (CSV, TXT)
-│   │   │   ├── rain_gauge_analysis_YYYYMMDD.csv
-│   │   │   ├── alarm_summary.csv
-│   │   │   ├── alarm_summary_full.csv
-│   │   │   └── analysis_report.txt
-│   │   ├── 📁 visualizations/      # HTML dashboards
-│   │   │   ├── dashboard.html
-│   │   │   └── 📁 gauges/
-│   │   │       └── GAUGE_XXX.html
-│   │   ├── ari_alarm_validation.csv
-│   │   ├── 📁 validation_viz/      # Validation dashboards
-│   │   │   ├── validation_dashboard.html
-│   │   │   ├── validation_summary.png
-│   │   │   └── top_exceedances.png
-│   │   └── 📁 historical/          # Historical date-specific data
-│   │       └── YYYY-MM-DD/
-│   │           └── (same structure as above)
+│   │   └── 📁 YYYYMMDD-YYYYMMDD/   # Date range folder (e.g., 20260120-20260121)
+│   │       ├── 📁 raw/             # Raw API data (JSON)
+│   │       │   └── rain_gauges_traces_alarms.json
+│   │       ├── 📁 analysis/        # Analysis results (CSV, TXT)
+│   │       │   ├── alarm_summary.csv
+│   │       │   ├── alarm_summary_full.csv
+│   │       │   └── analysis_report.txt
+│   │       ├── 📁 visualizations/  # HTML dashboards
+│   │       │   ├── dashboard.html
+│   │       │   └── 📁 gauges/
+│   │       │       └── GAUGE_XXX.html
+│   │       └── 📁 validation/      # Validation outputs
+│   │           ├── ari_alarm_validation.csv
+│   │           └── validation_dashboard.html
 │   │
 │   └── 📁 rain_radar/
-│       ├── 📁 raw/                 # Current radar data
-│       │   ├── catchments.json
-│       │   ├── 📁 pixel_mappings/  # Catchment → pixel mappings (cached)
-│       │   │   └── catchment_XXX_pixels.json (~157 files)
-│       │   └── 📁 radar_data/      # Radar CSV data per catchment
-│       │       └── XXXX_CatchmentName.csv (~157 files)
-│       ├── 📁 analyze/              # ARI analysis results
-│       │   ├── ari_analysis_summary.csv
-│       │   ├── ari_exceedances.csv
-│       │   └── analysis_report.txt
-│       ├── 📁 dashboard/            # HTML dashboards
-│       │   ├── radar_dashboard.html
-│       │   ├── catchment_stats.csv
-│       │   └── 📁 charts/
-│       │       ├── rainfall_timeseries.png
-│       │       ├── top_catchments.png
-│       │       ├── ari_distribution.png
-│       │       └── spatial_heatmap.png
-│       ├── ari_alarm_validation.csv
-│       ├── 📁 validation_viz/      # Validation dashboards
-│       │   ├── validation_dashboard.html
-│       │   ├── ari_distribution.png
-│       │   ├── top_catchments.png
-│       │   ├── proportion_distribution.png
-│       │   └── validation_stats.csv
-│       └── 📁 historical/          # Historical data by date
-│           └── YYYY-MM-DD/
-│               └── (same structure as above)
+│       └── 📁 YYYYMMDD-YYYYMMDD/   # Date range folder (e.g., 20260120-20260121)
+│           ├── 📁 raw/             # Radar data
+│           │   ├── catchments.json
+│           │   ├── pixels.json     # Cached pixel mappings
+│           │   └── 📁 radar_data/  # Radar CSV per catchment
+│           │       └── XXXX_CatchmentName.csv (~233 files)
+│           ├── 📁 analysis/        # ARI analysis results
+│           │   ├── ari_analysis_summary.csv
+│           │   ├── ari_exceedances.csv
+│           │   └── analysis_report.txt
+│           ├── 📁 alarms/          # Alarm detection results
+│           │   └── alarm_status.csv
+│           └── 📁 visualizations/  # HTML dashboards
+│               └── radar_dashboard.html
 │
 ├── 🎨 Entry Points
-├── moata_alert_lab.py          # GUI launcher
-├── logging_setup.py                # Root logging config
+├── moata_alert_lab.py              # GUI launcher
 │
 ├── 📄 Configuration
 ├── .env                            # Credentials (Git-ignored, REQUIRED)
 ├── .env.example                    # Template for credentials
-├── requirements.txt                # Python dependencies (24 packages)
+├── requirements.txt                # Python dependencies
 ├── .gitignore                      # Git ignore rules
 │
 └── 📖 Documentation
@@ -381,10 +373,9 @@ internship-project/
 ```
 
 **Total Files:**
-- **Python Source**: 44 files
-- **CLI Scripts**: 10 files (5 gauge + 5 radar)
+- **Python Source**: ~50 files
+- **CLI Scripts**: 11 files (5 gauge + 4 radar + 2 alarms)
 - **GUI Files**: 10 files
-- **Lines of Code**: ~11,100 LOC
 
 ---
 
@@ -476,13 +467,13 @@ ARI = exp(m × D + b)
 ### Alarm Thresholds
 
 - **Rain Gauge**: ARI ≥ 5 years at single gauge point
-- **Rain Radar**: ≥30% catchment area with ARI ≥ 5 years (spatial threshold)
+- **Rain Radar**: ≥25% catchment area with ARI ≥ 5 years (spatial threshold)
 
 ### Data Sources
 
-- **Rain Gauges**: 76 gauges across Auckland
+- **Rain Gauges**: ~76 gauges across Auckland
 - **Stormwater Catchments**: 233 catchments
-- **Radar Pixels**: ~25k pixels total (~6-800 per catchment)
+- **Radar Pixels**: ~25k pixels total
 
 ---
 
@@ -509,13 +500,15 @@ customtkinter==5.2.2
 # Visualization
 matplotlib==3.10.8
 
+# Geospatial
+shapely==2.1.2
+pyproj==3.7.2
+
 # Document Generation
 python-docx==1.2.0
 ```
 
 Install all: `pip install -r requirements.txt`
-
-Total: **24 packages** (including dependencies)
 
 ---
 
@@ -583,17 +576,17 @@ Exit codes:
 ## Changelog
 
 ### Version 2.0.0 (January 2026)
-- **Reorganized project structure**: Moved CLI scripts to `scripts/` folder for better organization
-- **Updated GUI**: Fixed script paths to work with new structure
-- **Improved maintainability**: Cleaner root folder with organized scripts
-- **No functional changes**: All features work exactly as before
+- **Date-range based output structure**: All outputs organized in `YYYYMMDD-YYYYMMDD` folders
+- **Current time-based collection**: Retrieve scripts now use current time as endpoint
+- **Improved path management**: Centralized path handling with `PipelinePaths` class
+- **Enhanced GUI**: Modern interface with CustomTkinter
+- **Alarm analysis scripts**: Added radar alarm checking utilities
 
 ### Version 1.0.0 (December 2024)
 - Initial release
 - Rain gauge and radar data collection pipelines
 - ARI analysis and alarm validation using TP108 methodology
 - HTML dashboard generation with interactive visualizations
-- Modern GUI interface with CustomTkinter
 
 ---
 

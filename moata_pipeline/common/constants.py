@@ -225,6 +225,14 @@ Default trace description for ARI traces.
 Used to identify ARI-related traces in the API.
 """
 
+DEFAULT_RADAR_PROPORTION_THRESHOLD: Final[float] = 0.25
+"""
+Default proportion threshold for radar alarm triggering (25%).
+
+Alarm triggers if ≥25% of catchment area has ARI exceeding threshold.
+This is a spatial threshold - different from point measurements used for gauges.
+"""
+
 # ============================================================================
 # TIME WINDOWS
 # ============================================================================

@@ -4,8 +4,8 @@ Script Executor Module
 Handles subprocess execution with real-time output display.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
-Version: 1.0.0
+Last Modified: 2026-01-22
+Version: 1.1.0 - Added alarm script timeout detection
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from typing import Callable, Dict, List, Optional
 from .config import (
     TIMEOUT_RETRIEVE,
     TIMEOUT_RADAR,
+    TIMEOUT_ALARMS,
     TIMEOUT_DEFAULT,
 )
 
@@ -31,16 +32,25 @@ def get_timeout_for_script(script: str) -> int:
     Get appropriate timeout based on script type.
     
     Args:
-        script: Script filename
+        script: Script filename or path
         
     Returns:
         Timeout in seconds
     """
     script_lower = script.lower()
+    
+    # Check for alarm-related scripts (highest priority - longest running)
+    if "alarm" in script_lower or "alarms" in script_lower:
+        return TIMEOUT_ALARMS
+    
+    # Check for retrieve scripts
     if "retrieve" in script_lower:
         return TIMEOUT_RETRIEVE
-    elif "radar" in script_lower:
+    
+    # Check for radar scripts
+    if "radar" in script_lower:
         return TIMEOUT_RADAR
+    
     return TIMEOUT_DEFAULT
 
 
@@ -109,9 +119,12 @@ class ScriptExecutor:
         )
         title_label.pack(pady=(15, 5))
         
+        # Show timeout info
+        timeout_seconds = get_timeout_for_script(script)
+        timeout_minutes = timeout_seconds // 60
         script_label = ctk.CTkLabel(
             header,
-            text=f"Running: {script}",
+            text=f"Running: {script} (timeout: {timeout_minutes} min)",
             font=ctk.CTkFont(size=12),
             text_color="#B8C5D6"
         )
@@ -257,10 +270,21 @@ class ScriptExecutor:
                     except Exception:
                         pass
                 
-                # Update elapsed time
+                # Update elapsed time with better formatting
                 elapsed = int(time.time() - start_time)
+                elapsed_min = elapsed // 60
+                elapsed_sec = elapsed % 60
+                timeout_min = timeout_seconds // 60
+                
                 try:
-                    status_label.configure(text=f"⏳ Running... ({elapsed}s elapsed)")
+                    if elapsed_min > 0:
+                        status_label.configure(
+                            text=f"⏳ Running... ({elapsed_min}m {elapsed_sec}s / {timeout_min}m timeout)"
+                        )
+                    else:
+                        status_label.configure(
+                            text=f"⏳ Running... ({elapsed_sec}s elapsed)"
+                        )
                 except:
                     process.kill()
                     return False
@@ -270,10 +294,12 @@ class ScriptExecutor:
                     process.kill()
                     try:
                         status_label.configure(
-                            text=f"⏱️ Timeout after {timeout_seconds}s",
+                            text=f"⏱️ Timeout after {timeout_min} minutes",
                             text_color=self.colors["danger"]
                         )
                         console_text.insert("end", f"\n{'='*70}\n⏱️ TIMEOUT\n")
+                        console_text.insert("end", f"\nScript exceeded {timeout_min} minute timeout.\n")
+                        console_text.insert("end", f"Consider running from command line for longer operations.\n")
                     except:
                         pass
                     break

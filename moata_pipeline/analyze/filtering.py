@@ -137,6 +137,29 @@ def _is_bad_primary_rain_trace(description: str) -> bool:
     return any(token in desc for token in bad_tokens)
 
 
+def _normalize_trace_data(trace_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize trace data to handle both nested and flat formats.
+    
+    Handles two formats:
+        1. Nested: {"trace": {...properties...}}
+        2. Flat: {...properties...} (direct trace object)
+    
+    Returns:
+        Dictionary with "trace" key containing the trace properties
+    """
+    # Check if it's already in nested format
+    if "trace" in trace_data and isinstance(trace_data.get("trace"), dict):
+        return trace_data
+    
+    # Check if it's a flat trace object (has typical trace keys)
+    if "dataVariableType" in trace_data or "description" in trace_data or "id" in trace_data:
+        return {"trace": trace_data}
+    
+    # Unknown format, return as-is with empty trace
+    return {"trace": {}}
+
+
 def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """
     Extract the PRIMARY measured rainfall trace from gauge data.
@@ -148,9 +171,10 @@ def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, 
         
     Args:
         traces_data: List of trace dictionaries from gauge data
+                     Supports both nested {"trace": {...}} and flat {...} formats
         
     Returns:
-        Trace data dictionary, or None if no valid rainfall trace found
+        Trace data dictionary with "trace" key, or None if no valid rainfall trace found
         
     Example:
         >>> traces = [
@@ -166,8 +190,11 @@ def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, 
     if not traces_data:
         return None
     
+    # Normalize all trace data to consistent format
+    normalized_traces = [_normalize_trace_data(td) for td in traces_data]
+    
     # Stage 1: Exact match on description == "Rainfall"
-    for trace_data in traces_data:
+    for trace_data in normalized_traces:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
         
@@ -176,7 +203,7 @@ def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, 
             return trace_data
     
     # Stage 2: Strong heuristic - data variable type check
-    for trace_data in traces_data:
+    for trace_data in normalized_traces:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
         
@@ -198,7 +225,7 @@ def get_rainfall_trace(traces_data: List[Dict[str, Any]]) -> Optional[Dict[str, 
             return trace_data
     
     # Stage 3: Fallback - any visible rain trace
-    for trace_data in traces_data:
+    for trace_data in normalized_traces:
         trace = trace_data.get("trace", {}) or {}
         description = (trace.get("description") or "").strip()
         

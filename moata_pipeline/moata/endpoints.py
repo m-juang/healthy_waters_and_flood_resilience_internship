@@ -43,6 +43,21 @@ Example:
     >>> # "projects/594/assets"
 """
 
+ASSET_DETAIL: Final[str] = "assets/{asset_id}"
+"""
+Get a single asset by ID.
+
+Placeholders:
+    - asset_id: Asset ID (int)
+
+Returns:
+    AssetDto with id, name, description, assetType, projectId, etc.
+
+Example:
+    >>> path = ASSET_DETAIL.format(asset_id=3880960)
+    >>> # "assets/3880960"
+"""
+
 # ============================================================================
 # TRACES (TIMESERIES METADATA)
 # ============================================================================
@@ -104,6 +119,28 @@ Query params typically include:
 Example:
     >>> path = TRACE_ARI.format(trace_id=12345)
     >>> # "traces/12345/ari?from=...&to=...&type=Tp108"
+"""
+
+PROJECT_TRACES_INFO: Final[str] = "projects/{project_id}/traces/info"
+"""
+Get trace information for a project with optional filtering.
+
+This endpoint allows efficient filtering by dataVariableTypeId and description,
+useful for identifying specific trace types (e.g., "Rainfall" traces) without
+fetching all traces for each asset individually.
+
+Placeholders:
+    - project_id: Moata project ID (int)
+
+Query params:
+    - dataVariableTypeId: Filter by data variable type (e.g., 10 for rainfall)
+    - description: Filter by trace description (e.g., "Rainfall")
+
+Example:
+    >>> path = PROJECT_TRACES_INFO.format(project_id=594)
+    >>> # "projects/594/traces/info?dataVariableTypeId=10&description=Rainfall"
+
+Reference: Sam's email - use this for efficient inactive gauge filtering.
 """
 
 # ============================================================================
@@ -209,6 +246,7 @@ Example:
 # All available endpoints for validation/documentation
 ALL_ENDPOINTS: Final[dict[str, str]] = {
     "PROJECT_ASSETS": PROJECT_ASSETS,
+    "ASSET_DETAIL": ASSET_DETAIL,
     "ASSET_TRACES": ASSET_TRACES,
     "TRACE_THRESHOLDS": TRACE_THRESHOLDS,
     "TRACE_DATA_UTC": TRACE_DATA_UTC,

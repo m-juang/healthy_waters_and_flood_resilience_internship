@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Tuple, TYPE_CHECKING
-from moata_pipeline.common.paths import get_paths
+import customtkinter as ctk
+from moata_pipeline.common.paths import PipelinePaths
 
 if TYPE_CHECKING:
     from ..__main__ import ModernApp
@@ -42,7 +43,30 @@ class BasePipeline(ABC):
         self.app = app
         self.initial_start_time = initial_start_time
         self.initial_end_time = initial_end_time
-        self.paths = get_paths()
+        self.paths = PipelinePaths()
+    
+    def _get_date_from_user(self, title: str = "Select Date") -> str | None:
+        """
+        Simple date picker dialog.
+        
+        Returns:
+            Date string in YYYY-MM-DD format or None if cancelled
+        """
+        date_str = ctk.CTkInputDialog(
+            text="Enter date in YYYY-MM-DD format:\n\n(Leave blank for today)",
+            title=title
+        ).get_input()
+        
+        # Check if user cancelled (None return value)
+        if date_str is None:
+            return None
+        
+        # If empty string, use today's date
+        if date_str.strip() == "":
+            from datetime import datetime
+            return datetime.now().strftime('%Y-%m-%d')
+        
+        return date_str
     
     @property
     @abstractmethod
@@ -107,12 +131,22 @@ class BasePipeline(ABC):
         """Run visualize step."""
         pass
     
-    @abstractmethod
     def run_validate(self) -> None:
-        """Run validate step."""
+        """
+        Run validate step (optional - override if pipeline uses validation).
+        
+        Default implementation does nothing.
+        Gauge pipeline overrides this for historical event validation.
+        Radar pipeline doesn't use this (has real-time alarm checking instead).
+        """
         pass
     
-    @abstractmethod
     def run_visualize_validation(self) -> None:
-        """Run visualize validation step."""
+        """
+        Run visualize validation step (optional - override if pipeline uses validation).
+        
+        Default implementation does nothing.
+        Gauge pipeline overrides this to show validation results.
+        Radar pipeline doesn't use this (has alarm visualization instead).
+        """
         pass

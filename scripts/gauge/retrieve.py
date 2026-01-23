@@ -19,63 +19,41 @@ Usage:
     gauge-retrieve --date 2025-05-09 --log-level DEBUG
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-04
-Version: 2.1.0 - Fixed: Removed sys.path manipulation, proper packaging
+Last Modified: 2026-01-23 (FIXED: --date parameter now works correctly)
+Version: 2.2.1
 """
 
-import argparse
-import logging
 import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Optional
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-from moata_pipeline.logging_setup import setup_logging
+from moata_pipeline.common.script_utils import (
+    create_base_arg_parser,
+    add_logging_args,
+    setup_script_logger,
+    print_script_header,
+    print_script_footer,
+    handle_keyboard_interrupt
+)
+from moata_pipeline.common.validation import validate_date_string
 from moata_pipeline.collect.runner import run_collect_rain_gauges
 
 
 # Version info
-__version__ = "2.1.0"
+__version__ = "2.2.1"
 
 
-def parse_date(date_str: str, param_name: str) -> datetime:
-    """
-    Parse date string to datetime.
-    
-    Args:
-        date_str: Date string in YYYY-MM-DD format
-        param_name: Parameter name for error messages
-        
-    Returns:
-        Parsed datetime at start of day (00:00:00 UTC)
-        
-    Raises:
-        ValueError: If date format is invalid
-    """
-    try:
-        date = datetime.strptime(date_str, "%Y-%m-%d")
-        return datetime(
-            date.year, date.month, date.day, 
-            0, 0, 0, 
-            tzinfo=timezone.utc
-        )
-    except ValueError as e:
-        raise ValueError(
-            f"Invalid {param_name} format: '{date_str}'. "
-            f"Expected YYYY-MM-DD (e.g., 2025-05-09). Error: {e}"
-        ) from e
-
-
-def validate_date_range(start_time: datetime, end_time: datetime) -> None:
+def validate_date_range(start_time: datetime, end_time: datetime, logger) -> None:
     """
     Validate date range is logical.
     
     Args:
         start_time: Start datetime
         end_time: End datetime
+        logger: Logger instance for warnings
         
     Raises:
         ValueError: If date range is invalid
@@ -89,90 +67,63 @@ def validate_date_range(start_time: datetime, end_time: datetime) -> None:
     # Check if range is too large (warn, don't error)
     duration = (end_time - start_time).days
     if duration > 31:
-        logging.warning(
+        logger.warning(
             f"⚠️  Large date range: {duration} days. "
             f"This may take a long time and use significant disk space."
         )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     """
     Parse command-line arguments.
     
     Returns:
         Parsed arguments namespace
     """
-    parser = argparse.ArgumentParser(
+    parser = create_base_arg_parser(
         description="Collect rain gauge data from Moata API for Auckland rain monitoring network",
+        script_name="retrieve.py",
+        version=__version__,
         epilog="""
 Examples:
-  # Collect last 24 hours (current data)
-  %(prog)s
-  
-  # Collect specific historical date
-  %(prog)s --date 2025-05-09
-  
-  # Collect date range (multiple days)
-  %(prog)s --start 2025-05-09 --end 2025-05-12
-  
-  # Verbose logging for debugging
-  %(prog)s --date 2025-05-09 --log-level DEBUG
-  
-  # Combine options
-  %(prog)s --start 2025-05-01 --end 2025-05-07 --log-level INFO
+  %(prog)s                                    # Collect last 24 hours (current)
+  %(prog)s --date 2025-05-09                  # Collect specific date
+  %(prog)s --start 2025-05-09 --end 2025-05-12  # Collect date range
+  %(prog)s --date 2025-05-09 --log-level DEBUG  # Verbose logging
 
 Notes:
   - All dates are in UTC timezone
   - Historical data available from 2024-01-01 onwards
   - Current data collection fetches last 24 hours
   - Collection duration: ~5-10 minutes depending on date range
-  - Output location: outputs/rain_gauges/raw/ or outputs/rain_gauges/historical/YYYY-MM-DD/raw/
-        """,
-        formatter_class=argparse.RawDescriptionHelpFormatter
+  - Output: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/raw/
+        """
     )
     
     # Date options (mutually exclusive)
-    date_group = parser.add_argument_group('Date Options (choose one)')
+    date_group = parser.add_argument_group('Date Options')
     date_mutex = date_group.add_mutually_exclusive_group()
     
     date_mutex.add_argument(
         "--date",
         metavar="YYYY-MM-DD",
-        help="Fetch data for specific date (full 24 hours UTC). "
-             "Example: --date 2025-05-09"
+        help="Fetch data for specific date (full 24 hours UTC). Example: --date 2025-05-09"
     )
     
     date_group.add_argument(
         "--start",
         metavar="YYYY-MM-DD",
-        help="Start date for date range (UTC, inclusive). "
-             "Requires --end. Example: --start 2025-05-09"
+        help="Start date for date range (UTC, inclusive). Requires --end."
     )
     
     date_group.add_argument(
         "--end",
         metavar="YYYY-MM-DD",
-        help="End date for date range (UTC, exclusive). "
-             "Requires --start. Example: --end 2025-05-12"
+        help="End date for date range (UTC, exclusive). Requires --start."
     )
     
-    # Logging options
-    log_group = parser.add_argument_group('Logging Options')
-    
-    log_group.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set logging level (default: INFO). "
-             "Use DEBUG for verbose output."
-    )
-    
-    # Metadata
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}"
-    )
+    # Add logging arguments
+    add_logging_args(parser)
     
     args = parser.parse_args()
     
@@ -198,17 +149,14 @@ def main() -> int:
     try:
         args = parse_args()
     except SystemExit as e:
-        # argparse calls sys.exit() for --help or errors
         return e.code if e.code is not None else 0
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
-        logger.info("=" * 80)
-        logger.info("Rain Gauge Data Collection - v%s", __version__)
-        logger.info("=" * 80)
+        # Print header
+        print_script_header("Rain Gauge Data Collection", __version__, logger)
         
         # Determine time range
         start_time: Optional[datetime] = None
@@ -216,23 +164,42 @@ def main() -> int:
         mode: str = "current"
         
         if args.date:
-            # Single date (historical)
-            logger.info("Mode: Historical (single date)")
-            start_time = parse_date(args.date, "--date")
-            end_time = start_time + timedelta(days=1)
+            # ✅ FIXED: Parse tanggal yang diminta user
+            logger.info("Mode: Historical (specific date)")
+            logger.info(f"Requested date: {args.date}")
+            
+            # Parse dan validasi tanggal
+            validated_date = validate_date_string(args.date, "%Y-%m-%d", "date")
+            
+            # Buat range 24 jam untuk tanggal tersebut
+            # Contoh: 2025-05-09 → dari 2025-05-09 00:00:00 sampai 2025-05-10 00:00:00
+            start_time = datetime(
+                validated_date.year, validated_date.month, validated_date.day,
+                0, 0, 0, tzinfo=timezone.utc
+            )
+            end_time = start_time + timedelta(hours=24)
+            
             mode = "historical"
-            logger.info(f"Date: {args.date}")
+            logger.info(f"Date range: {start_time.date()} to {end_time.date()}")
             
         elif args.start and args.end:
-            # Date range (historical)
+            # Date range (historical) - validate and parse
             logger.info("Mode: Historical (date range)")
-            start_time = parse_date(args.start, "--start")
-            end_time = parse_date(args.end, "--end")
+            validated_start = validate_date_string(args.start, "%Y-%m-%d", "start")
+            validated_end = validate_date_string(args.end, "%Y-%m-%d", "end")
+            start_time = datetime(
+                validated_start.year, validated_start.month, validated_start.day,
+                0, 0, 0, tzinfo=timezone.utc
+            )
+            end_time = datetime(
+                validated_end.year, validated_end.month, validated_end.day,
+                0, 0, 0, tzinfo=timezone.utc
+            )
             mode = "historical"
             logger.info(f"Range: {args.start} to {args.end}")
             
             # Validate range
-            validate_date_range(start_time, end_time)
+            validate_date_range(start_time, end_time, logger)
             duration = (end_time - start_time).days
             logger.info(f"Duration: {duration} day(s)")
             
@@ -251,9 +218,8 @@ def main() -> int:
         logger.info("=" * 80)
         logger.info("")
         
-        # Run collection with time parameters
+        # Run collection
         logger.info("Starting rain gauge data collection...")
-        
         run_collect_rain_gauges(
             start_time=start_time,
             end_time=end_time,
@@ -264,25 +230,16 @@ def main() -> int:
         logger.info("✅ Rain gauge data collection completed successfully")
         logger.info("=" * 80)
         
-        # Log output location
-        if mode == "historical" and args.date:
-            output_dir = f"outputs/rain_gauges/historical/{args.date}/raw/"
-            logger.info(f"Output location: {output_dir}")
-        elif mode == "historical":
-            logger.info("Output location: outputs/rain_gauges/historical/YYYY-MM-DD/raw/")
-        else:
-            logger.info("Output location: outputs/rain_gauges/raw/")
+        # Log output location (actual path is managed by runner with YYYYMMDD-YYYYMMDD format)
+        from moata_pipeline.common.paths import PipelinePaths
+        output_paths = PipelinePaths.for_date_range(start_time, end_time)
+        logger.info(f"Output location: {output_paths.rain_gauges_raw_dir}")
         
+        print_script_footer(logger, success=True)
         return 0
         
     except KeyboardInterrupt:
-        logger.warning("")
-        logger.warning("=" * 80)
-        logger.warning("⚠️  Collection interrupted by user (Ctrl+C)")
-        logger.warning("=" * 80)
-        logger.warning("Partial data may have been saved.")
-        logger.warning("You can resume by running the script again.")
-        return 130
+        return handle_keyboard_interrupt(logger)
 
     except ValueError as e:
         logger.error("")
@@ -292,8 +249,8 @@ def main() -> int:
         logger.error(str(e))
         logger.error("")
         logger.error("Run with --help for usage information.")
+        print_script_footer(logger, success=False)
         return 1
-    
         
     except Exception as e:
         logger.error("")
@@ -309,6 +266,7 @@ def main() -> int:
         logger.error("3. Check disk space")
         logger.error("4. Try with --log-level DEBUG for more details")
         logger.error("5. Check if date is valid (historical data from 2024-01-01)")
+        print_script_footer(logger, success=False)
         return 1
 
 

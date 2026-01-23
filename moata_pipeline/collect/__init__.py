@@ -30,11 +30,17 @@ Version: 1.0.0
 
 from moata_pipeline.collect.collector import (
     RainGaugeCollector,
-    RadarDataCollector,
     CollectionError,
     GeometryError,
     CacheError,
 )
+
+from moata_pipeline.collect.collectors.radar_collector import (
+    RadarCollector,
+)
+
+# Legacy alias for backward compatibility
+RadarDataCollector = RadarCollector
 
 from moata_pipeline.collect.runner import (
     run_collect_rain_gauges,

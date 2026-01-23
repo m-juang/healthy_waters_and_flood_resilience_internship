@@ -4,8 +4,8 @@ Configuration Module
 Contains color palettes, theme settings, and application constants.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
-Version: 1.0.0
+Last Modified: 2026-01-22
+Version: 1.1.0 - Added TIMEOUT_ALARMS for alarm checking scripts
 """
 
 from dataclasses import dataclass
@@ -17,7 +17,7 @@ from typing import Dict
 # =============================================================================
 
 APP_TITLE = "Auckland Council - Moata AlertLab"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_SUBTITLE = "Auckland Council  •  Healthy Waters & Flood Resilience"
 APP_FOOTER = "COMPSCI 778 Internship"
 
@@ -28,9 +28,10 @@ MIN_WIDTH = 900
 MIN_HEIGHT = 650
 
 # Timeouts for script execution (seconds)
-TIMEOUT_RETRIEVE = 10800  # 3 hours
-TIMEOUT_RADAR = 1800     # 30 minutes
-TIMEOUT_DEFAULT = 600    # 10 minutes
+TIMEOUT_RETRIEVE = 10800  # 3 hours - data collection from API
+TIMEOUT_RADAR = 1800      # 30 minutes - radar analysis
+TIMEOUT_ALARMS = 7200     # 2 hours - alarm timeline checking (232 catchments × ~30s each)
+TIMEOUT_DEFAULT = 600     # 10 minutes - general scripts
 
 
 # =============================================================================

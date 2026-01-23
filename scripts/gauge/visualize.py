@@ -46,12 +46,14 @@ import logging
 import sys
 from pathlib import Path
 
-from moata_pipeline.logging_setup import setup_logging
+from moata_pipeline.common.script_utils import setup_script_logger
+from moata_pipeline.common.paths import PipelinePaths
 from moata_pipeline.viz.runner import run_visual_report
 
 
 # Version info
 __version__ = "1.1.0"
+paths = PipelinePaths()
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,7 +68,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                          # Auto-detect most recent (prefers historical)
+  %(prog)s                          # Auto-detect most recent data
   %(prog)s --current                # Visualize current (last 24h) data
   %(prog)s --date 2025-05-09        # Visualize specific historical date
   %(prog)s --csv path/to/file.csv   # Custom input CSV
@@ -74,17 +76,16 @@ Examples:
   %(prog)s --log-level DEBUG        # Verbose logging
 
 Auto-Detection (no flags):
-  Searches for most recent rain_gauge_analysis_*.csv in:
-  1. outputs/rain_gauges/historical/*/analyze/ (prefers historical)
-  2. outputs/rain_gauges/analyze/ (fallback to current)
+  Searches for most recent alarm_summary.csv in:
+  outputs/rain_gauges/YYYYMMDD-YYYYMMDD/analysis/
 
 Current Mode (--current):
-  Uses: outputs/rain_gauges/analyze/rain_gauge_analysis_*.csv
-  Output: outputs/rain_gauges/visualizations/
+  Uses: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/analysis/alarm_summary.csv
+  Output: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/visualizations/
 
 Historical Mode (--date YYYY-MM-DD):
-  Uses: outputs/rain_gauges/historical/DATE/analyze/rain_gauge_analysis_*.csv
-  Output: outputs/rain_gauges/historical/DATE/visualizations/
+  Uses: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/analysis/alarm_summary.csv
+  Output: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/visualizations/
 
 Input Requirements:
   - CSV file must contain: gauge_id, gauge_name, latitude, longitude
@@ -197,8 +198,26 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
         
     # Option 3: Specific date (historical)
     elif args.date:
-        analyze_dir = Path(f"outputs/rain_gauges/historical/{args.date}/analyze")
+        # Use PipelinePaths for proper folder structure
+        from moata_pipeline.common.paths import PipelinePaths
+        date_paths = PipelinePaths.for_date(args.date)
+        analyze_dir = date_paths.rain_gauges_analysis_dir
         logger.info("Using historical data for date: %s", args.date)
+        
+        # Try specified date first
+        if not analyze_dir.exists():
+            # Try previous date (analysis stored with window start date)
+            from datetime import datetime, timedelta
+            try:
+                specified_date = datetime.strptime(args.date, "%Y-%m-%d")
+                prev_date = (specified_date - timedelta(days=1)).strftime("%Y-%m-%d")
+                logger.warning(
+                    f"No data found for {args.date}, trying previous date {prev_date}..."
+                )
+                date_paths = PipelinePaths.for_date(prev_date)
+                analyze_dir = date_paths.rain_gauges_analysis_dir
+            except Exception as e:
+                pass
         
         if not analyze_dir.exists():
             raise FileNotFoundError(
@@ -219,31 +238,28 @@ def detect_analysis_csv(args: argparse.Namespace, logger: logging.Logger) -> Pat
         
         logger.info("✓ Found alarm summary: %s", csv_path.name)
         
-    # Option 4: Auto-detect (prefer historical)
+    # Option 4: Auto-detect (prefer most recent date range folder)
     else:
-        logger.info("Auto-detecting alarm summary CSV (prefers historical)...")
+        logger.info("Auto-detecting alarm summary CSV...")
         
-        # Check historical directories (most recent first)
-        historical_base = Path("outputs/rain_gauges/historical")
+        # Check for date range folders: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/analysis/
+        from moata_pipeline.common.paths import PipelinePaths
+        historical_base = Path("outputs/rain_gauges")
         historical_files = []
         
         if historical_base.exists():
+            # Look for YYYYMMDD-YYYYMMDD pattern folders with alarm_summary.csv
             historical_files = sorted(
-                historical_base.glob("*/analyze/alarm_summary.csv"),
+                [f for f in historical_base.glob("*-*/analysis/alarm_summary.csv") if f.exists()],
+                key=lambda p: p.parent.parent.name,  # Sort by folder name
                 reverse=True
             )
         
-        # Check current directory
-        current_file = Path("outputs/rain_gauges/analyze/alarm_summary.csv")
-        
-        # Prefer most recent historical
+        # Prefer most recent
         if historical_files:
             csv_path = historical_files[0]
-            date = csv_path.parent.parent.name
-            logger.info("✓ Found historical alarm summary: %s (date: %s)", csv_path.name, date)
-        elif current_file.exists():
-            csv_path = current_file
-            logger.info("✓ Found current alarm summary: %s", csv_path.name)
+            date_range = csv_path.parent.parent.name
+            logger.info("✓ Found alarm summary: %s (range: %s)", csv_path.name, date_range)
         else:
             raise FileNotFoundError(
                 "No alarm_summary.csv found.\n\n"
@@ -305,8 +321,7 @@ def main() -> int:
     args = parse_args()
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
         logger.info("=" * 80)

@@ -9,6 +9,10 @@ Where:
     - D = rainfall depth (mm) for a given duration
     - m, b = coefficients from tp108_stats.csv per pixel and duration
 
+FIXED: Now uses weighted_value for proper area-proportional rainfall calculation.
+When a pixel overlaps multiple catchments, the rainfall is weighted by the
+proportion of the pixel area that falls within each catchment.
+
 Classes:
     ARICalculator: Main calculator class with TP108 coefficient handling
 
@@ -16,8 +20,8 @@ Functions:
     process_all_catchments: Batch process all catchment files
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-22
+Version: 1.1.0 - Fixed to use weighted_value for area-proportional calculations
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ import pandas as pd
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # Duration mapping: column prefix -> minutes
@@ -77,6 +81,10 @@ class ARICalculator:
     
     Uses the TP108 methodology to convert rainfall depths to ARI (Average
     Recurrence Interval) values for various durations (10m, 20m, 30m, 1h, 2h, 6h, 12h, 24h).
+    
+    IMPORTANT: This calculator uses weighted_value (area-proportional rainfall)
+    when available, falling back to raw value if weighted_value is not present.
+    This ensures proper handling of pixels that overlap multiple catchments.
     
     Args:
         tp108_path: Path to TP108 coefficients CSV file
@@ -224,6 +232,33 @@ class ARICalculator:
         except Exception:
             return float('inf')
     
+    @staticmethod
+    def _get_rainfall_column(df: pd.DataFrame) -> str:
+        """
+        Determine which column to use for rainfall values.
+        
+        Prefers weighted_value (area-proportional) over raw value.
+        This ensures proper handling of pixels that overlap multiple catchments.
+        
+        Args:
+            df: DataFrame with rainfall data
+            
+        Returns:
+            Column name to use ('weighted_value' or 'value')
+            
+        Raises:
+            InvalidDataError: If neither column exists
+        """
+        if "weighted_value" in df.columns:
+            return "weighted_value"
+        elif "value" in df.columns:
+            return "value"
+        else:
+            raise InvalidDataError(
+                f"DataFrame must have 'weighted_value' or 'value' column. "
+                f"Found: {df.columns.tolist()}"
+            )
+    
     def process_pixel_data(
         self,
         pixel_df: pd.DataFrame,
@@ -235,8 +270,11 @@ class ARICalculator:
         Calculates rolling rainfall totals for each duration window and
         converts to ARI values using TP108 coefficients.
         
+        FIXED: Now uses weighted_value when available for proper area-proportional
+        rainfall calculation. Falls back to value if weighted_value not present.
+        
         Args:
-            pixel_df: DataFrame with 'timestamp' and 'value' columns (sorted by timestamp)
+            pixel_df: DataFrame with 'timestamp' and ('weighted_value' or 'value') columns
             pixel_index: Pixel index for coefficient lookup
             
         Returns:
@@ -245,11 +283,13 @@ class ARICalculator:
         Raises:
             InvalidDataError: If pixel_df is missing required columns
         """
-        # Validate input data
-        if "value" not in pixel_df.columns:
-            raise InvalidDataError(
-                f"pixel_df must have 'value' column. Found: {pixel_df.columns.tolist()}"
-            )
+        # Determine which rainfall column to use
+        rainfall_col = self._get_rainfall_column(pixel_df)
+        
+        if rainfall_col == "weighted_value":
+            self._logger.debug(f"Using weighted_value for pixel {pixel_index} (area-proportional)")
+        else:
+            self._logger.debug(f"Using raw value for pixel {pixel_index} (no weights available)")
         
         # Load coefficients
         coeffs = self.load_coefficients()
@@ -282,7 +322,8 @@ class ARICalculator:
                 continue
             
             # Calculate rolling sum over duration window
-            rolling_sum = pixel_df["value"].rolling(
+            # FIXED: Use weighted_value when available
+            rolling_sum = pixel_df[rainfall_col].rolling(
                 window=minutes,
                 min_periods=minutes,
             ).sum()
@@ -303,6 +344,7 @@ class ARICalculator:
                         "duration_minutes": minutes,
                         "rainfall_depth_mm": round(depth, 2),
                         "ari_years": round(ari, 2),
+                        "used_weighted": rainfall_col == "weighted_value",
                     })
         
         return results
@@ -315,8 +357,11 @@ class ARICalculator:
         """
         Process radar data file for a catchment and calculate ARI values.
         
+        FIXED: Now uses weighted_value when available for proper area-proportional
+        rainfall calculation.
+        
         Args:
-            radar_csv: Path to radar data CSV (with pixel_index, timestamp, value)
+            radar_csv: Path to radar data CSV (with pixel_index, timestamp, value/weighted_value)
             output_csv: Optional path to save results
             
         Returns:
@@ -339,19 +384,28 @@ class ARICalculator:
             # Load radar data
             df = pd.read_csv(radar_csv)
             
-            # Validate columns
-            required_cols = ["pixel_index", "timestamp", "value"]
-            missing = [c for c in required_cols if c not in df.columns]
-            if missing:
+            # Validate columns - need pixel_index, timestamp, and (weighted_value OR value)
+            if "pixel_index" not in df.columns:
                 raise InvalidDataError(
-                    f"Radar CSV missing columns: {missing}\n"
+                    f"Radar CSV missing 'pixel_index' column.\n"
                     f"Found: {df.columns.tolist()}"
                 )
+            if "timestamp" not in df.columns:
+                raise InvalidDataError(
+                    f"Radar CSV missing 'timestamp' column.\n"
+                    f"Found: {df.columns.tolist()}"
+                )
+            
+            # Check for rainfall column
+            rainfall_col = self._get_rainfall_column(df)
+            self._logger.info(f"  Using '{rainfall_col}' column for rainfall data")
             
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             
         except pd.errors.EmptyDataError:
             raise InvalidDataError(f"Radar CSV is empty: {radar_csv}")
+        except InvalidDataError:
+            raise
         except Exception as e:
             raise InvalidDataError(f"Failed to load radar CSV: {e}") from e
         
@@ -462,6 +516,9 @@ def process_all_catchments(
 ) -> pd.DataFrame:
     """
     Process all catchment radar files and calculate ARI values.
+    
+    FIXED: Now uses weighted_value when available for proper area-proportional
+    rainfall calculation.
     
     Args:
         radar_dir: Directory containing radar CSV files

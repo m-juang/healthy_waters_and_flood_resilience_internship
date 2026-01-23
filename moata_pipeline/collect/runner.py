@@ -23,6 +23,7 @@ from typing import Optional, List
 
 from dotenv import load_dotenv
 
+from moata_pipeline.common.config import Config
 from moata_pipeline.common.constants import (
     TOKEN_URL,
     BASE_API_URL,
@@ -38,7 +39,8 @@ from moata_pipeline.common.output_writer import JsonOutputWriter
 from moata_pipeline.moata.auth import MoataAuth
 from moata_pipeline.moata.http import MoataHttp
 from moata_pipeline.moata.client import MoataClient
-from moata_pipeline.collect.collector import RainGaugeCollector, RadarDataCollector
+from moata_pipeline.collect.collector import RainGaugeCollector
+from moata_pipeline.collect.collectors.radar_collector import RadarCollector
 
 
 # Version info
@@ -152,30 +154,21 @@ def _determine_radar_output_dir(
     end_time: datetime,
     custom_dir: Optional[Path] = None,
 ) -> Path:
-    """..."""
+    """Determine output directory for radar data collection.
+    
+    Always uses date range-based directory (YYYYMMDD-YYYYMMDD format).
+    """
     logger = logging.getLogger(__name__)
     
     if custom_dir is not None:
         logger.info(f"Using custom output directory: {custom_dir}")
         return custom_dir
     
-    # Get paths instance
-    paths = get_paths()
+    # Use date range for path
+    paths = PipelinePaths.for_date_range(start_time, end_time)
+    output_dir = paths.rain_radar_raw_dir
     
-    # Check if data is recent (within last 24 hours)
-    now = datetime.now(timezone.utc)
-    hours_since_end = (now - end_time).total_seconds() / 3600
-    
-    is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
-    
-    if is_recent:
-        output_dir = paths.rain_radar_raw_dir  # ← FIXED
-        logger.info("Recent data (within 24h) - output to: %s", output_dir)
-    else:
-        # Historical data - use date-based directory
-        date_str = start_time.strftime("%Y-%m-%d")
-        output_dir = paths.get_historical_radar_dir(date_str)  # ← FIXED
-        logger.info("Historical data (%s) - output to: %s", date_str, output_dir)
+    logger.info("Output directory: %s", output_dir)
     
     return output_dir
 
@@ -185,30 +178,21 @@ def _determine_gauge_output_dir(
     end_time: datetime,
     custom_dir: Optional[Path] = None,
 ) -> Path:
-    """..."""
+    """Determine output directory for gauge data collection.
+    
+    Always uses date range-based directory (YYYYMMDD-YYYYMMDD format).
+    """
     logger = logging.getLogger(__name__)
     
     if custom_dir is not None:
         logger.info(f"Using custom output directory: {custom_dir}")
         return custom_dir
     
-    # Get paths instance
-    paths = get_paths()
+    # Use date range for path
+    paths = PipelinePaths.for_date_range(start_time, end_time)
+    output_dir = paths.rain_gauges_raw_dir
     
-    # Check if data is recent (within last 24 hours)
-    now = datetime.now(timezone.utc)
-    hours_since_end = (now - end_time).total_seconds() / 3600
-    
-    is_recent = hours_since_end < RECENT_DATA_THRESHOLD_HOURS
-    
-    if is_recent:
-        output_dir = paths.rain_gauges_raw_dir  # ← FIXED
-        logger.info("Recent data (within 24h) - output to: %s", output_dir)
-    else:
-        # Historical data - use date-based directory
-        date_str = start_time.strftime("%Y-%m-%d")
-        output_dir = paths.get_historical_gauge_dir(date_str) / "raw"  # ← FIXED
-        logger.info("Historical data (%s) - output to: %s", date_str, output_dir)
+    logger.info("Output directory: %s", output_dir)
     
     return output_dir
 
@@ -218,8 +202,8 @@ def _determine_gauge_output_dir(
 # =============================================================================
 
 def run_collect_rain_gauges(
-    project_id: int = DEFAULT_PROJECT_ID,
-    asset_type_id: int = DEFAULT_RAIN_GAUGE_ASSET_TYPE_ID,
+    project_id: Optional[int] = None,
+    asset_type_id: Optional[int] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     trace_batch_size: int = 100,
@@ -244,8 +228,8 @@ def run_collect_rain_gauges(
         8. Cleans up temp on failure
         
     Args:
-        project_id: Moata project ID (default from constants)
-        asset_type_id: Rain gauge asset type ID (default from constants)
+        project_id: Moata project ID (default: Config.AUCKLAND_PROJECT_ID)
+        asset_type_id: Rain gauge asset type ID (default: Config.RAIN_GAUGE_ASSET_TYPE)
         start_time: Start of time range (default: 24 hours ago)
         end_time: End of time range (default: now)
         trace_batch_size: Traces to fetch per API batch (default: 100)
@@ -258,7 +242,7 @@ def run_collect_rain_gauges(
         CollectionRunnerError: If collection fails
         
     Example:
-        >>> # Collect last 24 hours
+        >>> # Collect last 24 hours (using defaults from Config)
         >>> run_collect_rain_gauges()
         
         >>> # Collect specific date
@@ -268,6 +252,12 @@ def run_collect_rain_gauges(
         ... )
     """
     logger = logging.getLogger(__name__)
+    
+    # Use Config defaults if not provided
+    if project_id is None:
+        project_id = Config.AUCKLAND_PROJECT_ID
+    if asset_type_id is None:
+        asset_type_id = Config.RAIN_GAUGE_ASSET_TYPE
     
     logger.info("=" * 80)
     logger.info("Rain Gauge Data Collection")
@@ -436,7 +426,7 @@ def run_collect_rain_gauges(
         logger.error("")
         logger.error("How to fix:")
         logger.error("1. Check date parameters are correct")
-        logger.error("2. Verify project_id=594 and asset_type_id=100")
+        logger.error(f"2. Verify project_id={Config.AUCKLAND_PROJECT_ID} and asset_type_id={Config.RAIN_GAUGE_ASSET_TYPE}")
         logger.error("3. Ensure trace_batch_size is > 0")
         
         if 'collector' in locals():
@@ -501,7 +491,7 @@ def run_collect_rain_gauges(
 
 
 def run_collect_radar(
-    project_id: int = DEFAULT_PROJECT_ID,
+    project_id: Optional[int] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     catchment_ids: Optional[List[int]] = None,
@@ -521,7 +511,7 @@ def run_collect_radar(
         6. Saves collection summary JSON
         
     Args:
-        project_id: Moata project ID (default from constants)
+        project_id: Moata project ID (default: Config.AUCKLAND_PROJECT_ID)
         start_time: Start of time range (default: 24 hours ago)
         end_time: End of time range (default: now)
         catchment_ids: Optional list of specific catchment IDs to collect
@@ -535,7 +525,7 @@ def run_collect_radar(
         CollectionRunnerError: If collection fails
         
     Example:
-        >>> # Collect last 24 hours
+        >>> # Collect last 24 hours (using Config defaults)
         >>> run_collect_radar()
         
         >>> # Collect specific date
@@ -548,6 +538,10 @@ def run_collect_radar(
         >>> run_collect_radar(catchment_ids=[123, 456, 789])
     """
     logger = logging.getLogger(__name__)
+    
+    # Use Config defaults if not provided
+    if project_id is None:
+        project_id = Config.AUCKLAND_PROJECT_ID
     
     logger.info("=" * 80)
     logger.info("Radar QPE Data Collection")
@@ -587,11 +581,10 @@ def run_collect_radar(
         # Create collector
         logger.info("")
         logger.info("Initializing radar collector...")
-        collector = RadarDataCollector(
+        collector = RadarCollector(
             client=client,
             output_dir=output_path,
             pixel_batch_size=pixel_batch_size,
-            max_hours_per_request=24,
         )
         logger.info("✓ Collector ready")
         

@@ -6,35 +6,37 @@ Provides canonical directory structure and file paths for pipeline outputs.
 Classes:
     PipelinePaths: Central path management for all pipeline outputs
 
-Directory Structure:
+Directory Structure (NEW - Date Range Format):
     outputs/
     ├── rain_gauges/
-    │   ├── raw/              # Raw collected data
-    │   ├── analyze/          # Analysis outputs
-    │   ├── visualizations/   # HTML dashboards, charts
-    │   └── historical/       # Historical data by date (NEW!)
+    │   └── 20250509-20250510/    # Date range (YYYYMMDD-YYYYMMDD)
+    │       ├── raw/              # Raw collected data
+    │       ├── analysis/         # Analysis outputs
+    │       └── visualizations/   # HTML dashboards, charts
     └── rain_radar/
-        ├── raw/              # Raw radar data
-        │   └── radar_data/   # Per-catchment CSVs
-        ├── analyze/          # ARI analysis outputs
-        ├── ari/              # ARI calculation results
-        ├── historical/       # Historical data by date
-        └── visualizations/   # Radar dashboards
+        └── 20250509-20250510/    # Date range (YYYYMMDD-YYYYMMDD)
+            ├── raw/              # Raw radar data
+            │   └── radar_data/   # Per-catchment CSVs
+            ├── analysis/         # ARI analysis outputs
+            ├── alarms/           # Alarm timeline outputs
+            ├── validation/       # Validation outputs
+            └── visualizations/   # Radar dashboards
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2026-01-03
-Version: 1.1.0 (Added gauge historical support)
+Last Modified: 2026-01-21
+Version: 2.0.0 (Complete restructure - date-based organization)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, date, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 
 # Version info
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 
 
 # =============================================================================
@@ -46,31 +48,80 @@ class PipelinePaths:
     """
     Canonical directory structure for pipeline outputs.
     
-    This class provides a single source of truth for all output paths used
-    throughout the rain monitoring system.
+    ALL data is organized by date range (YYYYMMDD-YYYYMMDD format).
+    Use current date for real-time/current data.
     
     Attributes:
         outputs_root: Root directory for all outputs (default: "outputs")
+        date: Date for data organization (defaults to today, used for single-day ranges)
+        start_time: Start datetime for data range (overrides date if provided)
+        end_time: End datetime for data range (overrides date if provided)
         
     Example:
+        >>> from datetime import date, datetime
+        >>> # Today's data (single day)
         >>> paths = PipelinePaths()
-        >>> print(paths.rain_gauges_analyze_dir)
-        outputs/rain_gauges/analyze
-        
-        >>> # Custom root
-        >>> paths = PipelinePaths(outputs_root=Path("/data/outputs"))
         >>> print(paths.rain_gauges_raw_dir)
-        /data/outputs/rain_gauges/raw
+        outputs/rain_gauges/20260120-20260121/raw
+        
+        >>> # Historical data with date range
+        >>> paths = PipelinePaths(
+        ...     start_time=datetime(2025, 5, 9, 0, 0, 0),
+        ...     end_time=datetime(2025, 5, 10, 0, 0, 0)
+        ... )
+        >>> print(paths.rain_gauges_raw_dir)
+        outputs/rain_gauges/20250509-20250510/raw
     """
     
     # Root directory for all outputs
     outputs_root: Path = Path("outputs")
     
+    # Date for data organization (defaults to today)
+    date: Union[date, datetime, str, None] = None
+    
+    # Optional: explicit start/end times for data range
+    start_time: Union[datetime, None] = None
+    end_time: Union[datetime, None] = None
+    
     def __post_init__(self) -> None:
-        """Validate outputs_root is a Path object."""
-        # Convert to Path if string was provided
+        """Validate and convert attributes."""
+        # Convert outputs_root to Path if string
         if not isinstance(self.outputs_root, Path):
             object.__setattr__(self, 'outputs_root', Path(self.outputs_root))
+        
+        # Handle date/time conversion
+        if self.start_time is not None and self.end_time is not None:
+            # Explicit date range provided - use it
+            pass
+        elif self.date is not None:
+            # Single date provided - convert to 24-hour range
+            if isinstance(self.date, str):
+                date_obj = datetime.strptime(self.date, '%Y-%m-%d').date()
+            elif isinstance(self.date, datetime):
+                date_obj = self.date.date()
+            else:
+                date_obj = self.date
+            
+            # Create 24-hour range: previous day 00:00 to current date 00:00
+            object.__setattr__(self, 'end_time', datetime.combine(date_obj, datetime.min.time()))
+            object.__setattr__(self, 'start_time', self.end_time - timedelta(days=1))
+        else:
+            # No date provided - use last 24 hours (today)
+            now = datetime.now()
+            today = now.date()
+            object.__setattr__(self, 'end_time', datetime.combine(today, datetime.min.time()))
+            object.__setattr__(self, 'start_time', self.end_time - timedelta(days=1))
+        
+        # Keep date attribute for backward compatibility
+        if self.date is None:
+            object.__setattr__(self, 'date', self.end_time.date() if self.end_time else datetime.now().date())
+    
+    def _get_date_path(self) -> Path:
+        """Get date range path component in YYYYMMDD-YYYYMMDD format."""
+        # Format: YYYYMMDD-YYYYMMDD
+        start_str = self.start_time.strftime('%Y%m%d') if self.start_time else self.date.strftime('%Y%m%d')
+        end_str = self.end_time.strftime('%Y%m%d') if self.end_time else self.date.strftime('%Y%m%d')
+        return Path(f"{start_str}-{end_str}")
     
     # =========================================================================
     # Rain Gauges - Directories
@@ -78,8 +129,8 @@ class PipelinePaths:
     
     @property
     def rain_gauges_dir(self) -> Path:
-        """Root directory for rain gauge outputs."""
-        return self.outputs_root / "rain_gauges"
+        """Root directory for rain gauge outputs (includes date path)."""
+        return self.outputs_root / "rain_gauges" / self._get_date_path()
     
     @property
     def rain_gauges_raw_dir(self) -> Path:
@@ -87,18 +138,27 @@ class PipelinePaths:
         return self.rain_gauges_dir / "raw"
     
     @property
-    def rain_gauges_analyze_dir(self) -> Path:
+    def rain_gauges_analysis_dir(self) -> Path:
         """Analysis outputs directory for rain gauges."""
-        return self.rain_gauges_dir / "analyze"
+        return self.rain_gauges_dir / "analysis"
+    
+    @property
+    def rain_gauges_analyze_dir(self) -> Path:
+        """
+        Deprecated alias for rain_gauges_analysis_dir (backward compatibility).
+        
+        Use rain_gauges_analysis_dir instead.
+        """
+        return self.rain_gauges_analysis_dir
     
     @property
     def rain_gauges_filtered_dir(self) -> Path:
         """
-        Deprecated alias for rain_gauges_analyze_dir.
+        Deprecated alias for rain_gauges_analysis_dir.
         
-        Use rain_gauges_analyze_dir instead for consistency.
+        Use rain_gauges_analysis_dir instead for consistency.
         """
-        return self.rain_gauges_analyze_dir
+        return self.rain_gauges_analysis_dir
     
     @property
     def rain_gauges_viz_dir(self) -> Path:
@@ -106,9 +166,9 @@ class PipelinePaths:
         return self.rain_gauges_dir / "visualizations"
     
     @property
-    def rain_gauges_historical_dir(self) -> Path:
-        """Historical rain gauge data directory (organized by date)."""
-        return self.rain_gauges_dir / "historical"
+    def rain_gauges_validation_dir(self) -> Path:
+        """Validation outputs directory for rain gauges."""
+        return self.rain_gauges_dir / "validation"
     
     # =========================================================================
     # Rain Radar - Directories
@@ -116,8 +176,8 @@ class PipelinePaths:
     
     @property
     def rain_radar_dir(self) -> Path:
-        """Root directory for rain radar outputs."""
-        return self.outputs_root / "rain_radar"
+        """Root directory for rain radar outputs (includes date path)."""
+        return self.outputs_root / "rain_radar" / self._get_date_path()
     
     @property
     def rain_radar_raw_dir(self) -> Path:
@@ -130,19 +190,28 @@ class PipelinePaths:
         return self.rain_radar_raw_dir / "radar_data"
     
     @property
-    def rain_radar_analyze_dir(self) -> Path:
+    def rain_radar_analysis_dir(self) -> Path:
         """Analysis outputs directory for rain radar."""
-        return self.rain_radar_dir / "analyze"
+        return self.rain_radar_dir / "analysis"
+    
+    @property
+    def rain_radar_analyze_dir(self) -> Path:
+        """
+        Deprecated alias for rain_radar_analysis_dir (backward compatibility).
+        
+        Use rain_radar_analysis_dir instead.
+        """
+        return self.rain_radar_analysis_dir
     
     @property
     def rain_radar_ari_dir(self) -> Path:
-        """ARI calculation results directory."""
-        return self.rain_radar_dir / "ari"
+        """ARI calculation results directory (same as analysis for consistency)."""
+        return self.rain_radar_analysis_dir
     
     @property
-    def rain_radar_historical_dir(self) -> Path:
-        """Historical radar data directory (organized by date)."""
-        return self.rain_radar_dir / "historical"
+    def rain_radar_alarms_dir(self) -> Path:
+        """Alarm timeline outputs directory."""
+        return self.rain_radar_dir / "alarms"
     
     @property
     def rain_radar_viz_dir(self) -> Path:
@@ -278,39 +347,19 @@ class PipelinePaths:
         directories = [
             # Rain Gauges
             self.rain_gauges_raw_dir,
-            self.rain_gauges_analyze_dir,
+            self.rain_gauges_analysis_dir,
             self.rain_gauges_viz_dir,
-            self.rain_gauges_historical_dir,
             
             # Rain Radar
             self.rain_radar_raw_dir,
             self.rain_radar_data_dir,
-            self.rain_radar_analyze_dir,
-            self.rain_radar_ari_dir,
-            self.rain_radar_historical_dir,
+            self.rain_radar_analysis_dir,
+            self.rain_radar_alarms_dir,
             self.rain_radar_viz_dir,
         ]
         
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-    
-    def get_historical_radar_dir(self, date_str: str) -> Path:
-        """
-        Get historical radar data directory for a specific date.
-        
-        Args:
-            date_str: Date string in YYYY-MM-DD format
-            
-        Returns:
-            Path to historical data directory for the date
-            
-        Example:
-            >>> paths = PipelinePaths()
-            >>> historical_dir = paths.get_historical_radar_dir("2024-05-09")
-            >>> print(historical_dir)
-            outputs/rain_radar/historical/2024-05-09/raw
-        """
-        return self.rain_radar_historical_dir / date_str / "raw"
     
     def get_catchment_radar_file(self, catchment_id: int, catchment_name: str) -> Path:
         """
@@ -327,7 +376,7 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> file_path = paths.get_catchment_radar_file(123, "Auckland_CBD")
             >>> print(file_path)
-            outputs/rain_radar/raw/radar_data/123_Auckland_CBD.csv
+            outputs/rain_radar/20260120-20260121/raw/radar_data/123_Auckland_CBD.csv
         """
         filename = f"{catchment_id}_{catchment_name}.csv"
         return self.rain_radar_data_dir / filename
@@ -347,169 +396,256 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> ari_file = paths.get_ari_file(123, "Auckland_CBD")
             >>> print(ari_file)
-            outputs/rain_radar/ari/ari_123_Auckland_CBD.csv
+            outputs/rain_radar/20260120-20260121/analyze/ari_123_Auckland_CBD.csv
         """
         filename = f"ari_{catchment_id}_{catchment_name}.csv"
         return self.rain_radar_ari_dir / filename
     
-    # =========================================================================
-    # Rain Gauge Historical Helper Methods (NEW!)
-    # =========================================================================
-    
-    def get_historical_gauge_dir(self, date_str: str) -> Path:
+    def get_gauge_raw_path(self, date_str: Optional[str] = None) -> Path:
         """
-        Get historical gauge data directory for a specific date.
+        Get path to rain gauge raw data JSON file.
         
         Args:
-            date_str: Date string in YYYY-MM-DD format
-            
+            date_str: Optional date string (YYYY-MM-DD). If provided, returns path
+                     for that date. If None, uses current instance's date.
+                     
         Returns:
-            Path to historical data directory for the date
+            Path to rain_gauges_traces_alarms.json file
             
         Example:
             >>> paths = PipelinePaths()
-            >>> historical_dir = paths.get_historical_gauge_dir("2025-01-01")
-            >>> print(historical_dir)
-            outputs/rain_gauges/historical/2025-01-01
-        """
-        return self.rain_gauges_historical_dir / date_str
-    
-    def get_gauge_raw_path(self, date_str: str = None) -> Path:
-        """
-        Get raw gauge data path (current or historical).
-        
-        Args:
-            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
+            >>> raw_path = paths.get_gauge_raw_path()
+            >>> print(raw_path)
+            outputs/rain_gauges/20260120-20260121/raw/rain_gauges_traces_alarms.json
             
-        Returns:
-            Path to raw data file
-            
-        Example:
-            >>> paths = PipelinePaths()
-            >>> # Current
-            >>> current = paths.get_gauge_raw_path()
-            >>> print(current)
-            outputs/rain_gauges/raw/rain_gauges_traces_alarms.json
-            
-            >>> # Historical
-            >>> historical = paths.get_gauge_raw_path("2025-01-01")
-            >>> print(historical)
-            outputs/rain_gauges/historical/2025-01-01/raw/rain_gauges_traces_alarms.json
+            >>> raw_path = paths.get_gauge_raw_path("2025-05-09")
+            >>> print(raw_path)
+            outputs/rain_gauges/20250508-20250509/raw/rain_gauges_traces_alarms.json
         """
         if date_str:
-            # Historical
-            return self.get_historical_gauge_dir(date_str) / "raw" / "rain_gauges_traces_alarms.json"
-        else:
-            # Current
-            return self.rain_gauges_raw_dir / "rain_gauges_traces_alarms.json"
+            date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
+            return date_paths.rain_gauges_traces_alarms_json
+        return self.rain_gauges_traces_alarms_json
     
-    def get_gauge_analyze_dir(self, date_str: str = None) -> Path:
+    def get_gauge_analyze_dir(self, date_str: Optional[str] = None) -> Path:
         """
-        Get gauge analysis directory (current or historical).
+        Get path to rain gauge analysis directory.
         
         Args:
-            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
-            
+            date_str: Optional date string (YYYY-MM-DD). If provided, returns path
+                     for that date. If None, uses current instance's date.
+                     
         Returns:
             Path to analysis directory
             
         Example:
             >>> paths = PipelinePaths()
-            >>> # Current
-            >>> current = paths.get_gauge_analyze_dir()
-            >>> print(current)
-            outputs/rain_gauges/analyze
+            >>> analyze_dir = paths.get_gauge_analyze_dir()
+            >>> print(analyze_dir)
+            outputs/rain_gauges/20260120-20260121/analysis
             
-            >>> # Historical
-            >>> historical = paths.get_gauge_analyze_dir("2025-01-01")
-            >>> print(historical)
-            outputs/rain_gauges/historical/2025-01-01/analyze
+            >>> analyze_dir = paths.get_gauge_analyze_dir("2025-05-09")
+            >>> print(analyze_dir)
+            outputs/rain_gauges/20250508-20250509/analysis
         """
         if date_str:
-            return self.get_historical_gauge_dir(date_str) / "analyze"
-        else:
-            return self.rain_gauges_analyze_dir
+            date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
+            return date_paths.rain_gauges_analysis_dir
+        return self.rain_gauges_analysis_dir
     
-    def get_gauge_viz_dir(self, date_str: str = None) -> Path:
+    def get_gauge_viz_dir(self, date_str: Optional[str] = None) -> Path:
         """
-        Get gauge visualization directory (current or historical).
+        Get path to rain gauge visualization directory.
         
         Args:
-            date_str: Optional date in YYYY-MM-DD format. If None, uses current.
-            
+            date_str: Optional date string (YYYY-MM-DD). If provided, returns path
+                     for that date. If None, uses current instance's date.
+                     
         Returns:
             Path to visualization directory
             
         Example:
             >>> paths = PipelinePaths()
-            >>> # Current
-            >>> current = paths.get_gauge_viz_dir()
-            >>> print(current)
-            outputs/rain_gauges/visualizations
+            >>> viz_dir = paths.get_gauge_viz_dir()
+            >>> print(viz_dir)
+            outputs/rain_gauges/20260120-20260121/visualizations
             
-            >>> # Historical
-            >>> historical = paths.get_gauge_viz_dir("2025-01-01")
-            >>> print(historical)
-            outputs/rain_gauges/historical/2025-01-01/visualizations
+            >>> viz_dir = paths.get_gauge_viz_dir("2025-05-09")
+            >>> print(viz_dir)
+            outputs/rain_gauges/20250508-20250509/visualizations
         """
         if date_str:
-            return self.get_historical_gauge_dir(date_str) / "visualizations"
-        else:
-            return self.rain_gauges_viz_dir
+            date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
+            return date_paths.rain_gauges_viz_dir
+        return self.rain_gauges_viz_dir
+    
+    @staticmethod
+    def for_date(date_value: Union[str, date, datetime], outputs_root: Path = Path("outputs")) -> "PipelinePaths":
+        """
+        Create PipelinePaths instance for a specific date.
+        
+        Args:
+            date_value: Date as string (YYYY-MM-DD), date, or datetime object
+            outputs_root: Root directory for outputs
+            
+        Returns:
+            PipelinePaths configured for the specified date
+            
+        Example:
+            >>> # From string
+            >>> paths = PipelinePaths.for_date("2025-05-09")
+            >>> print(paths.rain_radar_raw_dir)
+            outputs/rain_radar/20250508-20250509/raw
+            
+            >>> # From date object
+            >>> from datetime import date
+            >>> paths = PipelinePaths.for_date(date(2025, 5, 9))
+            >>> print(paths.rain_gauges_raw_dir)
+            outputs/rain_gauges/20250508-20250509/raw
+        """
+        return PipelinePaths(outputs_root=outputs_root, date=date_value)
+    
+    @staticmethod
+    def for_date_range(
+        start_time: datetime, 
+        end_time: datetime, 
+        outputs_root: Path = Path("outputs")
+    ) -> "PipelinePaths":
+        """
+        Create PipelinePaths instance for a specific date range.
+        
+        Args:
+            start_time: Start datetime for data range
+            end_time: End datetime for data range
+            outputs_root: Root directory for outputs
+            
+        Returns:
+            PipelinePaths configured for the specified date range
+            
+        Example:
+            >>> from datetime import datetime
+            >>> start = datetime(2025, 5, 9, 0, 0, 0)
+            >>> end = datetime(2025, 5, 10, 0, 0, 0)
+            >>> paths = PipelinePaths.for_date_range(start, end)
+            >>> print(paths.rain_radar_raw_dir)
+            outputs/rain_radar/20250509-20250510/raw
+        """
+        return PipelinePaths(outputs_root=outputs_root, start_time=start_time, end_time=end_time)
+    
+    @staticmethod
+    def for_today(outputs_root: Path = Path("outputs")) -> "PipelinePaths":
+        """
+        Create PipelinePaths instance for today's date.
+        
+        Args:
+            outputs_root: Root directory for outputs
+            
+        Returns:
+            PipelinePaths configured for today
+            
+        Example:
+            >>> paths = PipelinePaths.for_today()
+            >>> print(paths.rain_radar_raw_dir)
+            outputs/rain_radar/20260120-20260121/raw
+        """
+        return PipelinePaths(outputs_root=outputs_root, date=datetime.now().date())
+    
+    def with_date(self, date_value: Union[str, date, datetime]) -> "PipelinePaths":
+        """
+        Create new PipelinePaths instance with different date.
+        
+        Args:
+            date_value: New date as string (YYYY-MM-DD), date, or datetime
+            
+        Returns:
+            New PipelinePaths instance with specified date
+            
+        Example:
+            >>> paths = PipelinePaths()  # Today
+            >>> historical = paths.with_date("2025-05-09")
+            >>> print(historical.rain_radar_raw_dir)
+            outputs/rain_radar/20250508-20250509/raw
+        """
+        return PipelinePaths(outputs_root=self.outputs_root, date=date_value)
+    
+    def get_date_str(self) -> str:
+        """
+        Get date as YYYY-MM-DD string.
+        
+        Returns:
+            Date string in YYYY-MM-DD format
+            
+        Example:
+            >>> paths = PipelinePaths.for_date("2025-05-09")
+            >>> paths.get_date_str()
+            '2025-05-09'
+        """
+        return self.date.strftime('%Y-%m-%d')
     
     def __repr__(self) -> str:
-        """String representation showing root directory."""
-        return f"PipelinePaths(outputs_root='{self.outputs_root}')"
-    
+        """String representation showing root and date."""
+        return f"PipelinePaths(outputs_root='{self.outputs_root}', date='{self.get_date_str()}')"
+
 
 # =============================================================================
-# Singleton Support
+# Global Helper Functions
 # =============================================================================
 
-_global_paths_instance: Optional[PipelinePaths] = None
+_global_paths_cache: dict[str, PipelinePaths] = {}
 
 
 def get_paths(
+    date_value: Union[str, date, datetime, None] = None,
     outputs_root: Optional[Path] = None,
     force_new: bool = False
 ) -> PipelinePaths:
     """
-    Get PipelinePaths instance (singleton by default).
+    Get PipelinePaths instance (cached by date for efficiency).
     
     Args:
+        date_value: Date for paths (None = today)
         outputs_root: Optional custom root directory
-        force_new: If True, create new instance instead of singleton
+        force_new: If True, create new instance instead of using cache
         
     Returns:
         PipelinePaths instance
         
     Example:
         >>> from moata_pipeline.common.paths import get_paths
+        >>> # Today's paths
         >>> paths = get_paths()
         >>> print(paths.rain_gauges_raw_dir)
-        outputs/rain_gauges/raw
+        outputs/rain_gauges/20260120-20260121/raw
+        
+        >>> # Historical paths
+        >>> historical = get_paths(date_value="2025-05-09")
+        >>> print(historical.rain_radar_raw_dir)
+        outputs/rain_radar/20250508-20250509/raw
     """
-    global _global_paths_instance
+    root = outputs_root or Path("outputs")
+    
+    # Create temporary instance to get date string for cache key
+    temp_paths = PipelinePaths(outputs_root=root, date=date_value)
+    cache_key = f"{root}:{temp_paths.get_date_str()}"
     
     if force_new:
-        return PipelinePaths(outputs_root=outputs_root or Path("outputs"))
+        return temp_paths
     
-    if _global_paths_instance is None:
-        _global_paths_instance = PipelinePaths(
-            outputs_root=outputs_root or Path("outputs")
-        )
+    if cache_key not in _global_paths_cache:
+        _global_paths_cache[cache_key] = temp_paths
     
-    return _global_paths_instance
+    return _global_paths_cache[cache_key]
 
 
-def set_global_paths(paths: PipelinePaths) -> None:
+def clear_paths_cache() -> None:
     """
-    Set the global paths instance.
+    Clear the global paths cache.
     
-    Useful for custom configurations or testing.
+    Useful for testing or when switching between many dates.
     
-    Args:
-        paths: PipelinePaths instance to use as global
+    Example:
+        >>> from moata_pipeline.common.paths import clear_paths_cache
+        >>> clear_paths_cache()
     """
-    global _global_paths_instance
-    _global_paths_instance = paths
+    global _global_paths_cache
+    _global_paths_cache = {}

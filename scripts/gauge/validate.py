@@ -23,6 +23,7 @@ from moata_pipeline.common.constants import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     DEFAULT_REQUESTS_PER_SECOND,
 )
+from moata_pipeline.common.paths import PipelinePaths
 from moata_pipeline.moata.auth import MoataAuth
 from moata_pipeline.moata.http import MoataHttp
 from moata_pipeline.moata.client import MoataClient
@@ -30,9 +31,10 @@ from moata_pipeline.moata.client import MoataClient
 # =====================
 # SETTINGS
 # =====================
+paths = PipelinePaths()
 INPUT_CSV = Path("data/inputs/raingauge_ari_alarms.csv")
-TRACE_MAPPING_CSV = Path("outputs/rain_gauges/analyze/alarm_summary_full.csv")
-OUTPUT_CSV = Path("outputs/rain_gauges/ari_alarm_validation.csv")
+TRACE_MAPPING_CSV = paths.alarm_summary_full_csv
+OUTPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
 
 # What we are validating
 ARI_TRACE_DESC = "Max TP108 ARI"

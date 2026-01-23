@@ -492,6 +492,28 @@ def _extract_trace_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
 # Trace Selection Helpers
 # =============================================================================
 
+def _normalize_trace(td: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize trace data to handle both nested and flat formats.
+    
+    Handles:
+        1. Nested: {"trace": {...properties...}}
+        2. Flat: {...properties...} (direct trace object)
+    
+    Returns:
+        The trace properties dictionary (not wrapped)
+    """
+    # If nested format, extract trace
+    if "trace" in td and isinstance(td.get("trace"), dict):
+        return td.get("trace", {})
+    
+    # If flat format (has typical trace keys), return as-is
+    if "dataVariableType" in td or "description" in td or "id" in td:
+        return td
+    
+    return {}
+
+
 def _is_primary_rainfall_trace(trace: Dict[str, Any]) -> bool:
     """Check if trace is primary rainfall trace."""
     desc = (trace.get("description") or "").strip().lower()
@@ -502,7 +524,7 @@ def _get_latest_telemetered_time(traces: List[Dict[str, Any]]) -> Optional[datet
     """Get latest telemetered time across all traces."""
     latest: Optional[datetime] = None
     for td in traces:
-        t = td.get("trace", {}) or {}
+        t = _normalize_trace(td)
         tmax = _to_utc(_parse_iso(_as_str(t.get("telemeteredMaximumTime"))))
         if tmax and (latest is None or tmax > latest):
             latest = tmax
@@ -519,7 +541,7 @@ def _get_primary_rainfall_times(
         Tuple of (archived_min, archived_max, telemetered_max)
     """
     for td in traces:
-        t = td.get("trace", {}) or {}
+        t = _normalize_trace(td)
         if _is_primary_rainfall_trace(t):
             amin = _to_utc(_parse_iso(_as_str(t.get("archivedMinimumTime"))))
             amax = _to_utc(_parse_iso(_as_str(t.get("archivedMaximumTime"))))
@@ -697,15 +719,17 @@ def analyze_alarms(
             if not isinstance(trace_wrap, dict):
                 continue
 
-            trace = trace_wrap.get("trace", {}) or {}
+            trace = _normalize_trace(trace_wrap)
             if not isinstance(trace, dict):
                 trace = {}
 
             trace_fields = _extract_trace_fields(trace)
 
             # 1) Trace inventory row
-            present_alarm_types, alarm_type_counts = alarms_by_type_inventory(trace_wrap)
-            detailed_type = detailed_alarm_inventory(trace_wrap)
+            # Wrap trace back for alarm inventory functions that expect nested format
+            trace_wrapped = {"trace": trace}
+            present_alarm_types, alarm_type_counts = alarms_by_type_inventory(trace_wrapped)
+            detailed_type = detailed_alarm_inventory(trace_wrapped)
 
             trace_inventory_row = {
                 **gauge_base,
@@ -730,7 +754,8 @@ def analyze_alarms(
                 alarm_records.append(inv_alarm_row)
 
             # 3) Threshold configs (one row per threshold)
-            thresholds = trace_wrap.get("thresholds", []) or []
+            # thresholds are in the trace object, not trace_wrap
+            thresholds = trace.get("thresholds", []) or []
             if isinstance(thresholds, dict):
                 thresholds = list(thresholds.values())
 

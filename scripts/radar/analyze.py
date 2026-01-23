@@ -29,15 +29,15 @@ Usage:
     python analyze_rain_radar.py --date 2025-05-09 --threshold 10.0 --output-dir custom/
 
 Output:
-    outputs/rain_radar/analyze/                    (for current data)
-    outputs/rain_radar/historical/DATE/analyze/    (for historical data)
+    outputs/rain_radar/analysis/                    (for current data)
+    outputs/rain_radar/YYYY/MM/DD/analysis/         (for historical data)
     +-- ari_analysis_summary.csv      # Per-catchment ARI summary
     +-- ari_exceedances.csv           # Catchments exceeding threshold
     +-- analysis_report.txt           # Detailed text report
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-20
+Version: 1.1.0
 """
 
 import sys
@@ -55,12 +55,13 @@ from typing import Dict, Any, Optional
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-from moata_pipeline.logging_setup import setup_logging
+from moata_pipeline.common.script_utils import setup_script_logger
+from moata_pipeline.common.paths import PipelinePaths
 from moata_pipeline.analyze.radar_analysis import run_radar_analysis
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,6 +89,9 @@ Examples:
   
   # Custom ARI threshold (10-year instead of default 5-year)
   %(prog)s --date 2025-05-09 --threshold 10.0
+  
+  # Generate alarm timeline
+  %(prog)s --date 2025-05-09 --alarm-timeline
   
   # Custom output directory
   %(prog)s --current --output-dir custom/analysis/
@@ -150,9 +154,16 @@ Notes:
         type=float,
         default=5.0,
         metavar="YEARS",
-        help="ARI threshold in years for flagging catchments (default: 5.0). "
-             "Catchments exceeding this threshold are highlighted. "
-             "Example: --threshold 10.0"
+        help="ARI threshold for exceedance recording (default: 5.0 years). "
+             "Example: --threshold 10.0 for 10-year threshold"
+    )
+    
+    analysis_group.add_argument(
+        "--alarm-timeline",
+        action="store_true",
+        help="Generate alarm timeline showing when alarms would trigger. "
+             "Checks alarm status at EVERY timestamp. "
+             "Note: This significantly increases processing time (may add 5-15 minutes)."
     )
     
     # Logging options
@@ -193,21 +204,21 @@ def validate_threshold(threshold: float) -> None:
     
     if threshold > 100:
         logging.warning(
-            f"??  Very high ARI threshold: {threshold} years. "
+            f"⚠️  Very high ARI threshold: {threshold} years. "
             f"This may result in very few or no exceedances."
         )
 
 
-def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> Path:
+def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> tuple[Path, PipelinePaths]:
     """
-    Detect radar data directory based on arguments.
+    Detect radar data directory based on arguments and return PipelinePaths instance.
     
     Args:
         args: Parsed command-line arguments
         logger: Logger instance
         
     Returns:
-        Path to radar data directory
+        Tuple of (radar_data_dir, PipelinePaths)
         
     Raises:
         FileNotFoundError: If data directory doesn't exist
@@ -216,37 +227,68 @@ def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> P
     if args.data_dir:
         radar_data_dir = Path(args.data_dir)
         logger.info("Using custom data directory: %s", radar_data_dir)
+        paths = PipelinePaths()  # Use today's date for custom dir
         
     # Option 2: Specific date (historical)
     elif args.date:
-        radar_data_dir = Path(f"outputs/rain_radar/historical/{args.date}/raw/radar_data")
-        logger.info("Using historical data for date: %s", args.date)
+        # Try the specified date first
+        paths = PipelinePaths.for_date(args.date)
+        radar_data_dir = paths.rain_radar_data_dir
+        
+        # If no data found, try date-1 (because data is stored with window start date)
+        if not radar_data_dir.exists() or not list(radar_data_dir.glob("*.csv")):
+            from datetime import datetime, timedelta
+            try:
+                specified_date = datetime.strptime(args.date, "%Y-%m-%d")
+                prev_date = (specified_date - timedelta(days=1)).strftime("%Y-%m-%d")
+                logger.warning(
+                    f"No data found for {args.date}, trying previous date {prev_date}..."
+                )
+                paths = PipelinePaths.for_date(prev_date)
+                radar_data_dir = paths.rain_radar_data_dir
+                logger.info(f"Using historical data for date: {prev_date}")
+            except Exception as e:
+                logger.info("Using historical data for date: %s", args.date)
+        else:
+            logger.info("Using historical data for date: %s", args.date)
         
     # Option 3: Current data (explicit)
     elif args.current:
-        radar_data_dir = Path("outputs/rain_radar/raw/radar_data")
+        paths = PipelinePaths.for_today()
+        radar_data_dir = paths.rain_radar_data_dir
         logger.info("Using current (last 24h) data")
         
     # Option 4: Auto-detect (prefer historical)
     else:
         logger.info("Auto-detecting radar data directory...")
         
-        # Check for historical data
-        historical_base = Path("outputs/rain_radar/historical")
-        if historical_base.exists():
-            historical_dirs = sorted(historical_base.glob("*/raw/radar_data"))
-            if historical_dirs:
-                radar_data_dir = historical_dirs[-1]  # Most recent
-                date_dir = radar_data_dir.parent.parent.name
-                logger.info("? Found historical data: %s (date: %s)", radar_data_dir, date_dir)
+        # Try to find most recent historical data
+        # Format: outputs/rain_radar/YYYYMMDD-YYYYMMDD/raw/radar_data
+        historical_base = Path("outputs/rain_radar")
+        historical_dirs = sorted(
+            [d for d in historical_base.glob("*-*/raw/radar_data") if d.exists()],
+            key=lambda p: p.parent.parent.name,  # Sort by date folder name
+            reverse=True
+        )
+        
+        if historical_dirs:
+            radar_data_dir = historical_dirs[0]
+            # Extract date range from path: outputs/rain_radar/YYYYMMDD-YYYYMMDD/raw/radar_data
+            date_range_folder = radar_data_dir.parent.parent.name  # e.g., "20260120-20260121"
+            logger.info(f"✓ Found historical data: {radar_data_dir} (range: {date_range_folder})")
+            
+            # Parse end date from folder name for PipelinePaths
+            if "-" in date_range_folder and len(date_range_folder) == 17:
+                end_date_str = date_range_folder.split("-")[1]  # YYYYMMDD
+                date_str = f"{end_date_str[:4]}-{end_date_str[4:6]}-{end_date_str[6:8]}"
+                paths = PipelinePaths.for_date(date_str)
             else:
-                # Fallback to current
-                radar_data_dir = Path("outputs/rain_radar/raw/radar_data")
-                logger.info("No historical data found, using current: %s", radar_data_dir)
+                paths = PipelinePaths.for_today()
         else:
-            # Fallback to current
-            radar_data_dir = Path("outputs/rain_radar/raw/radar_data")
-            logger.info("Using current data: %s", radar_data_dir)
+            # Fallback to current/today
+            paths = PipelinePaths.for_today()
+            radar_data_dir = paths.rain_radar_data_dir
+            logger.info(f"Using current data: {radar_data_dir}")
     
     # Validate directory exists
     if not radar_data_dir.exists():
@@ -265,21 +307,23 @@ def detect_radar_data_dir(args: argparse.Namespace, logger: logging.Logger) -> P
             f"Directory exists but is empty."
         )
     
-    logger.info(f"? Found {len(data_files)} radar data files")
+    logger.info(f"✓ Found {len(data_files)} radar data files")
     
-    return radar_data_dir
+    return radar_data_dir, paths
 
 
 def determine_output_dir(
     radar_data_dir: Path,
+    paths: PipelinePaths,
     args: argparse.Namespace,
     logger: logging.Logger
 ) -> Path:
     """
-    Determine output directory based on input location.
+    Determine output directory based on PipelinePaths instance.
     
     Args:
         radar_data_dir: Input radar data directory
+        paths: PipelinePaths instance
         args: Parsed arguments
         logger: Logger instance
         
@@ -290,10 +334,8 @@ def determine_output_dir(
         output_dir = Path(args.output_dir)
         logger.info("Using custom output directory: %s", output_dir)
     else:
-        # Auto-determine: put analyze/ next to raw/
-        # outputs/rain_radar/raw/radar_data ? outputs/rain_radar/analyze/
-        # outputs/rain_radar/historical/DATE/raw/radar_data ? outputs/rain_radar/historical/DATE/analyze/
-        output_dir = radar_data_dir.parent.parent / "analyze"
+        # Use analysis directory from PipelinePaths
+        output_dir = paths.rain_radar_analysis_dir
         logger.info("Auto-determined output directory: %s", output_dir)
     
     return output_dir
@@ -313,8 +355,7 @@ def main() -> int:
         return e.code if e.code is not None else 0
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
         logger.info("=" * 80)
@@ -325,11 +366,11 @@ def main() -> int:
         validate_threshold(args.threshold)
         logger.info(f"ARI threshold: {args.threshold} years")
         
-        # Detect radar data directory
-        radar_data_dir = detect_radar_data_dir(args, logger)
+        # Detect radar data directory and get PipelinePaths
+        radar_data_dir, paths = detect_radar_data_dir(args, logger)
         
         # Determine output directory
-        output_dir = determine_output_dir(radar_data_dir, args, logger)
+        output_dir = determine_output_dir(radar_data_dir, paths, args, logger)
         
         logger.info("")
         logger.info("Configuration:")
@@ -346,6 +387,7 @@ def main() -> int:
             radar_data_dir=radar_data_dir,
             output_dir=output_dir,
             ari_threshold=args.threshold,
+            generate_alarm_timeline=args.alarm_timeline,
         )
         
         # Display report
@@ -358,7 +400,7 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("? Analysis completed successfully")
+        logger.info("✓ Analysis completed successfully")
         logger.info("=" * 80)
         logger.info(f"Output files saved to: {result['output_dir']}")
         logger.info("")
@@ -366,6 +408,10 @@ def main() -> int:
         logger.info("  - ari_analysis_summary.csv  (per-catchment ARI summary)")
         logger.info("  - ari_exceedances.csv       (catchments exceeding threshold)")
         logger.info("  - analysis_report.txt       (detailed text report)")
+        
+        if args.alarm_timeline:
+            logger.info("  - alarm_timeline.csv        (alarm status at each timestamp)")
+            logger.info("  - alarm_summary.txt         (alarm duration analysis)")
         logger.info("=" * 80)
         
         return 0
@@ -373,14 +419,14 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("??  Analysis interrupted by user (Ctrl+C)")
+        logger.warning("⚠️  Analysis interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         return 130
         
     except FileNotFoundError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Data Not Found")
+        logger.error("❌ Data Not Found")
         logger.error("=" * 80)
         logger.error(str(e))
         return 1
@@ -388,7 +434,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Validation Error")
+        logger.error("❌ Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -398,14 +444,14 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Analysis Failed")
+        logger.error("❌ Analysis Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")
         logger.error("")
         logger.error("Troubleshooting:")
         logger.error("1. Verify radar data was collected successfully")
-        logger.error("2. Check data directory exists and has .json files")
+        logger.error("2. Check data directory exists and has .csv files")
         logger.error("3. Ensure TP108 coefficients file is available")
         logger.error("4. Check disk space for output files")
         logger.error("5. Try with --log-level DEBUG for more details")

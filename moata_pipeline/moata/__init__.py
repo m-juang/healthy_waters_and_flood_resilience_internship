@@ -28,7 +28,7 @@ Usage:
     client = MoataClient(http=http)
     
     # Use the client
-    gauges = client.get_rain_gauges(project_id=594, asset_type_id=25)
+    gauges = client.get_rain_gauges(project_id=594, asset_type_id=100)
 
 Modules:
     - auth: OAuth2 authentication with token caching

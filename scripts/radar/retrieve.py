@@ -33,8 +33,8 @@ Output:
     Historical:   outputs/rain_radar/historical/YYYY-MM-DD/raw/
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
-Version: 1.0.0
+Last Modified: 2026-01-23 (FIXED: --date parameter now works correctly)
+Version: 1.0.1
 """
 
 import sys
@@ -52,12 +52,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from moata_pipeline.logging_setup import setup_logging
+from moata_pipeline.common.script_utils import setup_script_logger
+from moata_pipeline.common.paths import PipelinePaths
 from moata_pipeline.collect.runner import run_collect_radar
 
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,56 +75,33 @@ Examples:
   # Collect last 24 hours (current data)
   %(prog)s
   
-  # Collect specific historical date
+  # Collect specific date (full 24 hours)
   %(prog)s --date 2025-05-09
-  
-  # Collect date range (multiple days)
-  %(prog)s --start 2025-05-09 --end 2025-05-12
   
   # Force refresh pixel mappings from API
   %(prog)s --force-refresh-pixels
   
   # Verbose logging for debugging
   %(prog)s --date 2025-05-09 --log-level DEBUG
-  
-  # Combine options
-  %(prog)s --start 2025-05-01 --end 2025-05-07 --force-refresh-pixels --log-level INFO
 
 Notes:
-  - All dates are in UTC timezone
-  - Historical data available from 2024-01-01 onwards
-  - Current data collection fetches last 24 hours
+  - Data collection uses specified date for 24-hour period (00:00 to 23:59 UTC)
+  - Example: --date 2025-05-09 fetches 2025-05-09 00:00:00 to 2025-05-10 00:00:00
   - Pixel mappings are cached unless --force-refresh-pixels is used
-  - Collection duration: ~15-30 minutes depending on date range
+  - Collection duration: ~15-30 minutes
   - Requires: ~2-4 GB RAM for processing
-  - Output size: ~500 MB - 5 GB depending on duration
+  - Output size: ~500 MB - 2 GB
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
-    # Date options (mutually exclusive with default)
-    date_group = parser.add_argument_group('Date Options (choose one)')
-    date_mutex = date_group.add_mutually_exclusive_group()
+    # Date options
+    date_group = parser.add_argument_group('Date Options (default: last 24 hours)')
     
-    date_mutex.add_argument(
+    date_group.add_argument(
         "--date",
         metavar="YYYY-MM-DD",
-        help="Fetch data for specific date (full 24 hours UTC). "
-             "Example: --date 2025-05-09"
-    )
-    
-    date_group.add_argument(
-        "--start",
-        metavar="YYYY-MM-DD",
-        help="Start date for date range (UTC, inclusive). "
-             "Requires --end. Example: --start 2025-05-09"
-    )
-    
-    date_group.add_argument(
-        "--end",
-        metavar="YYYY-MM-DD",
-        help="End date for date range (UTC, exclusive). "
-             "Requires --start. Example: --end 2025-05-12"
+        help="Date to collect (fetches full 24 hours). Example: --date 2025-05-09"
     )
     
     # Processing options
@@ -156,14 +134,6 @@ Notes:
     )
     
     args = parser.parse_args()
-    
-    # Validate mutually exclusive date arguments
-    if args.start and not args.end:
-        parser.error("--start requires --end")
-    if args.end and not args.start:
-        parser.error("--end requires --start")
-    if args.date and (args.start or args.end):
-        parser.error("--date cannot be used with --start/--end")
     
     return args
 
@@ -217,7 +187,7 @@ def validate_date_range(start_time: datetime, end_time: datetime) -> None:
     duration = (end_time - start_time).days
     if duration > 31:
         logging.warning(
-            f"??  Large date range: {duration} days. "
+            f"⚠️  Large date range: {duration} days. "
             f"This may take a long time and use significant disk space."
         )
 
@@ -237,46 +207,43 @@ def main() -> int:
         return e.code if e.code is not None else 0
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
         logger.info("=" * 80)
         logger.info("Rain Radar Data Collection - v%s", __version__)
         logger.info("=" * 80)
         
-        # Determine time range
+        # Determine time range and paths
         start_time: Optional[datetime] = None
         end_time: Optional[datetime] = None
         mode: str = "current"
+        paths: PipelinePaths
         
         if args.date:
-            # Single date (historical)
-            logger.info("Mode: Historical (single date)")
-            start_time = parse_date(args.date, "--date")
-            end_time = start_time + timedelta(days=1)
-            mode = "historical"
-            logger.info(f"Date: {args.date}")
+            # ✅ FIXED: Parse tanggal yang diminta user
+            logger.info("Mode: Historical (specific date)")
+            logger.info(f"Requested date: {args.date}")
             
-        elif args.start and args.end:
-            # Date range (historical)
-            logger.info("Mode: Historical (date range)")
-            start_time = parse_date(args.start, "--start")
-            end_time = parse_date(args.end, "--end")
-            mode = "historical"
-            logger.info(f"Range: {args.start} to {args.end}")
+            # Parse tanggal dari string
+            requested_date = parse_date(args.date, "--date")
             
-            # Validate range
-            validate_date_range(start_time, end_time)
-            duration = (end_time - start_time).days
-            logger.info(f"Duration: {duration} day(s)")
+            # Buat range 24 jam untuk tanggal tersebut
+            # Contoh: 2025-05-09 → dari 2025-05-09 00:00:00 sampai 2025-05-10 00:00:00
+            start_time = requested_date
+            end_time = start_time + timedelta(hours=24)
+            
+            mode = "historical"
+            logger.info(f"Date range: {start_time.date()} to {end_time.date()}")
+            paths = PipelinePaths.for_date_range(start_time, end_time)
             
         else:
-            # Default: last 24 hours (current)
+            # Default: last 24 hours (current/today)
             logger.info("Mode: Current (last 24 hours)")
             end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(hours=24)
             mode = "current"
+            paths = PipelinePaths.for_date_range(start_time, end_time)
         
         # Log time range
         logger.info(f"Start time (UTC): {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -284,9 +251,9 @@ def main() -> int:
         
         # Log processing options
         if args.force_refresh_pixels:
-            logger.info("?? Pixel mappings: Force refresh from API")
+            logger.info("🔄 Pixel mappings: Force refresh from API")
         else:
-            logger.info("?? Pixel mappings: Use cached (if available)")
+            logger.info("📦 Pixel mappings: Use cached (if available)")
         
         logger.info("=" * 80)
         logger.info("")
@@ -302,24 +269,18 @@ def main() -> int:
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info("? Radar data collection completed successfully")
+        logger.info("✅ Radar data collection completed successfully")
         logger.info("=" * 80)
         
         # Log output location
-        if mode == "historical" and args.date:
-            output_dir = f"outputs/rain_radar/historical/{args.date}/raw/"
-            logger.info(f"Output location: {output_dir}")
-        elif mode == "historical":
-            logger.info("Output location: outputs/rain_radar/historical/YYYY-MM-DD/raw/")
-        else:
-            logger.info("Output location: outputs/rain_radar/raw/")
+        logger.info(f"Output location: {paths.rain_radar_raw_dir}/")
         
         return 0
         
     except KeyboardInterrupt:
         logger.warning("")
         logger.warning("=" * 80)
-        logger.warning("??  Collection interrupted by user (Ctrl+C)")
+        logger.warning("⚠️  Collection interrupted by user (Ctrl+C)")
         logger.warning("=" * 80)
         logger.warning("Partial data may have been saved.")
         logger.warning("You can resume by running the script again.")
@@ -328,7 +289,7 @@ def main() -> int:
     except ValueError as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Validation Error")
+        logger.error("❌ Validation Error")
         logger.error("=" * 80)
         logger.error(str(e))
         logger.error("")
@@ -338,7 +299,7 @@ def main() -> int:
     except Exception as e:
         logger.error("")
         logger.error("=" * 80)
-        logger.error("? Collection Failed")
+        logger.error("❌ Collection Failed")
         logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.exception("Full traceback:")

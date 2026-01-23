@@ -46,11 +46,13 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from moata_pipeline.logging_setup import setup_logging
+from moata_pipeline.common.script_utils import setup_script_logger
+from moata_pipeline.common.paths import PipelinePaths
 
 # Default paths
-DEFAULT_INPUT_CSV = Path("outputs/rain_gauges/ari_alarm_validation.csv")
-DEFAULT_OUT_DIR = Path("outputs/rain_gauges/validation_viz")
+paths = PipelinePaths()
+DEFAULT_INPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
+DEFAULT_OUT_DIR = paths.rain_gauges_validation_dir
 
 
 def parse_args() -> argparse.Namespace:
@@ -375,8 +377,7 @@ def main() -> int:
     args = parse_args()
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
         logger.info("=" * 80)

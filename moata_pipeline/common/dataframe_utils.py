@@ -171,7 +171,11 @@ def to_numeric_series(s: pd.Series) -> pd.Series:
 # Cleaning Functions
 # =============================================================================
 
-def clean_text_series(s: pd.Series) -> pd.Series:
+def clean_text_series(
+    s: pd.Series,
+    remove_extra_spaces: bool = False,
+    lowercase: bool = False
+) -> pd.Series:
     """
     Clean text Series by converting to string and stripping whitespace.
     
@@ -179,6 +183,8 @@ def clean_text_series(s: pd.Series) -> pd.Series:
     
     Args:
         s: Input Series to clean
+        remove_extra_spaces: If True, replace multiple spaces with single space
+        lowercase: If True, convert all text to lowercase
         
     Returns:
         Series with cleaned text (no leading/trailing whitespace)
@@ -188,11 +194,23 @@ def clean_text_series(s: pd.Series) -> pd.Series:
         >>> result = clean_text_series(data)
         >>> print(result.tolist())
         ['hello', 'world', '', '123']
+        
+        >>> result = clean_text_series(data, remove_extra_spaces=True, lowercase=True)
+        >>> print(result.tolist())
+        ['hello', 'world', '', '123']
     """
     if not isinstance(s, pd.Series):
         raise TypeError(f"Expected pd.Series, got {type(s).__name__}")
     
-    return s.fillna("").astype(str).str.strip()
+    result = s.fillna("").astype(str).str.strip()
+    
+    if remove_extra_spaces:
+        result = result.str.replace(r'\s+', ' ', regex=True)
+    
+    if lowercase:
+        result = result.str.lower()
+    
+    return result
 
 
 # =============================================================================
@@ -219,8 +237,8 @@ def ensure_columns(
         DataFrame with all expected columns (copy of original)
         
     Raises:
-        TypeError: If df is not a DataFrame
-        ValueError: If expected_columns is empty
+        TypeError: If df is not a DataFrame or expected_columns is not a list
+        ValueError: If expected_columns is empty or contains non-string values
         
     Example:
         >>> df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
@@ -233,8 +251,16 @@ def ensure_columns(
     if not isinstance(df, pd.DataFrame):
         raise TypeError(f"Expected pd.DataFrame, got {type(df).__name__}")
     
+    if not isinstance(expected_columns, list):
+        raise TypeError(f"expected_columns must be a list, got {type(expected_columns).__name__}")
+    
     if not expected_columns:
         raise ValueError("expected_columns cannot be empty")
+    
+    # Validate all columns are strings
+    for col in expected_columns:
+        if not isinstance(col, str):
+            raise ValueError(f"All column names must be strings, found {type(col).__name__}: {col}")
     
     # Create a copy to avoid modifying original
     df = df.copy()

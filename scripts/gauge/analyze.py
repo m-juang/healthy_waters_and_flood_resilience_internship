@@ -31,7 +31,8 @@ Filters Applied:
     - Name filtering: Excludes gauges matching keyword (default: "test")
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
+Last Modified: 2026-01-21 (Refactored to use common utilities)
+Version: 1.2.0
 """
 
 import sys
@@ -40,15 +41,23 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import argparse
 import logging
-import sys
 from typing import Dict, Any
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-from moata_pipeline.logging_setup import setup_logging
+# Use refactored utilities
+from moata_pipeline.common.script_utils import (
+    create_base_arg_parser,
+    add_data_source_args,
+    add_logging_args,
+    setup_script_logger,
+    print_script_header,
+    print_script_footer,
+    handle_keyboard_interrupt
+)
+from moata_pipeline.common.validation import validate_positive_number
 from moata_pipeline.analyze.runner import run_filter_active_gauges
 from moata_pipeline.common.constants import (
     INACTIVE_THRESHOLD_MONTHS,
@@ -56,19 +65,25 @@ from moata_pipeline.common.constants import (
 )
 
 
-def parse_args() -> argparse.Namespace:
+# Version info
+__version__ = "1.2.0"
+
+
+def parse_args():
     """
     Parse command-line arguments.
     
     Returns:
         Parsed arguments namespace
     """
-    parser = argparse.ArgumentParser(
+    # Create base parser with standard structure
+    parser = create_base_arg_parser(
         description="Analyze and filter rain gauge data for active, quality gauges",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        script_name="analyze.py",
+        version=__version__,
         epilog="""
 Examples:
-  %(prog)s                                    # Auto-detect (prefers historical)
+  %(prog)s                                    # Auto-detect (prefers most recent)
   %(prog)s --current                          # Analyze current (last 24h) data
   %(prog)s --date 2025-05-09                  # Analyze specific historical date
   %(prog)s --inactive-months 6                # Consider 6-month inactivity
@@ -81,38 +96,21 @@ Filters Applied:
   - Value range: 0-500 mm/hour (outlier removal)
   - Name filter: Exclude gauges matching keyword (default: "test")
 
-Input:
-  Current mode: outputs/rain_gauges/raw/
-  Historical mode: outputs/rain_gauges/historical/DATE/raw/
-
-Output:
-  Current mode: outputs/rain_gauges/analyze/
-  Historical mode: outputs/rain_gauges/historical/DATE/analyze/
+Input/Output:
+  All data is organized in: outputs/rain_gauges/YYYYMMDD-YYYYMMDD/
+  - Input: raw/rain_gauges_traces_alarms.json
+  - Output: analysis/
 
 Duration:
   Typically 2-3 minutes depending on dataset size.
         """
     )
     
-    # Data source options (mutually exclusive)
-    source_group = parser.add_argument_group('Data Source (choose one or auto-detect)')
-    source_mutex = source_group.add_mutually_exclusive_group()
+    # Add standard data source and logging arguments
+    add_data_source_args(parser, support_current=True, support_date=True)
+    add_logging_args(parser)
     
-    source_mutex.add_argument(
-        "--current",
-        action="store_true",
-        help="Analyze current (last 24h) data explicitly. "
-             "Uses outputs/rain_gauges/raw/"
-    )
-    
-    source_mutex.add_argument(
-        "--date",
-        metavar="YYYY-MM-DD",
-        help="Analyze specific historical date. "
-             "Example: --date 2025-05-09"
-    )
-    
-    # Filter options
+    # Add script-specific filter options
     filter_group = parser.add_argument_group('Filter Options')
     
     filter_group.add_argument(
@@ -129,23 +127,6 @@ Duration:
         default=DEFAULT_EXCLUDE_KEYWORD,
         metavar="KEYWORD",
         help=f'Exclude gauges with KEYWORD in name (default: "{DEFAULT_EXCLUDE_KEYWORD}")'
-    )
-    
-    # Logging options
-    log_group = parser.add_argument_group('Logging Options')
-    
-    log_group.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set logging level (default: INFO)"
-    )
-    
-    # Metadata
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="%(prog)s 1.1.0"
     )
     
     return parser.parse_args()
@@ -186,16 +167,18 @@ def main() -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    args = parse_args()
+    # Parse arguments
+    try:
+        args = parse_args()
+    except SystemExit as e:
+        return e.code if e.code is not None else 0
     
-    # Setup logging with user-specified level
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    # Setup logging
+    logger = setup_script_logger(args.log_level, __name__)
     
     try:
-        logger.info("=" * 80)
-        logger.info("Starting Rain Gauge Data Filtering and Analysis")
-        logger.info("=" * 80)
+        # Print header
+        print_script_header("Rain Gauge Data Filtering and Analysis", __version__, logger)
         
         # Determine mode
         if args.date:
@@ -208,13 +191,22 @@ def main() -> int:
             logger.info("Mode: Auto-detect (prefers historical)")
             input_date = None
         
-        logger.info(f"Inactive threshold: {args.inactive_months} months")
+        # Validate parameters
+        inactive_months = validate_positive_number(
+            args.inactive_months,
+            "inactive_months",
+            allow_zero=False,
+            min_value=1,
+            max_value=24
+        )
+        
+        logger.info(f"Inactive threshold: {inactive_months} months")
         logger.info(f"Exclude keyword: '{args.exclude_keyword}'")
         logger.info("=" * 80)
         
         # Run analysis with date parameter
         result = run_filter_active_gauges(
-            inactive_months=args.inactive_months,
+            inactive_months=inactive_months,
             exclude_keyword=args.exclude_keyword,
             input_date=input_date
         )
@@ -232,12 +224,12 @@ def main() -> int:
         logger.info("\n" + format_output_paths(result))
         logger.info("=" * 80)
         
+        # Print footer
+        print_script_footer(logger, success=True)
         return 0
         
     except KeyboardInterrupt:
-        logger.warning("\n⚠️  Analysis interrupted by user (Ctrl+C)")
-        logger.info("Partial results may have been saved")
-        return 130  # Standard exit code for SIGINT
+        return handle_keyboard_interrupt(logger)
         
     except FileNotFoundError as e:
         logger.error(f"❌ File not found: {e}")
@@ -245,11 +237,13 @@ def main() -> int:
         logger.error("1. Raw gauge data not collected yet - run retrieve_rain_gauges.py first")
         logger.error("2. Missing outputs/rain_gauges/raw/ or historical directory")
         logger.error("3. No JSON files in raw data directory")
+        print_script_footer(logger, success=False)
         return 1
         
     except PermissionError as e:
         logger.error(f"❌ Permission denied: {e}")
         logger.error("Check file/directory permissions for outputs/rain_gauges/")
+        print_script_footer(logger, success=False)
         return 1
         
     except ValueError as e:
@@ -259,6 +253,7 @@ def main() -> int:
         logger.error("2. Invalid filter parameters (check --inactive-months)")
         logger.error("3. Empty or malformed JSON files")
         logger.error("4. Invalid date format (use YYYY-MM-DD)")
+        print_script_footer(logger, success=False)
         return 1
         
     except Exception as e:
@@ -275,6 +270,7 @@ def main() -> int:
         logger.error("3. Verify filter parameters are reasonable (e.g., --inactive-months > 0)")
         logger.error("4. Try running with --log-level DEBUG for more information")
         logger.error("5. Check disk space in outputs/ directory")
+        print_script_footer(logger, success=False)
         return 1
 
 

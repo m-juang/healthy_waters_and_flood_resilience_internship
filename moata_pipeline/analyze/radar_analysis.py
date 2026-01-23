@@ -17,6 +17,7 @@ Version: 1.0.0
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +54,8 @@ def _process_catchment_file(
     calc: ARICalculator,
     filepath: Path,
     ari_threshold: float,
+    catchment_id: Optional[int] = None,
+    pixel_weights: Optional[Dict[tuple, float]] = None,
 ) -> Dict[str, Any]:
     """
     Process one catchment radar file and return ARI summary.
@@ -61,6 +64,8 @@ def _process_catchment_file(
         calc: Initialized ARICalculator instance
         filepath: Path to catchment radar CSV
         ari_threshold: ARI threshold for exceedance
+        catchment_id: Catchment ID for weight lookup (optional)
+        pixel_weights: Dict mapping (catchment_id, pixel_idx) -> weight (optional)
         
     Returns:
         Dictionary with catchment summary statistics
@@ -117,7 +122,13 @@ def _process_catchment_file(
                 if pd.isna(depth) or depth <= 0:
                     continue
                 
-                ari = calc.calculate_ari(depth, b, m)
+                # Apply pixel weight if available
+                weighted_depth = depth
+                if catchment_id is not None and pixel_weights is not None:
+                    weight = pixel_weights.get((catchment_id, int(pixel_idx)), 1.0)
+                    weighted_depth = depth * weight
+                
+                ari = calc.calculate_ari(weighted_depth, b, m)
                 
                 # Track pixel max
                 if ari > pixel_max_ari:
@@ -130,7 +141,7 @@ def _process_catchment_file(
                         "peak_pixel_index": int(pixel_idx),
                         "peak_timestamp": ts,
                         "peak_duration": dur_name,
-                        "peak_depth_mm": round(depth, 2),
+                        "peak_depth_mm": round(weighted_depth, 2),
                     }
                 
                 # Record exceedances
@@ -139,7 +150,7 @@ def _process_catchment_file(
                         "pixel_index": int(pixel_idx),
                         "timestamp": ts,
                         "duration": dur_name,
-                        "depth_mm": round(depth, 2),
+                        "depth_mm": round(weighted_depth, 2),
                         "ari_years": round(ari, 2),
                     })
         
@@ -245,6 +256,96 @@ def _generate_report(
     
     return "\n".join(lines)
 
+def _generate_alarm_summary(alarm_timeline_df: pd.DataFrame) -> str:
+    """
+    Generate alarm summary report from timeline.
+    
+    Args:
+        alarm_timeline_df: DataFrame with alarm timeline
+        
+    Returns:
+        Formatted report text
+    """
+    lines = []
+    lines.append("=" * 70)
+    lines.append("ALARM TIMELINE SUMMARY")
+    lines.append(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    lines.append("=" * 70)
+    lines.append("")
+    
+    # Overall stats
+    total_checks = len(alarm_timeline_df)
+    total_alarms = int((alarm_timeline_df["alarm"] == True).sum())
+    alarm_rate = (total_alarms / total_checks * 100) if total_checks > 0 else 0
+    
+    lines.append("OVERALL STATISTICS")
+    lines.append("-" * 70)
+    lines.append(f"Total timestamp checks: {total_checks:,}")
+    lines.append(f"Alarm triggers: {total_alarms:,}")
+    lines.append(f"Alarm rate: {alarm_rate:.2f}%")
+    lines.append("")
+    
+    # Catchments with alarms
+    catchments_with_alarms = alarm_timeline_df[alarm_timeline_df["alarm"] == True]
+    unique_catchments = catchments_with_alarms["catchment_name"].nunique()
+    lines.append(f"Catchments that triggered alarms: {unique_catchments}")
+    lines.append("")
+    
+    # Top catchments by alarm frequency
+    if not catchments_with_alarms.empty:
+        lines.append("TOP 10 CATCHMENTS BY ALARM FREQUENCY")
+        lines.append("-" * 70)
+        
+        alarm_counts = catchments_with_alarms.groupby("catchment_name").size()
+        alarm_counts = alarm_counts.sort_values(ascending=False).head(10)
+        
+        for name, count in alarm_counts.items():
+            lines.append(f"  {name}: {count} alarm triggers")
+        
+        lines.append("")
+    
+    # Alarm duration analysis
+    lines.append("ALARM PERIODS BY CATCHMENT")
+    lines.append("-" * 70)
+    
+    catchment_names = alarm_timeline_df["catchment_name"].unique()
+    
+    for catchment_name in sorted(catchment_names):
+        catchment_data = alarm_timeline_df[
+            alarm_timeline_df["catchment_name"] == catchment_name
+        ].sort_values("timestamp")
+        
+        # Find alarm periods
+        alarm_periods = []
+        in_alarm = False
+        alarm_start = None
+        
+        for _, row in catchment_data.iterrows():
+            if row["alarm"] and not in_alarm:
+                # Alarm starts
+                in_alarm = True
+                alarm_start = row["timestamp"]
+            elif not row["alarm"] and in_alarm:
+                # Alarm ends
+                in_alarm = False
+                if alarm_start is not None:
+                    alarm_periods.append((alarm_start, row["timestamp"]))
+        
+        # If still in alarm at end
+        if in_alarm and alarm_start is not None:
+            alarm_periods.append((alarm_start, catchment_data.iloc[-1]["timestamp"]))
+        
+        if alarm_periods:
+            lines.append(f"  {catchment_name}:")
+            for start, end in alarm_periods:
+                duration_minutes = (end - start).total_seconds() / 60
+                lines.append(f"    {start} to {end} ({duration_minutes:.0f} minutes)")
+    
+    lines.append("")
+    lines.append("=" * 70)
+    
+    return "\n".join(lines)
+
 
 # =============================================================================
 # Main Analysis Function
@@ -255,6 +356,7 @@ def run_radar_analysis(
     output_dir: Path,
     tp108_path: Path = Path("data/inputs/tp108_stats.csv"),
     ari_threshold: float = 5.0,
+    generate_alarm_timeline: bool = False,
 ) -> Dict[str, Any]:
     """
     Run ARI analysis on all radar data files.
@@ -330,6 +432,31 @@ def run_radar_analysis(
                 f"  python retrieve_rain_radar.py"
             )
         
+        # Load pixel weights if available
+        pixel_weights: Optional[Dict[tuple, float]] = None
+        pixel_weights_path = radar_data_dir.parent / "pixel_weights.json"
+        if pixel_weights_path.exists():
+            try:
+                with open(pixel_weights_path, "r") as f:
+                    weights_data = json.load(f)
+                # Convert string keys back to tuples: "(catchment_id, pixel_idx)" -> (catchment_id, pixel_idx)
+                pixel_weights = {}
+                for key_str, weight in weights_data.items():
+                    try:
+                        # Parse "(123, 456)" format
+                        key_str = key_str.strip("()")
+                        parts = [int(p.strip()) for p in key_str.split(",")]
+                        if len(parts) == 2:
+                            pixel_weights[tuple(parts)] = weight
+                    except (ValueError, IndexError):
+                        continue
+                logger.info(f"✓ Loaded {len(pixel_weights)} pixel weights from {pixel_weights_path.name}")
+            except Exception as e:
+                logger.warning(f"⚠ Failed to load pixel weights: {e}\n  Proceeding without weighting")
+                pixel_weights = None
+        else:
+            logger.info("⚠ No pixel weights found - using unweighted analysis")
+        
         # Process each catchment
         logger.info("")
         logger.info("Processing catchments...")
@@ -346,8 +473,14 @@ def run_radar_analysis(
                 catchment_id = int(parts[0]) if parts[0].isdigit() else None
                 catchment_name = parts[1] if len(parts) > 1 else filepath.stem
                 
-                # Process file
-                result = _process_catchment_file(calc, filepath, ari_threshold)
+                # Process file with weights
+                result = _process_catchment_file(
+                    calc, 
+                    filepath, 
+                    ari_threshold,
+                    catchment_id=catchment_id,
+                    pixel_weights=pixel_weights
+                )
                 
                 # Add catchment info
                 result["catchment_id"] = catchment_id
@@ -388,6 +521,61 @@ def run_radar_analysis(
         exceedance_path = output_dir / "ari_exceedances.csv"
         exceedance_df.to_csv(exceedance_path, index=False)
         logger.info(f"✓ Saved exceedances to {exceedance_path}")
+
+        exceedance_path = output_dir / "ari_exceedances.csv"
+        exceedance_df.to_csv(exceedance_path, index=False)
+        logger.info(f"✓ Saved exceedances to {exceedance_path}")
+        
+        # Generate alarm timeline if requested
+        alarm_timeline_df = pd.DataFrame()
+        
+        if generate_alarm_timeline:
+            logger.info("")
+            logger.info("=" * 80)
+            logger.info("Generating Alarm Timeline...")
+            logger.info("=" * 80)
+            logger.info("NOTE: This will check alarm status at EVERY timestamp.")
+            logger.info("Using parallel processing for faster execution.")
+            logger.info("")
+            
+            try:
+                from moata_pipeline.alarms.radar_alarm_checker import RadarAlarmChecker
+                
+                alarm_checker = RadarAlarmChecker(
+                    tp108_path=tp108_path,
+                    ari_threshold=ari_threshold,
+                    area_threshold=0.25,
+                )
+                
+                # Use parallel processing
+                alarm_timeline_df = alarm_checker.check_multiple_catchments_parallel(
+                    catchment_files=radar_files
+                )
+                
+                if not alarm_timeline_df.empty:
+                    alarm_timeline_df = alarm_timeline_df.sort_values(["catchment_name", "timestamp"])
+                    
+                    # Save alarm timeline
+                    alarm_timeline_path = output_dir / "alarm_timeline.csv"
+                    alarm_timeline_df.to_csv(alarm_timeline_path, index=False)
+                    logger.info(f"✓ Saved alarm timeline to {alarm_timeline_path}")
+                    
+                    # Generate alarm summary
+                    alarm_summary = _generate_alarm_summary(alarm_timeline_df)
+                    alarm_summary_path = output_dir / "alarm_summary.txt"
+                    alarm_summary_path.write_text(alarm_summary, encoding="utf-8")
+                    logger.info(f"✓ Saved alarm summary to {alarm_summary_path}")
+                
+                logger.info("=" * 80)
+                
+            except ImportError as e:
+                logger.warning(f"Could not import alarm checker: {e}")
+                logger.warning("Alarm timeline will not be generated.")
+            except Exception as e:
+                logger.error(f"Failed to generate alarm timeline: {e}")
+                logger.exception("Full traceback:")
+        
+
         
         # Generate report
         logger.info("")
@@ -411,6 +599,7 @@ def run_radar_analysis(
         return {
             "summary_df": summary_df,
             "exceedance_df": exceedance_df,
+            "alarm_timeline_df": alarm_timeline_df,
             "report": report,
             "output_dir": output_dir,
             "summary_path": summary_path,

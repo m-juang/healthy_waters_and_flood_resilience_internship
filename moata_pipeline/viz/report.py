@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import html
 import logging
+from datetime import datetime
 from pathlib import Path
+from typing import Optional, Tuple
 
 import pandas as pd
 
@@ -103,15 +105,42 @@ REPORT_CSS = """
   a:hover {
     text-decoration: underline;
   }
+  .meta-info {
+    background: #e8f4fd;
+    border: 1px solid #b8d4e8;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 0.95em;
+  }
+  .meta-info .meta-row {
+    margin: 4px 0;
+  }
+  .meta-info .meta-label {
+    font-weight: bold;
+    color: #2c5282;
+    display: inline-block;
+    width: 140px;
+  }
+  .meta-info .meta-value {
+    color: #333;
+  }
 </style>
 """
 
 
-def build_report(df: pd.DataFrame, out_dir: Path) -> None:
+def build_report(
+    df: pd.DataFrame, 
+    out_dir: Path,
+    *,
+    data_period: Optional[Tuple[str, str]] = None,
+    input_date: Optional[str] = None,
+) -> None:
     """
     Generate main HTML report for rain gauge alarm configuration.
     
     Creates comprehensive report with:
+        - Data generation metadata (when generated, data period)
         - Summary statistics
         - Per-gauge overview table
         - All overflow alarms
@@ -122,13 +151,17 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
         df: DataFrame with alarm data (must have columns: Gauge, Trace,
             Alarm Name, Threshold, row_category)
         out_dir: Output directory for report
+        data_period: Optional tuple of (start_date, end_date) strings for data range
+        input_date: Optional date string (YYYY-MM-DD) for the analysis date
         
     Raises:
         ValueError: If DataFrame is empty or missing required columns
         
     Example:
         >>> df = load_and_clean(csv_path)
-        >>> build_report(df, Path("outputs/rain_gauges/visualizations"))
+        >>> build_report(df, Path("outputs/rain_gauges/visualizations"),
+        ...              data_period=("2026-01-20", "2026-01-21"),
+        ...              input_date="2026-01-21")
         # Creates outputs/rain_gauges/visualizations/report.html
     """
     logger = logging.getLogger(__name__)
@@ -193,6 +226,27 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
         })
     links_df = pd.DataFrame(link_rows)
     
+    # === BUILD METADATA INFO ===
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S NZDT")
+    
+    # Build data period string
+    if data_period:
+        start_date, end_date = data_period
+        data_period_str = f"{start_date} to {end_date}"
+    elif input_date:
+        # Derive from input_date (24h window ending on that date)
+        data_period_str = f"24 hours ending on {input_date}"
+    else:
+        data_period_str = "Current/Latest"
+    
+    metadata_html = f"""
+    <div class='meta-info'>
+        <div class='meta-row'><span class='meta-label'>Report Generated:</span> <span class='meta-value'>{generated_at}</span></div>
+        <div class='meta-row'><span class='meta-label'>Data Period:</span> <span class='meta-value'>{data_period_str}</span></div>
+        <div class='meta-row'><span class='meta-label'>Analysis Date:</span> <span class='meta-value'>{input_date or 'Current'}</span></div>
+    </div>
+    """
+    
     # === BUILD HTML ===
     html_parts = [
         "<html>",
@@ -206,6 +260,9 @@ def build_report(df: pd.DataFrame, out_dir: Path) -> None:
         # Header
         "<h1>Rain Gauge Alarm Configuration</h1>",
         "<p class='muted'>Active rain gauges with configured alarms</p>",
+        
+        # Metadata info box
+        metadata_html,
         
         # Statistics boxes
         "<div class='stats'>",

@@ -18,6 +18,7 @@ from .constants import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     INACTIVE_THRESHOLD_MONTHS,
     DEFAULT_EXCLUDE_KEYWORD,
+    DEFAULT_RADAR_PROPORTION_THRESHOLD,
 )
 
 from .paths import PipelinePaths
@@ -44,6 +45,55 @@ from .html_utils import df_to_html_table
 from .typing_utils import (
     JsonList,
     GaugeEntry,
+)
+
+# Protocols for dependency injection and testing
+from .protocols import (
+    HTTPClientProtocol,
+    AuthProviderProtocol,
+    DataCollectorProtocol,
+    DataAnalyzerProtocol,
+    ReportGeneratorProtocol,
+    CacheManagerProtocol,
+    ValidationProtocol,
+    OutputWriterProtocol,
+)
+
+# Unified exception hierarchy
+from .exceptions import (
+    PipelineError,
+    CollectionError,
+    APIError,
+    RateLimitError,
+    AuthenticationError,
+    GeometryError,
+    AnalysisError,
+    InputDataError,
+    CalculationError,
+    ValidationError,
+    PathValidationError,
+    DataValidationError,
+    StorageError,
+    CacheError,
+    OutputError,
+    VisualizationError,
+    ChartGenerationError,
+    DashboardError,
+)
+
+# Validation utilities
+from .validation import (
+    validate_path_exists,
+    validate_positive_number,
+    validate_proportion,
+    validate_ari_threshold,
+    validate_date_string,
+    validate_log_level,
+    validate_required_env_vars,
+    validate_dataframe_not_empty,
+    validate_dataframe_columns,
+    validate_dataframe,
+    ValidationResult,
 )
 
 # ========== NEW: Spatial utilities for pixel weighting ==========
@@ -87,6 +137,46 @@ __all__ = [
     # typing (optional)
     "JsonList",
     "GaugeEntry",
+    # validation
+    "validate_path_exists",
+    "validate_positive_number",
+    "validate_proportion",
+    "validate_ari_threshold",
+    "validate_date_string",
+    "validate_log_level",
+    "validate_required_env_vars",
+    "validate_dataframe_not_empty",
+    "validate_dataframe_columns",
+    "validate_dataframe",
+    "ValidationResult",
+    # protocols
+    "HTTPClientProtocol",
+    "AuthProviderProtocol",
+    "DataCollectorProtocol",
+    "DataAnalyzerProtocol",
+    "ReportGeneratorProtocol",
+    "CacheManagerProtocol",
+    "ValidationProtocol",
+    "OutputWriterProtocol",
+    # exceptions
+    "PipelineError",
+    "CollectionError",
+    "APIError",
+    "RateLimitError",
+    "AuthenticationError",
+    "GeometryError",
+    "AnalysisError",
+    "InputDataError",
+    "CalculationError",
+    "ValidationError",
+    "PathValidationError",
+    "DataValidationError",
+    "StorageError",
+    "CacheError",
+    "OutputError",
+    "VisualizationError",
+    "ChartGenerationError",
+    "DashboardError",
     # ========== NEW: Spatial utilities ==========
     "calculate_pixel_overlap_weights",
     "estimate_pixel_area_weights_simple",
