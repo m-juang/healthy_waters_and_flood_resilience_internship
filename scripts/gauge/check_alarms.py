@@ -288,6 +288,10 @@ def check_all_gauges(
                 alarms_found.append(alarm_record)
                 print(f"        🚨 ALARM: {gauge_name} {total_mm:.1f}mm in the last {window_desc} (threshold {threshold}mm)")
     alarms = alarms_found
+    
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
     # Generate text report
     report_lines = [
         "=" * 70,
@@ -599,7 +603,6 @@ def main():
     
     # Generate reports
     print("\nGenerating reports...")
-    # generate_alarm_report(alarms, end_time_utc, output_dir)
     generate_html_dashboard(alarms, end_time_utc, output_dir)
     
     # Print formatted alarm list

@@ -23,8 +23,8 @@ Directory Structure (NEW - Date Range Format):
             └── visualizations/   # Radar dashboards
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2026-01-21
-Version: 2.0.0 (Complete restructure - date-based organization)
+Last Modified: 2026-01-23 (FIXED: Correct date range logic)
+Version: 2.0.1
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from typing import Optional, Union
 
 
 # Version info
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 
 # =============================================================================
@@ -59,18 +59,23 @@ class PipelinePaths:
         
     Example:
         >>> from datetime import date, datetime
-        >>> # Today's data (single day)
+        >>> # Today's data (last 24 hours ending now)
         >>> paths = PipelinePaths()
         >>> print(paths.rain_gauges_raw_dir)
-        outputs/rain_gauges/20260120-20260121/raw
+        outputs/rain_gauges/20260122-20260123/raw
         
-        >>> # Historical data with date range
+        >>> # Historical data with specific date (full 24 hours)
+        >>> paths = PipelinePaths(date="2025-05-09")
+        >>> print(paths.rain_gauges_raw_dir)
+        outputs/rain_gauges/20250509-20250510/raw
+        
+        >>> # Explicit date range
         >>> paths = PipelinePaths(
         ...     start_time=datetime(2025, 5, 9, 0, 0, 0),
         ...     end_time=datetime(2025, 5, 10, 0, 0, 0)
         ... )
-        >>> print(paths.rain_gauges_raw_dir)
-        outputs/rain_gauges/20250509-20250510/raw
+        >>> print(paths.rain_radar_raw_dir)
+        outputs/rain_radar/20250509-20250510/raw
     """
     
     # Root directory for all outputs
@@ -91,10 +96,12 @@ class PipelinePaths:
         
         # Handle date/time conversion
         if self.start_time is not None and self.end_time is not None:
-            # Explicit date range provided - use it
+            # Explicit date range provided - use it as is
             pass
+            
         elif self.date is not None:
-            # Single date provided - convert to 24-hour range
+            # ✅ FIXED: Single date provided - convert to full 24-hour range for that date
+            # Example: date="2026-01-22" → 2026-01-22 00:00:00 to 2026-01-23 00:00:00
             if isinstance(self.date, str):
                 date_obj = datetime.strptime(self.date, '%Y-%m-%d').date()
             elif isinstance(self.date, datetime):
@@ -102,19 +109,34 @@ class PipelinePaths:
             else:
                 date_obj = self.date
             
-            # Create 24-hour range: previous day 00:00 to current date 00:00
-            object.__setattr__(self, 'end_time', datetime.combine(date_obj, datetime.min.time()))
-            object.__setattr__(self, 'start_time', self.end_time - timedelta(days=1))
+            # Start: Beginning of the requested day (00:00:00)
+            object.__setattr__(
+                self, 
+                'start_time', 
+                datetime.combine(date_obj, datetime.min.time())
+            )
+            # End: Beginning of the next day (00:00:00) = End of requested day
+            object.__setattr__(
+                self, 
+                'end_time', 
+                self.start_time + timedelta(days=1)
+            )
+            
         else:
-            # No date provided - use last 24 hours (today)
+            # ✅ FIXED: No date provided - use ACTUAL last 24 hours ending NOW
+            # Example: Run at 2026-01-23 15:30 → 2026-01-22 15:30 to 2026-01-23 15:30
             now = datetime.now()
-            today = now.date()
-            object.__setattr__(self, 'end_time', datetime.combine(today, datetime.min.time()))
-            object.__setattr__(self, 'start_time', self.end_time - timedelta(days=1))
+            object.__setattr__(self, 'end_time', now)
+            object.__setattr__(self, 'start_time', now - timedelta(days=1))
         
         # Keep date attribute for backward compatibility
         if self.date is None:
-            object.__setattr__(self, 'date', self.end_time.date() if self.end_time else datetime.now().date())
+            # Use end_time's date as reference
+            object.__setattr__(
+                self, 
+                'date', 
+                self.end_time.date() if self.end_time else datetime.now().date()
+            )
     
     def _get_date_path(self) -> Path:
         """Get date range path component in YYYYMMDD-YYYYMMDD format."""
@@ -376,7 +398,7 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> file_path = paths.get_catchment_radar_file(123, "Auckland_CBD")
             >>> print(file_path)
-            outputs/rain_radar/20260120-20260121/raw/radar_data/123_Auckland_CBD.csv
+            outputs/rain_radar/20260122-20260123/raw/radar_data/123_Auckland_CBD.csv
         """
         filename = f"{catchment_id}_{catchment_name}.csv"
         return self.rain_radar_data_dir / filename
@@ -396,7 +418,7 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> ari_file = paths.get_ari_file(123, "Auckland_CBD")
             >>> print(ari_file)
-            outputs/rain_radar/20260120-20260121/analyze/ari_123_Auckland_CBD.csv
+            outputs/rain_radar/20260122-20260123/analyze/ari_123_Auckland_CBD.csv
         """
         filename = f"ari_{catchment_id}_{catchment_name}.csv"
         return self.rain_radar_ari_dir / filename
@@ -416,11 +438,11 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> raw_path = paths.get_gauge_raw_path()
             >>> print(raw_path)
-            outputs/rain_gauges/20260120-20260121/raw/rain_gauges_traces_alarms.json
+            outputs/rain_gauges/20260122-20260123/raw/rain_gauges_traces_alarms.json
             
             >>> raw_path = paths.get_gauge_raw_path("2025-05-09")
             >>> print(raw_path)
-            outputs/rain_gauges/20250508-20250509/raw/rain_gauges_traces_alarms.json
+            outputs/rain_gauges/20250509-20250510/raw/rain_gauges_traces_alarms.json
         """
         if date_str:
             date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
@@ -442,11 +464,11 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> analyze_dir = paths.get_gauge_analyze_dir()
             >>> print(analyze_dir)
-            outputs/rain_gauges/20260120-20260121/analysis
+            outputs/rain_gauges/20260122-20260123/analysis
             
             >>> analyze_dir = paths.get_gauge_analyze_dir("2025-05-09")
             >>> print(analyze_dir)
-            outputs/rain_gauges/20250508-20250509/analysis
+            outputs/rain_gauges/20250509-20250510/analysis
         """
         if date_str:
             date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
@@ -468,11 +490,11 @@ class PipelinePaths:
             >>> paths = PipelinePaths()
             >>> viz_dir = paths.get_gauge_viz_dir()
             >>> print(viz_dir)
-            outputs/rain_gauges/20260120-20260121/visualizations
+            outputs/rain_gauges/20260122-20260123/visualizations
             
             >>> viz_dir = paths.get_gauge_viz_dir("2025-05-09")
             >>> print(viz_dir)
-            outputs/rain_gauges/20250508-20250509/visualizations
+            outputs/rain_gauges/20250509-20250510/visualizations
         """
         if date_str:
             date_paths = PipelinePaths.for_date(date_str, outputs_root=self.outputs_root)
@@ -495,13 +517,13 @@ class PipelinePaths:
             >>> # From string
             >>> paths = PipelinePaths.for_date("2025-05-09")
             >>> print(paths.rain_radar_raw_dir)
-            outputs/rain_radar/20250508-20250509/raw
+            outputs/rain_radar/20250509-20250510/raw
             
             >>> # From date object
             >>> from datetime import date
             >>> paths = PipelinePaths.for_date(date(2025, 5, 9))
             >>> print(paths.rain_gauges_raw_dir)
-            outputs/rain_gauges/20250508-20250509/raw
+            outputs/rain_gauges/20250509-20250510/raw
         """
         return PipelinePaths(outputs_root=outputs_root, date=date_value)
     
@@ -546,7 +568,7 @@ class PipelinePaths:
         Example:
             >>> paths = PipelinePaths.for_today()
             >>> print(paths.rain_radar_raw_dir)
-            outputs/rain_radar/20260120-20260121/raw
+            outputs/rain_radar/20260122-20260123/raw
         """
         return PipelinePaths(outputs_root=outputs_root, date=datetime.now().date())
     
@@ -564,7 +586,7 @@ class PipelinePaths:
             >>> paths = PipelinePaths()  # Today
             >>> historical = paths.with_date("2025-05-09")
             >>> print(historical.rain_radar_raw_dir)
-            outputs/rain_radar/20250508-20250509/raw
+            outputs/rain_radar/20250509-20250510/raw
         """
         return PipelinePaths(outputs_root=self.outputs_root, date=date_value)
     
@@ -615,12 +637,12 @@ def get_paths(
         >>> # Today's paths
         >>> paths = get_paths()
         >>> print(paths.rain_gauges_raw_dir)
-        outputs/rain_gauges/20260120-20260121/raw
+        outputs/rain_gauges/20260122-20260123/raw
         
         >>> # Historical paths
         >>> historical = get_paths(date_value="2025-05-09")
         >>> print(historical.rain_radar_raw_dir)
-        outputs/rain_radar/20250508-20250509/raw
+        outputs/rain_radar/20250509-20250510/raw
     """
     root = outputs_root or Path("outputs")
     
