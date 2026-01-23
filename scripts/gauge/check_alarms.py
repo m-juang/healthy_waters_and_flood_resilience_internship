@@ -354,10 +354,19 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Sort alarms by rainfall amount
-    sorted_alarms = sorted(alarms, key=lambda x: x["total_mm"], reverse=True)
+    # Calculate period start (24 hours before end time)
+    start_time_utc = end_time_utc - timedelta(hours=LOOKBACK_HOURS)
     
-    # Generate alarm rows
+    # Format times for display
+    period_start_utc = start_time_utc.strftime("%Y-%m-%d %H:%M:%S")
+    period_end_utc = end_time_utc.strftime("%Y-%m-%d %H:%M:%S")
+    period_start_nzdt = format_nzdt(start_time_utc)
+    period_end_nzdt = format_nzdt(end_time_utc)
+    
+    # Sort alarms by rainfall amount
+    sorted_alarms = sorted(alarms, key=lambda x: x["total_mm"], reverse=True) if alarms else []
+    
+    # Generate alarm rows (without Time column)
     alarm_rows = ""
     for alarm in sorted_alarms:
         severity_class = "critical" if alarm["total_mm"] >= 100 else "warning" if alarm["total_mm"] >= 50 else "normal"
@@ -367,7 +376,6 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
             <td class="rainfall">{alarm['total_mm']:.1f} mm</td>
             <td>{alarm['window_description']}</td>
             <td>{alarm['threshold_mm']} mm</td>
-            <td>{alarm['end_time_nzdt']}</td>
         </tr>
         """
     
@@ -412,6 +420,41 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
         .meta {{
             color: #888;
             font-size: 0.9rem;
+        }}
+        .period-info {{
+            margin-top: 15px;
+            padding: 15px 20px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+            display: inline-block;
+            text-align: left;
+        }}
+        .period-info .label {{
+            color: #00d4ff;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: block;
+            text-align: center;
+        }}
+        .period-row {{
+            display: flex;
+            gap: 10px;
+            margin: 5px 0;
+            align-items: center;
+        }}
+        .period-row .tz-label {{
+            color: #888;
+            font-size: 0.85rem;
+            width: 50px;
+            text-align: right;
+        }}
+        .period-row .dates {{
+            color: #fff;
+            font-size: 0.95rem;
+        }}
+        .arrow {{
+            color: #00d4ff;
+            margin: 0 5px;
         }}
         .summary {{
             display: flex;
@@ -500,9 +543,19 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
         <header>
             <h1>🌧️ Rain Gauge Alarm Dashboard</h1>
             <p class="meta">
-                Report End Time: {format_nzdt(end_time_utc)} (NZDT)<br>
-                Generated: {format_nzdt(datetime.now(timezone.utc))}
+                Generated: {format_nzdt(datetime.now(timezone.utc))} NZDT
             </p>
+            <div class="period-info">
+                <div class="label">📅 Analysis Period ({LOOKBACK_HOURS} hours)</div>
+                <div class="period-row">
+                    <span class="tz-label">NZDT:</span>
+                    <span class="dates">{period_start_nzdt} <span class="arrow">→</span> {period_end_nzdt}</span>
+                </div>
+                <div class="period-row">
+                    <span class="tz-label">UTC:</span>
+                    <span class="dates">{period_start_utc} <span class="arrow">→</span> {period_end_utc}</span>
+                </div>
+            </div>
         </header>
         
         <div class="summary">
@@ -526,7 +579,7 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
         
         <div class="alarms-section">
             <h2>📋 Alarm Details</h2>
-            {"<table><thead><tr><th>Gauge Name</th><th>Rainfall</th><th>Period</th><th>Threshold</th><th>Time (NZDT)</th></tr></thead><tbody>" + alarm_rows + "</tbody></table>" if alarms else "<div class='no-alarms'>✅ No alarms in the last 24 hours</div>"}
+            {"<table><thead><tr><th>Gauge Name</th><th>Rainfall</th><th>Period</th><th>Threshold</th></tr></thead><tbody>" + alarm_rows + "</tbody></table>" if alarms else "<div class='no-alarms'>✅ No alarms in the last " + str(LOOKBACK_HOURS) + " hours</div>"}
         </div>
         
         <footer>
@@ -571,9 +624,16 @@ def main():
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        paths = PipelinePaths()
-        date_str = to_nzdt(end_time_utc).strftime("%Y%m%d")
-        output_dir = paths.rain_gauges_dir / date_str / "alarms"
+        # Calculate actual analysis period (24 hours before end_time)
+        start_time_utc = end_time_utc - timedelta(hours=LOOKBACK_HOURS)
+        
+        # Convert to NZDT for folder naming (to match local date)
+        start_nzdt = to_nzdt(start_time_utc)
+        end_nzdt = to_nzdt(end_time_utc)
+        
+        # Use PipelinePaths with actual date range
+        paths = PipelinePaths.for_date_range(start_nzdt, end_nzdt)
+        output_dir = paths.rain_gauges_dir / "alarms"
     
     # Setup client
     print("\nConnecting to Moata API...")

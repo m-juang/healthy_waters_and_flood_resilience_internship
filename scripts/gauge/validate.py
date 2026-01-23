@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import argparse
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -31,10 +32,8 @@ from moata_pipeline.moata.client import MoataClient
 # =====================
 # SETTINGS
 # =====================
-paths = PipelinePaths()
+# Input alarms (static location)
 INPUT_CSV = Path("data/inputs/raingauge_ari_alarms.csv")
-TRACE_MAPPING_CSV = paths.alarm_summary_full_csv
-OUTPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
 
 # What we are validating
 ARI_TRACE_DESC = "Max TP108 ARI"
@@ -49,6 +48,40 @@ DATA_INTERVAL_SECONDS = 300  # 5 minutes
 DATA_TYPE = "None"  # Raw data
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Validate rain gauge ARI alarms against API data",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python validate.py --date 2026-01-21
+  python validate.py --date 2026-01-21 --threshold 10.0
+
+Notes:
+  - The --date specifies which analysis folder to use for trace mapping
+  - Input alarms are read from data/inputs/raingauge_ari_alarms.csv
+  - Output is saved to the validation folder for the specified date
+        """
+    )
+    
+    parser.add_argument(
+        "--date",
+        required=True,
+        metavar="YYYY-MM-DD",
+        help="Date of analysis folder to use for trace mapping (required)"
+    )
+    
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=ARI_THRESHOLD,
+        help=f"ARI threshold for validation (default: {ARI_THRESHOLD})"
+    )
+    
+    return parser.parse_args()
+
+
 def iso_z(dt: pd.Timestamp) -> str:
     """Convert pandas Timestamp (UTC) -> ISO string with Z."""
     if dt.tzinfo is None:
@@ -60,6 +93,13 @@ def build_trace_mapping(csv_path: Path) -> dict[int, int]:
     """
     Build mapping: asset_id -> trace_id for Max TP108 ARI traces.
     """
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Trace mapping file not found: {csv_path}\n\n"
+            f"Have you run the analysis pipeline for this date?\n"
+            f"  python scripts/gauge/analyze.py --date YYYY-MM-DD"
+        )
+    
     df = pd.read_csv(csv_path)
     ari = df[df["trace_description"] == ARI_TRACE_DESC].copy()
     ari = ari.dropna(subset=["gauge_id", "trace_id"])
@@ -74,6 +114,33 @@ def build_trace_mapping(csv_path: Path) -> dict[int, int]:
 
 
 def main() -> None:
+    # Parse arguments
+    args = parse_args()
+    
+    # Setup paths based on date
+    paths = PipelinePaths.for_date(args.date)
+    
+    TRACE_MAPPING_CSV = paths.alarm_summary_full_csv
+    OUTPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
+    
+    print("=" * 60)
+    print("Rain Gauge ARI Alarm Validation")
+    print("=" * 60)
+    print(f"Date:            {args.date}")
+    print(f"Input alarms:    {INPUT_CSV}")
+    print(f"Trace mapping:   {TRACE_MAPPING_CSV}")
+    print(f"Output:          {OUTPUT_CSV}")
+    print(f"ARI Threshold:   {args.threshold}")
+    print("=" * 60)
+    print()
+    
+    # Check input files exist
+    if not INPUT_CSV.exists():
+        raise FileNotFoundError(
+            f"Input alarm file not found: {INPUT_CSV}\n"
+            f"Please place your alarm CSV in data/inputs/"
+        )
+    
     # --- credentials ---
     client_id = os.getenv("MOATA_CLIENT_ID")
     client_secret = os.getenv("MOATA_CLIENT_SECRET")
@@ -133,7 +200,7 @@ def main() -> None:
                 "status": "UNVALIDATABLE",
                 "reason": "No trace mapping found",
                 "max_ari_value": None,
-                "threshold": ARI_THRESHOLD,
+                "threshold": args.threshold,
             })
             continue
 
@@ -159,7 +226,7 @@ def main() -> None:
                 "status": "UNVALIDATABLE",
                 "reason": f"API error: {e}",
                 "max_ari_value": None,
-                "threshold": ARI_THRESHOLD,
+                "threshold": args.threshold,
             })
             continue
 
@@ -174,7 +241,7 @@ def main() -> None:
                 "status": "UNVALIDATABLE",
                 "reason": "No data in window",
                 "max_ari_value": None,
-                "threshold": ARI_THRESHOLD,
+                "threshold": args.threshold,
             })
             continue
 
@@ -183,12 +250,12 @@ def main() -> None:
         max_value = max(values) if values else 0
 
         # Check if threshold was exceeded
-        exceeded = max_value >= ARI_THRESHOLD
+        exceeded = max_value >= args.threshold
         status = "VALIDATED" if exceeded else "NOT_VALIDATED"
 
         print(f"  Trace ID: {trace_id}")
         print(f"  Max ARI value: {max_value:.2f}")
-        print(f"  Threshold: {ARI_THRESHOLD}")
+        print(f"  Threshold: {args.threshold}")
         print(f"  Status: {status}")
 
         results.append({
@@ -199,7 +266,7 @@ def main() -> None:
             "status": status,
             "reason": "",
             "max_ari_value": round(max_value, 2),
-            "threshold": ARI_THRESHOLD,
+            "threshold": args.threshold,
         })
 
     # Save results

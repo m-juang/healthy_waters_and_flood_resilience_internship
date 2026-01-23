@@ -9,8 +9,12 @@ Usage:
     python visualize_ari_alarms_rain_gauges.py [options]
 
 Examples:
-    # Auto-detect validation file
+    # Auto-detect latest validation file
     python visualize_ari_alarms_rain_gauges.py
+    
+    # Use specific date (will search YYYYMMDD-YYYYMMDD+1 folder)
+    python visualize_ari_alarms_rain_gauges.py --date 2026-01-21
+    python visualize_ari_alarms_rain_gauges.py --date 20260121
     
     # Use custom input CSV
     python visualize_ari_alarms_rain_gauges.py --input outputs/custom/validation.csv
@@ -28,7 +32,7 @@ Output:
     - validation_stats.csv: Statistics CSV file
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2024-12-28
+Last Modified: 2026-01-23
 """
 
 import sys
@@ -40,7 +44,7 @@ sys.path.insert(0, str(project_root))
 import argparse
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -51,8 +55,137 @@ from moata_pipeline.common.paths import PipelinePaths
 
 # Default paths
 paths = PipelinePaths()
-DEFAULT_INPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
 DEFAULT_OUT_DIR = paths.rain_gauges_validation_dir
+
+
+def parse_date_string(date_str: str) -> datetime:
+    """
+    Parse date string in various formats.
+    
+    Args:
+        date_str: Date string (YYYY-MM-DD, YYYYMMDD, etc.)
+        
+    Returns:
+        datetime object
+        
+    Examples:
+        >>> parse_date_string("2026-01-21")
+        datetime(2026, 1, 21)
+        >>> parse_date_string("20260121")
+        datetime(2026, 1, 21)
+    """
+    # Remove spaces and dashes
+    clean_str = date_str.replace("-", "").replace(" ", "").strip()
+    
+    # Try YYYYMMDD format
+    if len(clean_str) == 8 and clean_str.isdigit():
+        return datetime.strptime(clean_str, "%Y%m%d")
+    
+    # Try with dashes
+    for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"]:
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            continue
+    
+    raise ValueError(
+        f"Unable to parse date: '{date_str}'\n"
+        "Supported formats: YYYY-MM-DD, YYYYMMDD, DD-MM-YYYY, etc."
+    )
+
+
+def build_date_folder_name(date: datetime) -> str:
+    """
+    Build folder name from date (YYYYMMDD-YYYYMMDD+1).
+    
+    Args:
+        date: Start date
+        
+    Returns:
+        Folder name string
+        
+    Example:
+        >>> build_date_folder_name(datetime(2026, 1, 21))
+        '20260121-20260122'
+    """
+    next_day = date + timedelta(days=1)
+    start = date.strftime("%Y%m%d")
+    end = next_day.strftime("%Y%m%d")
+    return f"{start}-{end}"
+
+
+def find_validation_file_by_date(date_str: str, logger) -> Path:
+    """
+    Find validation file based on date input.
+    
+    Args:
+        date_str: Date string to search for
+        logger: Logger instance
+        
+    Returns:
+        Path to validation file
+    """
+    # Use PipelinePaths.for_date() to get the correct path for the date
+    date_paths = PipelinePaths.for_date(date_str)
+    validation_path = date_paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
+    
+    logger.info(f"Looking for validation file: {validation_path}")
+    
+    if not validation_path.exists():
+        raise FileNotFoundError(
+            f"Validation file not found: {validation_path}\n"
+            f"Please ensure validate.py was run for date: {date_str}"
+        )
+    
+    return validation_path
+
+
+def find_latest_validation_file(logger) -> Path:
+    """
+    Find the most recent validation CSV file.
+    
+    Returns:
+        Path to most recent validation file
+    """
+    # Get the base outputs directory
+    # From validate.py: OUTPUT_CSV = paths.rain_gauges_validation_dir / "ari_alarm_validation.csv"
+    # paths.rain_gauges_validation_dir = outputs/rain_gauges/YYYYMMDD-YYYYMMDD/validation/
+    # So we need: outputs/rain_gauges/*/validation/ari_alarm_validation.csv
+    
+    outputs_dir = Path("outputs")
+    if not outputs_dir.exists():
+        raise FileNotFoundError(
+            f"Outputs directory not found: {outputs_dir}\n"
+            "Please run validate.py first."
+        )
+    
+    rain_gauges_dir = outputs_dir / "rain_gauges"
+    if not rain_gauges_dir.exists():
+        raise FileNotFoundError(
+            f"Rain gauges output directory not found: {rain_gauges_dir}\n"
+            "Please run validate.py first."
+        )
+    
+    if not rain_gauges_dir.exists():
+        raise FileNotFoundError(
+            f"Rain gauges output directory not found: {rain_gauges_dir}\n"
+            "Please run validate_ari_alarms_rain_gauges.py first."
+        )
+    
+    # Search all date folders for validation files
+    validation_files = list(rain_gauges_dir.glob("*/validation/ari_alarm_validation.csv"))
+    
+    if not validation_files:
+        raise FileNotFoundError(
+            f"No validation files found in {rain_gauges_dir}\n"
+            "Please run validate_ari_alarms_rain_gauges.py first."
+        )
+    
+    # Sort by modification time and get the most recent
+    latest_file = max(validation_files, key=lambda p: p.stat().st_mtime)
+    logger.info(f"Auto-detected latest validation file: {latest_file}")
+    
+    return latest_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,10 +200,17 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                                    # Auto-detect validation file
+  %(prog)s                                    # Auto-detect latest validation file
+  %(prog)s --date 2026-01-21                  # Use specific date folder
+  %(prog)s --date 20260121                    # Date without dashes
   %(prog)s --input path/to/validation.csv     # Custom input file
   %(prog)s --output custom/output/dir/        # Custom output directory
   %(prog)s --log-level DEBUG                  # Verbose logging
+
+Date Format:
+  --date accepts: YYYY-MM-DD, YYYYMMDD, DD-MM-YYYY, etc.
+  Searches for folder: YYYYMMDD-YYYYMMDD+1
+  Example: --date 2026-01-21 looks for folder 20260121-20260122
 
 Input File:
   Expects CSV from validate_ari_alarms_rain_gauges.py with columns:
@@ -89,19 +229,24 @@ Duration:
     )
     
     parser.add_argument(
+        "--date",
+        type=str,
+        metavar="DATE",
+        help="Date to search for (YYYY-MM-DD or YYYYMMDD). Searches YYYYMMDD-YYYYMMDD+1 folder."
+    )
+    
+    parser.add_argument(
         "--input",
         type=str,
-        default=str(DEFAULT_INPUT_CSV),
         metavar="PATH",
-        help=f"Path to validation CSV (default: {DEFAULT_INPUT_CSV})"
+        help="Path to validation CSV (overrides --date)"
     )
     
     parser.add_argument(
         "--output",
         type=str,
-        default=str(DEFAULT_OUT_DIR),
         metavar="DIR",
-        help=f"Output directory for visualizations (default: {DEFAULT_OUT_DIR})"
+        help="Output directory for visualizations (default: same as input file directory)"
     )
     
     parser.add_argument(
@@ -114,7 +259,7 @@ Duration:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 1.0.0"
+        version="%(prog)s 1.1.0"
     )
     
     return parser.parse_args()
@@ -384,9 +529,26 @@ def main() -> int:
         logger.info("Rain Gauge ARI Alarm Validation Visualization")
         logger.info("=" * 80)
         
-        # Resolve paths
-        input_path = Path(args.input)
-        out_dir = Path(args.output)
+        # Determine input path
+        if args.input:
+            # Explicit input path provided
+            input_path = Path(args.input)
+            logger.info(f"Using explicit input path: {input_path}")
+        elif args.date:
+            # Date provided - search for specific date folder
+            input_path = find_validation_file_by_date(args.date, logger)
+        else:
+            # No input or date - auto-detect latest
+            logger.info("No date or input specified - searching for latest validation file...")
+            input_path = find_latest_validation_file(logger)
+        
+        # Set output directory - default to same folder as input file
+        if args.output:
+            out_dir = Path(args.output)
+        else:
+            # Save visualizations in the same directory as the validation file
+            out_dir = input_path.parent
+            logger.info(f"Output will be saved to same directory as input: {out_dir}")
         
         # Validate input
         if not input_path.exists():
