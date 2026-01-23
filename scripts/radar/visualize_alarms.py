@@ -453,6 +453,7 @@ def create_html_dashboard(
         }}
         .card-body {{
             padding: 20px;
+            overflow-x: auto;
         }}
         table {{
             width: 100%;
