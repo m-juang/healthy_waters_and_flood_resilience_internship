@@ -1,609 +1,620 @@
-﻿# Auckland Council MOATA AlertLab
+﻿# MOATA AlertLab
 
-An automated pipeline for monitoring rainfall across Auckland region using data from Moata API. The system collects rain gauge measurements and rain radar data, calculates Average Recurrence Intervals (ARI) based on TP108 standards, validates alarm configurations, and generates interactive HTML dashboards for analysis.
+**Comprehensive Rainfall Monitoring and Flood Alarm Validation System for Auckland Council**
 
-**Key Features:**
-- 🌧️ **Rain Gauge Pipeline** - Point-based rainfall measurements with alarm validation
-- 📡 **Rain Radar Pipeline** - Spatial rainfall coverage across catchment areas
-- 📊 **ARI Calculation** - Intensity-Duration-Frequency analysis using TP108 standards
-- 📈 **Interactive Dashboards** - HTML visualizations with charts and maps
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: Proprietary](https://img.shields.io/badge/license-Auckland%20Council-red.svg)](LICENSE)
 
-> **Internship Project**: Auckland Council (COMPSCI 778)  
-> **Version**: 2.0.0 (Updated Jan 2026)
+MOATA AlertLab is a rainfall monitoring application developed for Auckland Council's Healthy Waters and Flood Resilience department. The system processes both rain gauge and radar (QPE) data from the Moata API to analyze and validate flood alarms using ARI (Average Recurrence Interval) calculations and TP108 methodology.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
 - [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Pipeline Workflows](#pipeline-workflows)
+- [Module Reference](#module-reference)
 - [Configuration](#configuration)
-- [Quick Start Guide](#quick-start-guide)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
+- [Output Structure](#output-structure)
+- [Technical Details](#technical-details)
 - [Troubleshooting](#troubleshooting)
-- [Key Concepts](#key-concepts)
+- [Development](#development)
+- [License](#license)
+
+---
+
+## Overview
+
+MOATA AlertLab addresses the critical need for accurate flood monitoring in Auckland's stormwater infrastructure. The system:
+
+- **Collects** rainfall data from 264+ rain gauges and radar QPE sources covering 233 stormwater catchments
+- **Analyzes** rainfall intensity using industry-standard TP108 methodology
+- **Validates** alarm configurations against historical events
+- **Visualizes** results through interactive HTML dashboards
+
+### Key Metrics
+
+| Component | Coverage |
+|-----------|----------|
+| Rain Gauges | 264 active stations |
+| Stormwater Catchments | 233 monitored areas |
+| Radar Pixels | ~15,000+ QPE data points |
+| Analysis Durations | 10min, 20min, 30min, 1hr, 2hr, 6hr, 12hr, 24hr |
+
+---
+
+## Key Features
+
+### Dual Data Pipeline
+- **Rain Gauge Pipeline**: Individual station monitoring with trace-level alarm validation
+- **Radar Pipeline**: Spatial rainfall analysis using Quantitative Precipitation Estimation (QPE)
+
+### Intelligent Filtering
+- 3-step filtering process: exclude non-Auckland gauges, require physical sensors, require recent data
+- Pre-filter optimization using Sam's method for efficient API calls
+- Configurable inactive threshold (default: 3 months)
+
+### ARI-Based Alarm Analysis
+- TP108 coefficient-based calculations for rainfall intensity
+- Weighted ARI values across multiple durations
+- Configurable thresholds (default: ARI ≥ 5 years)
+
+### Real-Time Alarm Checking
+- Checks **LATEST window only** for each duration (not entire historical period)
+- 25% area threshold for radar-based catchment alarms
+- Supports both current and historical data analysis
+
+### Professional Visualizations
+- Interactive HTML dashboards with search and filtering
+- Per-gauge detail pages with alarm configurations
+- Catchment-level radar analysis reports
+
+---
+
+## Architecture
+
+```
+moata_pipeline/
+├── alarms/          # Alarm checking logic (gauge & radar)
+├── analyze/         # Data filtering, ARI calculations, reporting
+├── collect/         # SOLID-refactored data collectors
+│   └── collectors/  # Specialized collector classes
+├── common/          # Shared utilities, config, constants
+├── moata/           # API client (auth, http, endpoints)
+│   └── clients/     # Domain-specific API clients
+├── viz/             # Visualization and dashboard generation
+└── gui/             # CustomTkinter desktop interface
+
+scripts/
+├── gauge/           # Rain gauge pipeline scripts
+├── radar/           # Radar pipeline scripts
+└── alarms/          # Alarm checking scripts
+
+data/inputs/         # Static reference data (TP108, alarm configs)
+outputs/             # Pipeline outputs (organized by date range)
+```
+
+### Design Principles
+
+The codebase follows **SOLID principles**:
+
+- **Single Responsibility**: Each collector/client handles one domain
+- **Open/Closed**: Easy to add new collectors without modifying existing code
+- **Liskov Substitution**: All collectors implement common protocols
+- **Interface Segregation**: Clients only expose relevant methods
+- **Dependency Inversion**: Components depend on abstractions (protocols)
 
 ---
 
 ## Installation
 
-### 1. Setup Virtual Environment
+### Prerequisites
+
+- Python 3.10 or higher
+- pip package manager
+- Git (for cloning)
+
+### Setup
 
 ```bash
-# Create virtual environment
-python -m venv .venv
+# Clone the repository
+git clone https://github.com/auckland-council/moata-alertlab.git
+cd moata-alertlab
 
-# Activate
-# Windows PowerShell:
-.\.venv\Scripts\Activate.ps1
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Windows CMD:
-.venv\Scripts\activate.bat
-
-# macOS/Linux:
-source .venv/bin/activate
-```
-
-### 2. Install Dependencies
-
-```bash
-pip install --upgrade pip
+# Install dependencies
 pip install -r requirements.txt
+
+# Install package in development mode
+pip install -e .
 ```
 
-### 3. Configure Credentials
+### Environment Configuration
 
-Create `.env` file in project root:
+Create a `.env` file in the project root:
+
+```env
+# Moata API Credentials (required)
+MOATA_CLIENT_ID=your_client_id_here
+MOATA_CLIENT_SECRET=your_client_secret_here
+
+# Optional: Override defaults
+# MOATA_PROJECT_ID=594
+# MOATA_REQUESTS_PER_SECOND=2.0
+```
+
+---
+
+## Quick Start
+
+### Option 1: GUI Application
 
 ```bash
-MOATA_CLIENT_ID=your_client_id_here
-MOATA_CLIENT_SECRET=your_secret_here
+# Launch the desktop interface
+python -m moata_pipeline.gui
+
+# Or with specific options
+python -m moata_pipeline.gui --headless  # Run without GUI
 ```
 
-**How to get credentials**: Contact your supervisor for Moata API OAuth2 credentials.
+### Option 2: Command Line
+
+```bash
+# Collect last 24 hours of rain gauge data
+python scripts/gauge/retrieve.py
+
+# Analyze the collected data
+python scripts/gauge/analyze.py
+
+# Generate visualization dashboard
+python scripts/gauge/visualize.py
+
+# Check current alarms
+python scripts/alarms/check_alarms.py
+```
+
+### Option 3: Historical Data
+
+```bash
+# Collect specific date
+python scripts/gauge/retrieve.py --date 2025-05-09
+
+# Analyze historical data
+python scripts/gauge/analyze.py --date 2025-05-09
+
+# Visualize historical data
+python scripts/gauge/visualize.py --date 2025-05-09
+```
+
+---
+
+## Pipeline Workflows
+
+### Rain Gauge Pipeline
+
+```
+┌─────────────┐    ┌─────────────┐     ┌─────────────┐    ┌─────────────┐
+│   Retrieve  │ >> │  Analyze    │ >>  │  Visualize  │ >> │   Validate  │
+│  (collect)  │    │  (filter)   │     │ (dashboard) │    │   (alarms)  │
+└─────────────┘    └─────────────┘     └─────────────┘    └─────────────┘
+      │                  │                  │                  │
+      ▼                  ▼                  ▼                  ▼
+ rain_gauges_      active_gauges.    report.html      validation.csv
+ traces_alarms.    csv, alarm_       gauge_pages/
+ json              summary.csv
+```
+
+**Commands:**
+```bash
+# Step 1: Collect data
+python scripts/gauge/retrieve.py [--date YYYY-MM-DD]
+
+# Step 2: Analyze and filter
+python scripts/gauge/analyze.py [--date YYYY-MM-DD] [--inactive-months 3]
+
+# Step 3: Generate visualizations
+python scripts/gauge/visualize.py [--date YYYY-MM-DD]
+
+# Step 4: Validate alarms (optional)
+python scripts/gauge/validate.py --date YYYY-MM-DD
+```
+
+### Radar Pipeline
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Retrieve  │ >> │   Analyze   │ >> │  Visualize  │ >> │ Check Alarms│
+│  (collect)  │    │    (ARI)    │    │ (dashboard) │    │  (realtime) │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+      │                  │                  │                  │
+      ▼                  ▼                  ▼                  ▼
+ catchment_        catchment_        radar_           alarm_status.csv
+ *.csv files       analysis.csv      dashboard.html   triggered_alarms.csv
+```
+
+**Commands:**
+```bash
+# Step 1: Collect radar data
+python scripts/radar/retrieve.py [--date YYYY-MM-DD]
+
+# Step 2: Analyze with ARI calculations
+python scripts/radar/analyze.py [--date YYYY-MM-DD]
+
+# Step 3: Generate dashboard
+python scripts/radar/visualize.py [--date YYYY-MM-DD]
+
+# Step 4: Check alarms at specific time
+python scripts/alarms/check_radar_alarms.py [--time "YYYY-MM-DD HH:MM:SS"]
+```
+
+---
+
+## Module Reference
+
+### `moata_pipeline.collect`
+
+Data collection from Moata API with SOLID-compliant architecture.
+
+```python
+from moata_pipeline.collect import run_collect_rain_gauges, run_collect_radar
+
+# Collect rain gauge data
+run_collect_rain_gauges(
+    start_time=datetime(2025, 5, 9, tzinfo=timezone.utc),
+    end_time=datetime(2025, 5, 10, tzinfo=timezone.utc)
+)
+
+# Collect radar data
+run_collect_radar(
+    start_time=start_time,
+    end_time=end_time,
+    force_refresh_pixels=False  # Use cached pixel mappings
+)
+```
+
+**Specialized Collectors:**
+- `AssetFetcher`: Fetch and prepare asset data
+- `TraceFetcher`: Fetch trace and timeseries data
+- `AlarmFetcher`: Fetch alarm and threshold data
+- `CatchmentFetcher`: Fetch stormwater catchments
+- `PixelMapper`: Map radar grid to catchment geometries
+- `RadarDataFetcher`: Fetch QPE timeseries
+- `WeightCalculator`: Calculate pixel area weights for de-duplication
+
+### `moata_pipeline.analyze`
+
+Data analysis with ARI calculations and quality filtering.
+
+```python
+from moata_pipeline.analyze import run_filter_active_gauges
+
+result = run_filter_active_gauges(
+    inactive_months=3,
+    exclude_keyword="test",
+    input_date="2025-05-09"  # Optional: for historical data
+)
+
+print(f"Active gauges: {result['active_count']}")
+print(f"Output: {result['output_dir']}")
+```
+
+**Key Components:**
+- `filtering.py`: 3-step quality filtering (exclude non-Auckland, require physical, require recent)
+- `ari.py`: ARI calculations using TP108 coefficients
+- `reporting.py`: Generate analysis summaries and CSV reports
+
+### `moata_pipeline.alarms`
+
+Alarm checking for both gauge and radar data.
+
+```python
+from moata_pipeline.alarms import GaugeAlarmChecker, RadarAlarmChecker
+
+# Check gauge alarms
+gauge_checker = GaugeAlarmChecker(
+    tp108_path=Path("data/inputs/tp108_stats.csv"),
+    alarm_config_path=Path("data/inputs/raingauge_ari_alarms.csv")
+)
+result = gauge_checker.check_gauge(gauge_data, check_time)
+
+# Check radar alarms (LATEST window only)
+radar_checker = RadarAlarmChecker(
+    tp108_path=Path("data/inputs/tp108_stats.csv"),
+    ari_threshold=5.0,
+    area_threshold=0.25  # 25% of catchment must exceed
+)
+result = radar_checker.check_catchment_at_time(catchment_df, check_time)
+```
+
+**Important**: Radar alarm checking examines only the **LATEST window** for each duration, not the entire historical period. This matches operational requirements.
+
+### `moata_pipeline.viz`
+
+HTML dashboard generation.
+
+```python
+from moata_pipeline.viz import run_visual_report
+
+report_path = run_visual_report(
+    csv_path=Path("outputs/rain_gauges/.../analysis/alarm_summary.csv"),
+    out_dir=Path("outputs/rain_gauges/.../visualizations"),
+    input_date="2025-05-09"
+)
+print(f"Dashboard: {report_path}")
+```
+
+### `moata_pipeline.moata`
+
+Low-level API client with OAuth2 authentication.
+
+```python
+from moata_pipeline.moata import MoataAuth, MoataHttp, MoataClient
+
+# Create authenticated client
+auth = MoataAuth(
+    token_url="https://login.moata.io/connect/token",
+    scope="mapi offline_access",
+    client_id="your_id",
+    client_secret="your_secret"
+)
+
+http = MoataHttp(
+    get_token_fn=auth.get_token,
+    base_url="https://api.moata.io/ae/v1",
+    requests_per_second=2.0
+)
+
+client = MoataClient(http=http)
+
+# Use domain-specific clients
+gauges = client.assets.get_rain_gauges(project_id=594, asset_type_id=100)
+traces = client.traces.get_traces_for_asset(asset_id=12345)
+alarms = client.alarms.get_alarms_for_trace(trace_id=67890)
+ari_data = client.ari.get_ari_data(trace_id=67890, from_time=..., to_time=...)
+```
+
+### `moata_pipeline.gui`
+
+Desktop application with CustomTkinter.
+
+```python
+# Launch GUI
+python -m moata_pipeline.gui
+
+# Headless mode (for automated processing)
+python -m moata_pipeline.gui --headless --gauge-timeout 600 --radar-timeout 1800
+```
+
+**Features:**
+- Tabbed interface for Gauge and Radar pipelines
+- Progress tracking with real-time logs
+- Configurable timeouts
+- Date selection for historical analysis
 
 ---
 
 ## Configuration
 
-### `.env` File (REQUIRED)
+### Constants (`moata_pipeline/common/constants.py`)
 
-```bash
-# Moata API OAuth2
-MOATA_CLIENT_ID=xxxxxxxxx
-MOATA_CLIENT_SECRET=xxxxxxxxx
-```
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `PROJECT_ID` | 594 | Auckland Council Moata project |
+| `RAIN_GAUGE_ASSET_TYPE_ID` | 100 | Asset type for rain gauges |
+| `STORMWATER_CATCHMENT_ASSET_TYPE_ID` | 3541 | Asset type for catchments |
+| `DEFAULT_REQUESTS_PER_SECOND` | 2.0 | API rate limit |
+| `INACTIVE_THRESHOLD_MONTHS` | 3 | Inactive gauge threshold |
+| `DEFAULT_ARI_THRESHOLD` | 5.0 | ARI alarm threshold (years) |
+| `DEFAULT_RADAR_PROPORTION_THRESHOLD` | 0.25 | 25% area threshold |
+| `RADAR_MAX_PIXELS_PER_REQUEST` | 150 | API batch limit |
+| `RADAR_RECOMMENDED_BATCH_SIZE` | 50 | Recommended batch size |
 
-⚠️ **IMPORTANT**: Never commit `.env` to Git!
+### TP108 Coefficients
 
----
-
-## Quick Start Guide
-
-### 🎯 Workflow Overview
-
-```
-┌─────────────────────────────────────────────────────┐
-│  RAIN GAUGE PIPELINE (Point Measurements)           │
-├─────────────────────────────────────────────────────┤
-│  1. RETRIEVE  → Collect gauge data from API         │
-│  2. ANALYZE   → Filter & analyze configurations     │
-│  3. VISUALIZE → Generate HTML dashboard             │
-│  4. VALIDATE  → Validate ARI alarm events (opt)     │
-│  5. VIZ VAL   → Validation dashboard (opt)          │
-└─────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────┐
-│  RAIN RADAR PIPELINE (Spatial Coverage)             │
-├─────────────────────────────────────────────────────┤
-│  1. RETRIEVE     → Collect radar data for catchments│
-│  2. ANALYZE      → Calculate ARI using TP108        │
-│  3. VISUALIZE    → Generate HTML dashboard          │
-│  4. CHECK ALARMS → Check alarm trigger status (opt) │
-│  5. VIZ ALARMS   → Alarm status visualization (opt) │
-└─────────────────────────────────────────────────────┘
-```
-
-### 🚀 First Time Setup
-
-```bash
-# 1. Install and activate environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# 2. Create .env file with credentials
-# (Get credentials from supervisor)
-
-# 3. Run Rain Gauge pipeline (easier, faster)
-python scripts/gauge/retrieve.py
-python scripts/gauge/analyze.py
-python scripts/gauge/visualize.py
-
-# 4. Open dashboard
-# outputs/rain_gauges/YYYYMMDD-YYYYMMDD/visualizations/dashboard.html
-```
-
-### 📊 Daily Usage
-
-**Simple daily workflow (no date argument needed):**
-
-```bash
-# Rain Gauge Pipeline - automatically uses last 24 hours
-python scripts/gauge/retrieve.py
-python scripts/gauge/analyze.py
-python scripts/gauge/visualize.py
-python scripts/gauge/validate.py              # optional
-python scripts/gauge/visualize_validation.py  # optional
-
-# Rain Radar Pipeline - automatically uses last 24 hours
-python scripts/radar/retrieve.py
-python scripts/radar/analyze.py
-python scripts/radar/visualize.py
-python scripts/alarms/check_radar_alarms.py   # optional
-python scripts/alarms/visualize_alarms.py     # optional
-```
-
-Data is stored in folder format `YYYYMMDD-YYYYMMDD` based on script execution time.
+Located in `data/inputs/tp108_stats.csv`, containing:
+- Auckland-specific rainfall intensity coefficients
+- Duration categories: 10min to 24hr
+- Used for ARI calculations
 
 ---
 
-## Usage
+## Output Structure
 
-### GUI Mode (Recommended) 🎨
-
-**Easy-to-use graphical interface:**
-
-```bash
-# Run the GUI
-python moata_alert_lab.py
 ```
-
-**Features:**
-- ✅ Modern dark/light theme
-- ✅ Step-by-step pipeline execution
-- ✅ Real-time console output
-- ✅ Auto-detection of latest data
-- ✅ No command-line knowledge needed
-
-**Workflow:**
-1. Launch GUI
-2. Select pipeline (Rain Gauge or Rain Radar)
-3. Click "Run" for each step in order
-4. View dashboards when complete
-
----
-
-### Command-Line Mode (Advanced Users)
-
-### Rain Gauge Pipeline
-
-```bash
-# 1. Retrieve data from API
-python scripts/gauge/retrieve.py
-
-# 2. Analyze data
-python scripts/gauge/analyze.py
-
-# 3. Generate HTML dashboard
-python scripts/gauge/visualize.py
-
-# 4. [Optional] Validate alarms
-python scripts/gauge/validate.py
-
-# 5. [Optional] Validation dashboard
-python scripts/gauge/visualize_validation.py
-```
-
-**View all options:**
-```bash
-python scripts/gauge/retrieve.py --help
-```
-
-### Rain Radar Pipeline
-
-**Current Data (Last 24 hours):**
-```bash
-# 1. Retrieve radar data
-python scripts/radar/retrieve.py
-
-# 2. Analyze with TP108 ARI
-python scripts/radar/analyze.py
-
-# 3. Generate HTML dashboard
-python scripts/radar/visualize.py
-
-# 4. [Optional] Check alarm triggers
-python scripts/alarms/check_radar_alarms.py
-
-# 5. [Optional] Alarm visualization
-python scripts/alarms/visualize_alarms.py
-```
-
-**Historical Data (Specific date range):**
-```bash
-python scripts/radar/retrieve.py --start 2025-05-09 --end 2025-05-10
-python scripts/radar/analyze.py --date 20250509-20250510
-python scripts/radar/visualize.py --date 20250509-20250510
+outputs/
+├── rain_gauges/
+│   └── YYYYMMDD-YYYYMMDD/           # Date range folder
+│       ├── raw/
+│       │   └── rain_gauges_traces_alarms.json
+│       ├── analysis/
+│       │   ├── active_gauges.csv
+│       │   ├── alarm_summary.csv
+│       │   └── alarm_summary_full.csv
+│       ├── visualizations/
+│       │   ├── report.html
+│       │   ├── cleaned_alarm_summary.csv
+│       │   └── gauge_pages/
+│       │       └── *.html
+│       └── validation/
+│           └── ari_alarm_validation.csv
+│
+└── rain_radar/
+    └── YYYYMMDD-YYYYMMDD/
+        ├── raw/
+        │   ├── radar_data/
+        │   │   └── {catchment_id}_{name}.csv
+        │   ├── pixel_mappings.json
+        │   └── pixel_weights.json
+        ├── analysis/
+        │   └── catchment_analysis.csv
+        ├── alarms/
+        │   ├── alarm_status.csv
+        │   ├── triggered_alarms.csv
+        │   └── alarm_report.txt
+        └── visualizations/
+            ├── radar_dashboard.html
+            └── catchment_stats.csv
 ```
 
 ---
 
-## Project Structure
+## Technical Details
 
-```
-internship-project/
-│
-├── 📁 moata_pipeline/              # Main Python package
-│   ├── __init__.py                 # Package root
-│   ├── logging_setup.py            # Centralized logging
-│   │
-│   ├── 📁 moata/                   # API Client (5 files)
-│   │   ├── __init__.py
-│   │   ├── auth.py                 # OAuth2 authentication
-│   │   ├── http.py                 # HTTP client with rate limiting
-│   │   ├── client.py               # High-level API methods
-│   │   └── endpoints.py            # API endpoint definitions
-│   │
-│   ├── 📁 collect/                 # Data Collection (3 files)
-│   │   ├── __init__.py
-│   │   ├── collector.py            # RainGaugeCollector, RadarDataCollector
-│   │   └── runner.py               # Collection orchestration
-│   │
-│   ├── 📁 analyze/                 # Data Analysis (7 files)
-│   │   ├── __init__.py
-│   │   ├── runner.py               # Analysis orchestration
-│   │   ├── filtering.py            # Gauge filtering logic
-│   │   ├── alarm_analysis.py       # Alarm configuration analysis
-│   │   ├── ari_calculator.py       # ARI calculations (TP108)
-│   │   ├── reporting.py            # Text report generation
-│   │   └── radar_analysis.py       # Radar-specific analysis
-│   │
-│   ├── 📁 viz/                     # Visualization (8 files)
-│   │   ├── __init__.py
-│   │   ├── runner.py               # Gauge visualization orchestration
-│   │   ├── radar_runner.py         # Radar visualization orchestration
-│   │   ├── cleaning.py             # Data cleaning for gauge viz
-│   │   ├── pages.py                # Per-gauge HTML page generation
-│   │   ├── report.py               # Main gauge dashboard HTML
-│   │   ├── radar_cleaning.py       # Radar data cleaning
-│   │   └── radar_report.py         # Radar dashboard HTML
-│   │
-│   └── 📁 common/                  # Shared Utilities (18 files)
-│       ├── __init__.py
-│       ├── paths.py                # Centralized path management
-│       ├── config.py               # Configuration settings
-│       ├── constants.py            # Configuration constants
-│       ├── time_utils.py           # Datetime utilities
-│       ├── file_utils.py           # File operations
-│       ├── json_io.py              # JSON read/write
-│       ├── html_utils.py           # HTML generation helpers
-│       ├── text_utils.py           # Text processing utilities
-│       ├── dataframe_utils.py      # Pandas helper functions
-│       ├── output_writer.py        # Output file writers
-│       ├── spatial_utils.py        # Pixel proportion within catchments
-│       ├── typing_utils.py         # Type conversion utilities
-│       ├── iter_utils.py           # Iterator utilities
-│       ├── validation.py           # Input validation utilities
-│       ├── script_utils.py         # CLI script utilities
-│       ├── error_handling.py       # Error handling utilities
-│       ├── exceptions.py           # Custom exception classes
-│       └── protocols.py            # Type protocols/interfaces
-│
-├── 📁 moata_alert_lab_gui/         # GUI Application (10 files)
-│   ├── __init__.py                 # Package init
-│   ├── __main__.py                 # Module entry point
-│   ├── main.py                     # Main application window (ModernApp)
-│   ├── config.py                   # Colors, constants, themes
-│   ├── components.py               # Reusable UI components
-│   ├── executor.py                 # Script execution handler
-│   └── 📁 pipelines/               # Pipeline implementations (4 files)
-│       ├── __init__.py
-│       ├── base.py                 # Abstract base class (BasePipeline)
-│       ├── gauge.py                # Rain Gauge pipeline implementation
-│       └── radar.py                # Rain Radar pipeline implementation
-│
-├── 📁 scripts/                     # CLI Scripts
-│   ├── 📁 gauge/                   # Rain Gauge scripts (5 files)
-│   │   ├── retrieve.py             # Data collection from API
-│   │   ├── analyze.py              # Data analysis & filtering
-│   │   ├── visualize.py            # HTML dashboard generation
-│   │   ├── validate.py             # ARI alarm validation
-│   │   └── visualize_validation.py # Validation dashboard
-│   │
-│   ├── 📁 radar/                   # Rain Radar scripts (4 files)
-│   │   ├── retrieve.py             # Radar data collection
-│   │   ├── analyze.py              # ARI analysis using TP108
-│   │   ├── visualize.py            # Radar dashboard generation
-│   │   └── visualize_alarms.py     # Alarm visualization
-│   │
-│   └── 📁 alarms/                  # Alarm analysis scripts (2 files)
-│       ├── check_radar_alarms.py   # Check radar alarm status
-│       └── check_alarm_timeline.py # Alarm timeline analysis
-│
-├── 📁 data/                        # Input data (static)
-│   └── 📁 inputs/
-│       ├── tp108_stats.csv         # TP108 ARI coefficients (REQUIRED)
-│       └── raingauge_ari_alarms.csv # Historical alarm events
-│
-├── 📁 outputs/                     # Generated outputs (Git-ignored)
-│   ├── 📁 rain_gauges/
-│   │   └── 📁 YYYYMMDD-YYYYMMDD/   # Date range folder (e.g., 20260120-20260121)
-│   │       ├── 📁 raw/             # Raw API data (JSON)
-│   │       │   └── rain_gauges_traces_alarms.json
-│   │       ├── 📁 analysis/        # Analysis results (CSV, TXT)
-│   │       │   ├── alarm_summary.csv
-│   │       │   ├── alarm_summary_full.csv
-│   │       │   └── analysis_report.txt
-│   │       ├── 📁 visualizations/  # HTML dashboards
-│   │       │   ├── dashboard.html
-│   │       │   └── 📁 gauges/
-│   │       │       └── GAUGE_XXX.html
-│   │       └── 📁 validation/      # Validation outputs
-│   │           ├── ari_alarm_validation.csv
-│   │           └── validation_dashboard.html
-│   │
-│   └── 📁 rain_radar/
-│       └── 📁 YYYYMMDD-YYYYMMDD/   # Date range folder (e.g., 20260120-20260121)
-│           ├── 📁 raw/             # Radar data
-│           │   ├── catchments.json
-│           │   ├── pixels.json     # Cached pixel mappings
-│           │   └── 📁 radar_data/  # Radar CSV per catchment
-│           │       └── XXXX_CatchmentName.csv (~233 files)
-│           ├── 📁 analysis/        # ARI analysis results
-│           │   ├── ari_analysis_summary.csv
-│           │   ├── ari_exceedances.csv
-│           │   └── analysis_report.txt
-│           ├── 📁 alarms/          # Alarm detection results
-│           │   └── alarm_status.csv
-│           └── 📁 visualizations/  # HTML dashboards
-│               └── radar_dashboard.html
-│
-├── 🎨 Entry Points
-├── moata_alert_lab.py              # GUI launcher
-│
-├── 📄 Configuration
-├── .env                            # Credentials (Git-ignored, REQUIRED)
-├── .env.example                    # Template for credentials
-├── requirements.txt                # Python dependencies
-├── .gitignore                      # Git ignore rules
-│
-└── 📖 Documentation
-    └── README.md                   # This file
+### ARI (Average Recurrence Interval) Calculation
+
+ARI represents the statistical return period of rainfall events in years. The system uses TP108 methodology:
+
+1. **Extract rainfall totals** for each standard duration (10min, 20min, 30min, 1hr, 2hr, 6hr, 12hr, 24hr)
+2. **Apply TP108 coefficients** specific to Auckland region
+3. **Calculate weighted ARI** across all durations
+4. **Compare against threshold** (default: 5-year return period)
+
+```python
+# Simplified ARI calculation
+ari = calculate_ari(
+    rainfall_mm=15.5,
+    duration_minutes=60,
+    tp108_coefficients=coefficients
+)
+# Returns: ARI in years (e.g., 2.5 means 2.5-year return period)
 ```
 
-**Total Files:**
-- **Python Source**: ~50 files
-- **CLI Scripts**: 11 files (5 gauge + 4 radar + 2 alarms)
-- **GUI Files**: 10 files
+### Pixel Weighting for Radar Data
+
+When radar pixels overlap multiple catchments, weighted values prevent double-counting:
+
+```python
+# Geometric weighting (preferred)
+weight = intersection_area / pixel_area
+
+# Simple weighting (fallback)
+weight = 1.0 / number_of_overlapping_catchments
+```
+
+### Atomic Write Strategy
+
+All file operations use atomic writes to prevent data corruption:
+
+1. Write to temporary directory (`_temp/`)
+2. Validate output integrity
+3. Move to final location only on success
+4. Windows file locking handled with retry logic
+
+### Pre-Filter Optimization
+
+Sam's optimization reduces API calls by identifying active gauges before full data fetch:
+
+```python
+# Uses /projects/{id}/traces/info endpoint
+# Filters by: data_variable_type_id=10 (rainfall), inactive_months=3
+# Excludes: "northland|waikato" patterns
+```
 
 ---
 
 ## Troubleshooting
 
-### Error: Authentication Failed
+### Common Issues
 
+**1. Authentication Error**
+```
+AuthenticationError: Failed to acquire token
+```
+**Solution**: Check `.env` file has valid `MOATA_CLIENT_ID` and `MOATA_CLIENT_SECRET`
+
+**2. No Data Found**
+```
+FileNotFoundError: Raw gauge data not found
+```
+**Solution**: Run `retrieve.py` before `analyze.py`
+
+**3. Rate Limit Exceeded**
+```
+RateLimitError: Rate limit exceeded
+```
+**Solution**: Reduce `MOATA_REQUESTS_PER_SECOND` in configuration
+
+**4. SSL Certificate Error**
+```
+SSLError: certificate verify failed
+```
+**Solution**: The code disables SSL verification by default for corporate networks. If needed, set `verify_ssl=True` in auth/http configuration.
+
+### Debug Mode
+
+Enable verbose logging:
 ```bash
-# Check if .env exists and is correct
-cat .env
-
-# Verify credentials are loaded
-python -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.getenv('MOATA_CLIENT_ID'))"
-```
-
-**Solution**: Ensure `.env` file exists in project root with correct credentials.
-
-### Error: InsecureRequestWarning
-
-**Message:**
-```
-InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.moata.io'
-```
-
-**Solution**: This warning is safe to suppress in Auckland Council development environment. It's already handled in the scripts.
-
-### Error: Rate Limit Exceeded
-
-```bash
-# Wait for the specified time (usually 60 seconds)
-sleep 60
-python scripts/gauge/retrieve.py
-```
-
-**Tip**: Don't run multiple collections simultaneously. Moata API has rate limit of 2 requests/second.
-
-### Error: Memory Error
-
-**Solutions**: 
-- Close other applications
-- Process specific dates only (avoid large date ranges)
-- Use computer with more RAM (radar analysis needs ~2GB)
-
-### Slow Performance
-
-**Check:**
-- Network connection to `api.moata.io`
-- If outputs folder is on network drive (move to local disk)
-- API rate limiting (normal if slow - radar takes 15-30 min)
-
-### View Detailed Logs
-
-```bash
-# Use debug mode
 python scripts/gauge/retrieve.py --log-level DEBUG
 ```
 
 ---
 
-## Key Concepts
+## Development
 
-### ARI (Average Recurrence Interval)
-
-ARI indicates how rare a rainfall event is.
-- **5-year ARI** = event occurs on average once per 5 years
-- **100-year ARI** = very rare (extreme) event
-
-**Calculation**: Uses TP108 methodology (Auckland Regional Council)
-
-```
-ARI = exp(m × D + b)
-```
-- D = rainfall depth (mm)
-- m, b = location-specific coefficients (from `tp108_stats.csv`)
-
-### Analyzed Durations
-
-| Duration | Use Case |
-|----------|----------|
-| 10 minutes | Flash flooding |
-| 20 minutes | Urban drainage |
-| 30 minutes | Infrastructure capacity |
-| 1 hour | Storm system design |
-| 2 hours | Extended events |
-| 6 hours | Multi-hour storms |
-| 12 hours | Long-duration events |
-| 24 hours | Multi-day storms |
-
-### Alarm Thresholds
-
-- **Rain Gauge**: ARI ≥ 5 years at single gauge point
-- **Rain Radar**: ≥25% catchment area with ARI ≥ 5 years (spatial threshold)
-
-### Data Sources
-
-- **Rain Gauges**: ~76 gauges across Auckland
-- **Stormwater Catchments**: 233 catchments
-- **Radar Pixels**: ~25k pixels total
-
----
-
-## Main Dependencies
-
-```txt
-# Core Data Processing
-pandas==2.3.3
-numpy==2.3.5
-
-# HTTP Client & API
-requests==2.32.5
-urllib3==2.6.1
-
-# Configuration
-python-dotenv==1.2.1
-
-# Date/Time Utilities
-python-dateutil==2.9.0.post0
-
-# GUI Framework
-customtkinter==5.2.2
-
-# Visualization
-matplotlib==3.10.8
-
-# Geospatial
-shapely==2.1.2
-pyproj==3.7.2
-
-# Document Generation
-python-docx==1.2.0
-```
-
-Install all: `pip install -r requirements.txt`
-
----
-
-## Support
-
-| Issue | Contact |
-|-------|---------|
-| API credentials | Sam Greenwood (Mott MacDonald) |
-| Technical questions | Kris Fordham (Systems and Insights' Manager) |
-| Moata API issues | Sam (Mott MacDonald) |
-
----
-
-## Tips
-
-### CLI Arguments (All scripts support)
+### Running Tests
 
 ```bash
-# View all options
-python scripts/gauge/retrieve.py --help
+# Run all tests
+pytest
 
-# Historical data
-python scripts/gauge/retrieve.py --date 2025-01-09
+# Run with coverage
+pytest --cov=moata_pipeline
 
-# Date range
-python scripts/gauge/retrieve.py --start 2025-01-01 --end 2025-01-07
-
-# Custom threshold
-python scripts/radar/validate.py --threshold 0.50
-
-# Debug mode
-python scripts/gauge/analyze.py --log-level DEBUG
+# Run specific module tests
+pytest tests/test_analyze.py -v
 ```
 
-### Automation with Exit Codes
+### Code Style
 
 ```bash
-python scripts/gauge/retrieve.py
-if [ $? -eq 0 ]; then
-  echo "Success!"
-  python scripts/gauge/analyze.py
-else
-  echo "Failed, check logs"
-fi
+# Format code
+black moata_pipeline/
+
+# Check types
+mypy moata_pipeline/
+
+# Lint
+flake8 moata_pipeline/
 ```
 
-Exit codes:
-- `0` = success
-- `1` = error
-- `130` = Ctrl+C interrupted
+### Adding New Collectors
 
-### Best Practices
+Follow the SOLID pattern:
 
-1. ✅ Always run in virtual environment
-2. ✅ Never commit `.env` to Git
-3. ✅ Backup `outputs/` regularly
-4. ✅ Run gauge collection daily, radar weekly
-5. ✅ Use `--help` to view options
-6. ✅ Check logs if errors occur
-7. ✅ Use historical mode for specific dates
-8. ✅ Keep `data/inputs/tp108_stats.csv` updated
+```python
+from moata_pipeline.collect.collectors.base import BaseCollector
 
----
-
-## Changelog
-
-### Version 2.0.0 (January 2026)
-- **Date-range based output structure**: All outputs organized in `YYYYMMDD-YYYYMMDD` folders
-- **Current time-based collection**: Retrieve scripts now use current time as endpoint
-- **Improved path management**: Centralized path handling with `PipelinePaths` class
-- **Enhanced GUI**: Modern interface with CustomTkinter
-- **Alarm analysis scripts**: Added radar alarm checking utilities
-
-### Version 1.0.0 (December 2024)
-- Initial release
-- Rain gauge and radar data collection pipelines
-- ARI analysis and alarm validation using TP108 methodology
-- HTML dashboard generation with interactive visualizations
+class MyNewCollector(BaseCollector):
+    """Single responsibility: collect specific data type."""
+    
+    def collect(self, **kwargs) -> dict:
+        # Implementation
+        pass
+```
 
 ---
 
 ## License
 
-**Internal Auckland Council Use Only**
+This software is proprietary to Auckland Council. Developed as part of COMPSCI 778 internship program at the University of Auckland.
 
-Copyright © 2025-2026 Auckland Council. All rights reserved.
+**Author**: Auckland Council Internship Team (COMPSCI 778)  
+**Contact**: mott909@aucklanduni.ac.nz  
+**Version**: 2.1.0  
+**Last Modified**: January 2026
 
 ---
 
-**Last Updated**: January 2026 
+## Acknowledgments
 
-**Version**: 2.0.0  
-
-**Created by**: Muhammad Juang (Healthy Waters and Flood Resilience Intern)
-
-**Supervisor**: Dr. Yu-Cheng Tu
-
-**Institution**: University of Auckland (COMPSCI 778: Internship)
+- **Auckland Council Healthy Waters** - Project sponsorship and domain expertise
+- **Kris Fordham** - Supervisor and technical guidance
+- **Sam (Moata Team)** - API documentation and optimization suggestions
+- **University of Auckland** - COMPSCI 778 program coordination
