@@ -5,7 +5,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Proprietary](https://img.shields.io/badge/license-Auckland%20Council-red.svg)](LICENSE)
 
-MOATA AlertLab is a rainfall monitoring application developed for Auckland Council's Healthy Waters and Flood Resilience department. The system processes both rain gauge and radar (QPE) data from the Moata API to analyze and validate flood alarms using ARI (Average Recurrence Interval) calculations and TP108 methodology.
+MOATA AlertLab is a sophisticated rainfall monitoring application developed for Auckland Council's Healthy Waters and Flood Resilience department. The system processes both rain gauge and radar (QPE) data from the Moata API to analyze and validate flood alarms using ARI (Average Recurrence Interval) calculations and TP108 methodology.
 
 ---
 
@@ -78,24 +78,86 @@ MOATA AlertLab addresses the critical need for accurate flood monitoring in Auck
 ## Architecture
 
 ```
-moata_pipeline/
-├── alarms/          # Alarm checking logic (gauge & radar)
-├── analyze/         # Data filtering, ARI calculations, reporting
-├── collect/         # SOLID-refactored data collectors
-│   └── collectors/  # Specialized collector classes
-├── common/          # Shared utilities, config, constants
-├── moata/           # API client (auth, http, endpoints)
-│   └── clients/     # Domain-specific API clients
-├── viz/             # Visualization and dashboard generation
-└── gui/             # CustomTkinter desktop interface
+moata_alert_lab_gui/         # Desktop GUI application
+├── pipelines/               # Pipeline implementations
+│   ├── base.py              # Base pipeline class
+│   ├── gauge.py             # Rain gauge pipeline
+│   └── radar.py             # Radar pipeline
+├── __main__.py              # Entry point: python -m moata_alert_lab_gui
+├── main.py                  # Main application window
+├── config.py                # Theme and timeout configuration
+├── executor.py              # Script execution handler
+└── components.py            # Reusable UI components
 
-scripts/
-├── gauge/           # Rain gauge pipeline scripts
-├── radar/           # Radar pipeline scripts
-└── alarms/          # Alarm checking scripts
+moata_pipeline/              # Core processing library
+├── alarms/                  # Alarm checking logic
+│   ├── gauge_alarm_checker.py
+│   └── radar_alarm_checker.py
+├── analyze/                 # Data analysis modules
+│   ├── filtering.py         # 3-step gauge filtering
+│   ├── ari_calculator.py    # ARI calculations
+│   ├── reporting.py         # Report generation
+│   └── runner.py            # Analysis entry point
+├── collect/                 # Data collection (SOLID architecture)
+│   ├── collectors/          # Specialized collectors
+│   │   ├── base.py          # BaseCollector
+│   │   ├── asset_fetcher.py
+│   │   ├── trace_fetcher.py
+│   │   ├── alarm_fetcher.py
+│   │   ├── catchment_fetcher.py
+│   │   ├── pixel_mapper.py
+│   │   ├── radar_data_fetcher.py
+│   │   └── weight_calculator.py
+│   ├── gauge_collector.py   # Gauge collection facade
+│   ├── radar_collector.py   # Radar collection facade
+│   └── runner.py            # Collection entry points
+├── common/                  # Shared utilities
+│   ├── config.py            # Centralized configuration
+│   ├── constants.py         # API constants
+│   ├── paths.py             # PipelinePaths class
+│   ├── exceptions.py        # Custom exceptions
+│   └── [utils].py           # Various utilities
+├── moata/                   # API client layer
+│   ├── auth.py              # OAuth2 authentication
+│   ├── http.py              # HTTP client with rate limiting
+│   ├── client.py            # Unified API client (facade)
+│   ├── endpoints.py         # API endpoint definitions
+│   └── clients/             # Domain-specific clients
+│       ├── assets.py
+│       ├── traces.py
+│       ├── alarms.py
+│       ├── radar.py
+│       └── ari.py
+└── viz/                     # Visualization generation
+    ├── runner.py            # Gauge visualization entry
+    ├── radar_runner.py      # Radar visualization entry
+    ├── cleaning.py          # Data preparation
+    ├── pages.py             # Per-gauge HTML pages
+    ├── report.py            # Main gauge report
+    └── radar_report.py      # Radar dashboard
 
-data/inputs/         # Static reference data (TP108, alarm configs)
-outputs/             # Pipeline outputs (organized by date range)
+scripts/                     # CLI entry points
+├── gauge/
+│   ├── retrieve.py
+│   ├── analyze.py
+│   ├── visualize.py
+│   ├── validate.py
+│   └── check_alarms.py
+├── radar/
+│   ├── retrieve.py
+│   ├── analyze.py
+│   └── visualize.py
+└── alarms/
+    ├── check_alarms.py
+    ├── check_radar_alarms.py
+    └── validate_ari_alarms.py
+
+data/inputs/                 # Static reference data
+├── tp108_stats.csv          # TP108 rainfall coefficients
+└── raingauge_ari_alarms.csv # Historical alarm records
+
+outputs/                     # Pipeline outputs (date-organized)
+└── [see Output Structure section]
 ```
 
 ### Design Principles
@@ -154,43 +216,92 @@ MOATA_CLIENT_SECRET=your_client_secret_here
 
 ## Quick Start
 
-### Option 1: GUI Application
+### Option 1: GUI Application (Desktop Interface)
+
+The GUI provides a modern desktop interface built with CustomTkinter:
 
 ```bash
 # Launch the desktop interface
-python -m moata_pipeline.gui
-
-# Or with specific options
-python -m moata_pipeline.gui --headless  # Run without GUI
+python -m moata_alert_lab_gui
 ```
 
-### Option 2: Command Line
+**GUI Features:**
+- **Pipeline Selection**: Choose between Rain Gauge or Radar pipeline
+- **Step-by-Step Execution**: Run each pipeline step with a single click
+- **Date Selection**: Built-in date picker for historical data
+- **Real-time Console**: View script output in embedded terminal
+- **Progress Tracking**: Visual progress bars with timeout information
+- **Dashboard Integration**: Auto-open generated HTML dashboards
 
+**GUI Pipeline Steps:**
+| Step | Rain Gauge | Radar |
+|------|------------|-------|
+| 1 | Retrieve Data | Retrieve Data |
+| 2 | Analyze Data | Analyze Data |
+| 3 | Visualize Results | Visualize Results |
+| 4 | Validate Alarms | Check Alarms |
+| 5 | Visualize Validation | - |
+| 6 | Check Alarms | - |
+
+### Option 2: Command Line Scripts
+
+All scripts support `--help` for detailed usage information.
+
+**Rain Gauge Pipeline:**
 ```bash
-# Collect last 24 hours of rain gauge data
+# Collect last 24 hours (default)
 python scripts/gauge/retrieve.py
 
-# Analyze the collected data
-python scripts/gauge/analyze.py
-
-# Generate visualization dashboard
-python scripts/gauge/visualize.py
-
-# Check current alarms
-python scripts/alarms/check_alarms.py
-```
-
-### Option 3: Historical Data
-
-```bash
-# Collect specific date
+# Collect specific date (24-hour period)
 python scripts/gauge/retrieve.py --date 2025-05-09
 
-# Analyze historical data
+# Collect date range
+python scripts/gauge/retrieve.py --start 2025-05-09 --end 2025-05-12
+
+# Analyze collected data
 python scripts/gauge/analyze.py --date 2025-05-09
 
-# Visualize historical data
+# With custom inactive threshold
+python scripts/gauge/analyze.py --date 2025-05-09 --inactive-months 6
+
+# Generate visualization
 python scripts/gauge/visualize.py --date 2025-05-09
+
+# Validate alarms against API data
+python scripts/gauge/validate.py --date 2025-05-09
+
+# Check alarms at specific datetime
+python scripts/gauge/check_alarms.py --datetime "2025-05-09 14:00"
+```
+
+**Radar Pipeline:**
+```bash
+# Collect last 24 hours (default)
+python scripts/radar/retrieve.py
+
+# Collect specific date
+python scripts/radar/retrieve.py --date 2025-05-09
+
+# Force refresh pixel mappings from API
+python scripts/radar/retrieve.py --date 2025-05-09 --force-refresh-pixels
+
+# Analyze radar data
+python scripts/radar/analyze.py --date 2025-05-09
+
+# Generate radar dashboard
+python scripts/radar/visualize.py --date 2025-05-09
+
+# Check radar alarms at specific time
+python scripts/alarms/check_radar_alarms.py --time "2025-05-09 14:00:00"
+
+# With custom thresholds
+python scripts/alarms/check_radar_alarms.py --ari-threshold 10.0 --area-threshold 0.25
+```
+
+**Verbose Logging:**
+```bash
+# Add --log-level DEBUG to any script for detailed output
+python scripts/gauge/retrieve.py --date 2025-05-09 --log-level DEBUG
 ```
 
 ---
@@ -200,10 +311,10 @@ python scripts/gauge/visualize.py --date 2025-05-09
 ### Rain Gauge Pipeline
 
 ```
-┌─────────────┐    ┌─────────────┐     ┌─────────────┐    ┌─────────────┐
-│   Retrieve  │ >> │  Analyze    │ >>  │  Visualize  │ >> │   Validate  │
-│  (collect)  │    │  (filter)   │     │ (dashboard) │    │   (alarms)  │
-└─────────────┘    └─────────────┘     └─────────────┘    └─────────────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Retrieve  │ >> │   Analyze   │ >> │  Visualize  │ >> │   Validate  │
+│  (collect)  │    │  (filter)   │    │ (dashboard) │    │   (alarms)  │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
       │                  │                  │                  │
       ▼                  ▼                  ▼                  ▼
  rain_gauges_      active_gauges.    report.html      validation.csv
@@ -211,19 +322,29 @@ python scripts/gauge/visualize.py --date 2025-05-09
  json              summary.csv
 ```
 
-**Commands:**
+**Step 1: Retrieve** - Collect gauge metadata, traces, and alarm configurations
 ```bash
-# Step 1: Collect data
-python scripts/gauge/retrieve.py [--date YYYY-MM-DD]
+python scripts/gauge/retrieve.py --date 2025-05-09
+```
 
-# Step 2: Analyze and filter
-python scripts/gauge/analyze.py [--date YYYY-MM-DD] [--inactive-months 3]
+**Step 2: Analyze** - Filter active gauges and generate alarm summary
+```bash
+python scripts/gauge/analyze.py --date 2025-05-09
+```
 
-# Step 3: Generate visualizations
-python scripts/gauge/visualize.py [--date YYYY-MM-DD]
+**Step 3: Visualize** - Generate HTML dashboard with gauge pages
+```bash
+python scripts/gauge/visualize.py --date 2025-05-09
+```
 
-# Step 4: Validate alarms (optional)
-python scripts/gauge/validate.py --date YYYY-MM-DD
+**Step 4: Validate** - Fetch timeseries and validate historical alarms
+```bash
+python scripts/gauge/validate.py --date 2025-05-09
+```
+
+**Step 5: Check Alarms** - Check ARI alarms with verification
+```bash
+python scripts/gauge/check_alarms.py --datetime "2025-05-09 14:00"
 ```
 
 ### Radar Pipeline
@@ -231,27 +352,32 @@ python scripts/gauge/validate.py --date YYYY-MM-DD
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │   Retrieve  │ >> │   Analyze   │ >> │  Visualize  │ >> │ Check Alarms│
-│  (collect)  │    │    (ARI)    │    │ (dashboard) │    │  (realtime) │
+│  (collect)  │    │   (ARI)     │    │ (dashboard) │    │  (realtime) │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
       │                  │                  │                  │
       ▼                  ▼                  ▼                  ▼
- catchment_        catchment_        radar_           alarm_status.csv
- *.csv files       analysis.csv      dashboard.html   triggered_alarms.csv
+ catchment_        ari_analysis_    radar_           alarm_status.csv
+ *.csv files       summary.csv      dashboard.html   triggered_alarms.csv
 ```
 
-**Commands:**
+**Step 1: Retrieve** - Collect radar QPE data for all catchments
 ```bash
-# Step 1: Collect radar data
-python scripts/radar/retrieve.py [--date YYYY-MM-DD]
+python scripts/radar/retrieve.py --date 2025-05-09
+```
 
-# Step 2: Analyze with ARI calculations
-python scripts/radar/analyze.py [--date YYYY-MM-DD]
+**Step 2: Analyze** - Run ARI analysis on radar data
+```bash
+python scripts/radar/analyze.py --date 2025-05-09
+```
 
-# Step 3: Generate dashboard
-python scripts/radar/visualize.py [--date YYYY-MM-DD]
+**Step 3: Visualize** - Generate radar dashboard
+```bash
+python scripts/radar/visualize.py --date 2025-05-09
+```
 
-# Step 4: Check alarms at specific time
-python scripts/alarms/check_radar_alarms.py [--time "YYYY-MM-DD HH:MM:SS"]
+**Step 4: Check Alarms** - Check alarm status at specific timestamp
+```bash
+python scripts/alarms/check_radar_alarms.py --date 2025-05-09 --time "2025-05-09 14:00:00"
 ```
 
 ---
@@ -380,23 +506,32 @@ alarms = client.alarms.get_alarms_for_trace(trace_id=67890)
 ari_data = client.ari.get_ari_data(trace_id=67890, from_time=..., to_time=...)
 ```
 
-### `moata_pipeline.gui`
+### `moata_alert_lab_gui`
 
-Desktop application with CustomTkinter.
+Desktop application with CustomTkinter for interactive pipeline execution.
 
-```python
+```bash
 # Launch GUI
-python -m moata_pipeline.gui
-
-# Headless mode (for automated processing)
-python -m moata_pipeline.gui --headless --gauge-timeout 600 --radar-timeout 1800
+python -m moata_alert_lab_gui
 ```
 
+**Module Structure:**
+- `main.py` - Main application window and navigation
+- `config.py` - Theme colors, timeouts, and settings
+- `executor.py` - Script execution with real-time output
+- `components.py` - Reusable UI components (cards, buttons, dialogs)
+- `pipelines/base.py` - Base pipeline class
+- `pipelines/gauge.py` - Rain gauge pipeline implementation
+- `pipelines/radar.py` - Radar pipeline implementation
+
 **Features:**
-- Tabbed interface for Gauge and Radar pipelines
-- Progress tracking with real-time logs
-- Configurable timeouts
-- Date selection for historical analysis
+- Modern dark/light theme with toggle
+- Pipeline selection cards with feature highlights
+- Step-by-step execution with numbered workflow
+- Date picker dialogs for historical data
+- Real-time console output with auto-scroll
+- Timeout handling per script type
+- Automatic dashboard opening on completion
 
 ---
 
