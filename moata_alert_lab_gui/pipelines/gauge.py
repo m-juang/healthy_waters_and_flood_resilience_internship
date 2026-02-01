@@ -80,16 +80,34 @@ class GaugePipeline(BasePipeline):
     # =========================================================================
     
     def run_retrieve(self) -> None:
-        """Run retrieve step - simple date picker."""
+        """Run retrieve step - simple date picker with existing data check."""
         date_str = self._get_date_from_user("Select Date to Retrieve")
         if not date_str:
             return
+        
+        # Check if data already exists
+        exists, info = self._check_existing_data("gauge", date_str)
+        
+        args = ["--date", date_str]
+        
+        if exists and info:
+            # Ask user if they want to re-download
+            if self._confirm_redownload("gauge", info):
+                args.append("--force")
+            else:
+                # User chose to skip - show message and return
+                messagebox.showinfo(
+                    "Skipped",
+                    f"Using existing data for {date_str}.\n\n"
+                    "Proceed to Step 2: Analyze Data."
+                )
+                return
         
         self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 1: Retrieve Data",
             "scripts/gauge/retrieve.py",
-            ["--date", date_str],
+            args,
             self._on_retrieve_complete
         )
     
@@ -420,72 +438,18 @@ class GaugePipeline(BasePipeline):
         self.app.show_pipeline_steps()
     
     def run_check_alarms(self) -> None:
-        """Run check alarms step - datetime picker for end time."""
-        datetime_str = self._get_datetime_from_user("Select End Time for Alarm Check")
-        if not datetime_str:
+        """Run check alarms step - simple date picker (uses cached data)."""
+        date_str = self._get_date_from_user("Select Date to Check Alarms")
+        if not date_str:
             return
         
+        self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 6: Check Alarms",
             "scripts/gauge/check_alarms.py",
-            ["--datetime", datetime_str],
+            ["--date", date_str],
             self._on_check_alarms_complete
         )
-    
-    def _get_datetime_from_user(self, title: str) -> str:
-        """Show datetime picker dialog and return datetime string."""
-        from datetime import datetime
-        
-        dialog = ctk.CTkToplevel(self.app)
-        dialog.title(title)
-        dialog.geometry("350x200")
-        dialog.transient(self.app)
-        dialog.grab_set()
-        
-        # Center the dialog
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (175)
-        y = (dialog.winfo_screenheight() // 2) - (100)
-        dialog.geometry(f"+{x}+{y}")
-        
-        result = {"value": None}
-        
-        # Date frame
-        date_frame = ctk.CTkFrame(dialog)
-        date_frame.pack(pady=10, padx=20, fill="x")
-        
-        ctk.CTkLabel(date_frame, text="Date (YYYY-MM-DD):").pack(side="left")
-        date_entry = ctk.CTkEntry(date_frame, width=120)
-        date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
-        date_entry.pack(side="right")
-        
-        # Time frame
-        time_frame = ctk.CTkFrame(dialog)
-        time_frame.pack(pady=10, padx=20, fill="x")
-        
-        ctk.CTkLabel(time_frame, text="Time (HH:MM) NZDT:").pack(side="left")
-        time_entry = ctk.CTkEntry(time_frame, width=120)
-        time_entry.insert(0, datetime.now().strftime("%H:%M"))
-        time_entry.pack(side="right")
-        
-        def on_ok():
-            date_val = date_entry.get().strip()
-            time_val = time_entry.get().strip()
-            result["value"] = f"{date_val} {time_val}"
-            dialog.destroy()
-        
-        def on_cancel():
-            dialog.destroy()
-        
-        # Buttons
-        btn_frame = ctk.CTkFrame(dialog)
-        btn_frame.pack(pady=20)
-        
-        ctk.CTkButton(btn_frame, text="OK", command=on_ok, width=80).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Cancel", command=on_cancel, width=80).pack(side="left", padx=10)
-        
-        dialog.wait_window()
-        return result["value"]
     
     def _on_check_alarms_complete(self, success: bool) -> None:
         """Handle check alarms completion."""

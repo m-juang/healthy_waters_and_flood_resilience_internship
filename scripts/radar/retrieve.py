@@ -11,6 +11,7 @@ Features:
     - Automatic pixel mapping generation
     - Progress tracking and logging
     - Error recovery and retry logic
+    - Database tracking to detect duplicate retrievals
 
 Usage:
     # Collect last 24 hours (current data)
@@ -25,6 +26,9 @@ Usage:
     # Force refresh pixel mappings
     python retrieve_rain_radar.py --force-refresh-pixels
     
+    # Force re-retrieve even if data exists
+    python retrieve_rain_radar.py --date 2025-05-09 --force
+    
     # Verbose logging
     python retrieve_rain_radar.py --date 2025-05-09 --log-level DEBUG
 
@@ -33,8 +37,8 @@ Output:
     Historical:   outputs/rain_radar/historical/YYYY-MM-DD/raw/
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2026-01-23 (FIXED: --date parameter now works correctly)
-Version: 1.0.1
+Last Modified: 2026-02-01 (Added database tracking for duplicate detection)
+Version: 1.1.0
 """
 
 import sys
@@ -54,11 +58,12 @@ from typing import Optional
 
 from moata_pipeline.common.script_utils import setup_script_logger
 from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.database import RetrievalDatabase, check_and_prompt_existing_data
 from moata_pipeline.collect.runner import run_collect_radar
 
 
 # Version info
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 
 def parse_args() -> argparse.Namespace:
@@ -113,6 +118,12 @@ Notes:
         help="Force rebuild pixel mappings from API. "
              "Normally cached pixel mappings are reused. "
              "Use this if catchment boundaries have changed."
+    )
+    
+    proc_group.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-retrieve even if data already exists in database"
     )
     
     # Logging options
@@ -251,12 +262,31 @@ def main() -> int:
         
         # Log processing options
         if args.force_refresh_pixels:
-            logger.info("🔄 Pixel mappings: Force refresh from API")
+            logger.info("[REFRESH] Pixel mappings: Force refresh from API")
         else:
-            logger.info("📦 Pixel mappings: Use cached (if available)")
+            logger.info("[CACHED] Pixel mappings: Use cached (if available)")
         
         logger.info("=" * 80)
         logger.info("")
+        
+        # Generate date range string for database
+        date_range_str = f"{start_time.strftime('%Y%m%d')}-{end_time.strftime('%Y%m%d')}"
+        
+        # Check if data already exists in database
+        should_proceed, existing_info = check_and_prompt_existing_data(
+            data_type="radar",
+            date_range=date_range_str,
+            logger=logger,
+            force=args.force
+        )
+        
+        if not should_proceed:
+            logger.info("")
+            logger.info("=" * 80)
+            logger.info("[OK] Using existing data (skipped retrieval)")
+            logger.info("=" * 80)
+            logger.info(f"Output location: {paths.rain_radar_raw_dir}/")
+            return 0
         
         # Run collection
         logger.info("Starting radar data collection...")
@@ -267,13 +297,24 @@ def main() -> int:
             force_refresh_pixels=args.force_refresh_pixels,
         )
         
+        # Record successful retrieval in database
+        db = RetrievalDatabase()
+        db.record_retrieval(
+            data_type="radar",
+            date_range=date_range_str,
+            start_date=start_time.strftime('%Y-%m-%d'),
+            end_date=end_time.strftime('%Y-%m-%d'),
+            status="completed"
+        )
+        
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Radar data collection completed successfully")
+        logger.info("[OK] Radar data collection completed successfully")
         logger.info("=" * 80)
         
         # Log output location
         logger.info(f"Output location: {paths.rain_radar_raw_dir}/")
+        logger.info(f"[DB] Data recorded in database for future reference")
         
         return 0
         

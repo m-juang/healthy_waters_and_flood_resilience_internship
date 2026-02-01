@@ -15,15 +15,24 @@ Usage:
     # Collect date range
     gauge-retrieve --start 2025-05-09 --end 2025-05-10
     
+    # Force re-retrieve even if data exists
+    gauge-retrieve --date 2025-05-09 --force
+    
     # Verbose logging
     gauge-retrieve --date 2025-05-09 --log-level DEBUG
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2026-01-23 (FIXED: --date parameter now works correctly)
-Version: 2.2.1
+Last Modified: 2026-02-01 (Added database tracking for duplicate detection)
+Version: 2.3.0
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -39,11 +48,12 @@ from moata_pipeline.common.script_utils import (
     handle_keyboard_interrupt
 )
 from moata_pipeline.common.validation import validate_date_string
+from moata_pipeline.common.database import RetrievalDatabase, check_and_prompt_existing_data
 from moata_pipeline.collect.runner import run_collect_rain_gauges
 
 
 # Version info
-__version__ = "2.2.1"
+__version__ = "2.3.0"
 
 
 def validate_date_range(start_time: datetime, end_time: datetime, logger) -> None:
@@ -120,6 +130,13 @@ Notes:
         "--end",
         metavar="YYYY-MM-DD",
         help="End date for date range (UTC, exclusive). Requires --start."
+    )
+    
+    # Force option
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-retrieve even if data already exists in database"
     )
     
     # Add logging arguments
@@ -218,6 +235,28 @@ def main() -> int:
         logger.info("=" * 80)
         logger.info("")
         
+        # Generate date range string for database
+        from moata_pipeline.common.paths import PipelinePaths
+        output_paths = PipelinePaths.for_date_range(start_time, end_time)
+        date_range_str = f"{start_time.strftime('%Y%m%d')}-{end_time.strftime('%Y%m%d')}"
+        
+        # Check if data already exists in database
+        should_proceed, existing_info = check_and_prompt_existing_data(
+            data_type="gauge",
+            date_range=date_range_str,
+            logger=logger,
+            force=args.force
+        )
+        
+        if not should_proceed:
+            logger.info("")
+            logger.info("=" * 80)
+            logger.info("[OK] Using existing data (skipped retrieval)")
+            logger.info("=" * 80)
+            logger.info(f"Output location: {output_paths.rain_gauges_raw_dir}")
+            print_script_footer(logger, success=True)
+            return 0
+        
         # Run collection
         logger.info("Starting rain gauge data collection...")
         run_collect_rain_gauges(
@@ -225,15 +264,24 @@ def main() -> int:
             end_time=end_time,
         )
         
+        # Record successful retrieval in database
+        db = RetrievalDatabase()
+        db.record_retrieval(
+            data_type="gauge",
+            date_range=date_range_str,
+            start_date=start_time.strftime('%Y-%m-%d'),
+            end_date=end_time.strftime('%Y-%m-%d'),
+            status="completed"
+        )
+        
         logger.info("")
         logger.info("=" * 80)
-        logger.info("✅ Rain gauge data collection completed successfully")
+        logger.info("[OK] Rain gauge data collection completed successfully")
         logger.info("=" * 80)
         
         # Log output location (actual path is managed by runner with YYYYMMDD-YYYYMMDD format)
-        from moata_pipeline.common.paths import PipelinePaths
-        output_paths = PipelinePaths.for_date_range(start_time, end_time)
         logger.info(f"Output location: {output_paths.rain_gauges_raw_dir}")
+        logger.info(f"[DB] Data recorded in database for future reference")
         
         print_script_footer(logger, success=True)
         return 0

@@ -91,7 +91,6 @@ moata_alert_lab_gui/         # Desktop GUI application
 
 moata_pipeline/              # Core processing library
 ├── alarms/                  # Alarm checking logic
-│   ├── gauge_alarm_checker.py
 │   └── radar_alarm_checker.py
 ├── analyze/                 # Data analysis modules
 │   ├── filtering.py         # 3-step gauge filtering
@@ -107,6 +106,7 @@ moata_pipeline/              # Core processing library
 │   │   ├── catchment_fetcher.py
 │   │   ├── pixel_mapper.py
 │   │   ├── radar_data_fetcher.py
+│   │   ├── rainfall_trace_filter.py
 │   │   └── weight_calculator.py
 │   ├── gauge_collector.py   # Gauge collection facade
 │   ├── radar_collector.py   # Radar collection facade
@@ -115,6 +115,7 @@ moata_pipeline/              # Core processing library
 │   ├── config.py            # Centralized configuration
 │   ├── constants.py         # API constants
 │   ├── paths.py             # PipelinePaths class
+│   ├── database.py          # SQLite retrieval tracking
 │   ├── exceptions.py        # Custom exceptions
 │   └── [utils].py           # Various utilities
 ├── moata/                   # API client layer
@@ -137,24 +138,28 @@ moata_pipeline/              # Core processing library
     └── radar_report.py      # Radar dashboard
 
 scripts/                     # CLI entry points
+├── list_retrievals.py       # View data retrieval history
 ├── gauge/
 │   ├── retrieve.py
 │   ├── analyze.py
 │   ├── visualize.py
 │   ├── validate.py
+│   ├── visualize_validation.py
 │   └── check_alarms.py
 ├── radar/
 │   ├── retrieve.py
 │   ├── analyze.py
 │   └── visualize.py
 └── alarms/
-    ├── check_alarms.py
+    ├── check_alarm_timeline.py
     ├── check_radar_alarms.py
     └── validate_ari_alarms.py
 
-data/inputs/                 # Static reference data
-├── tp108_stats.csv          # TP108 rainfall coefficients
-└── raingauge_ari_alarms.csv # Historical alarm records
+data/                        # Data files
+├── inputs/                  # Static reference data
+│   ├── tp108_stats.csv          # TP108 rainfall coefficients
+│   └── raingauge_ari_alarms.csv # Historical alarm records
+└── retrieval_history.db     # SQLite database for tracking retrievals
 
 outputs/                     # Pipeline outputs (date-organized)
 └── [see Output Structure section]
@@ -255,6 +260,9 @@ python scripts/gauge/retrieve.py
 # Collect specific date (24-hour period)
 python scripts/gauge/retrieve.py --date 2025-05-09
 
+# Force re-retrieve even if data exists in database
+python scripts/gauge/retrieve.py --date 2025-05-09 --force
+
 # Collect date range
 python scripts/gauge/retrieve.py --start 2025-05-09 --end 2025-05-12
 
@@ -274,13 +282,16 @@ python scripts/gauge/validate.py --date 2025-05-09
 python scripts/gauge/check_alarms.py --datetime "2025-05-09 14:00"
 ```
 
-**Radar Pipeline:**
+**Rain Radar Pipeline:**
 ```bash
 # Collect last 24 hours (default)
 python scripts/radar/retrieve.py
 
 # Collect specific date
 python scripts/radar/retrieve.py --date 2025-05-09
+
+# Force re-retrieve even if data exists in database
+python scripts/radar/retrieve.py --date 2025-05-09 --force
 
 # Force refresh pixel mappings from API
 python scripts/radar/retrieve.py --date 2025-05-09 --force-refresh-pixels
@@ -296,6 +307,22 @@ python scripts/alarms/check_radar_alarms.py --time "2025-05-09 14:00:00"
 
 # With custom thresholds
 python scripts/alarms/check_radar_alarms.py --ari-threshold 10.0 --area-threshold 0.25
+```
+
+**Data Retrieval History:**
+```bash
+# List all previous retrievals
+python scripts/list_retrievals.py
+
+# Filter by data type
+python scripts/list_retrievals.py --type gauge
+python scripts/list_retrievals.py --type radar
+
+# Show statistics
+python scripts/list_retrievals.py --stats
+
+# Check if specific date exists
+python scripts/list_retrievals.py --check gauge 20250509-20250510
 ```
 
 **Verbose Logging:**
@@ -322,29 +349,151 @@ python scripts/gauge/retrieve.py --date 2025-05-09 --log-level DEBUG
  json              summary.csv
 ```
 
-**Step 1: Retrieve** - Collect gauge metadata, traces, and alarm configurations
+#### Step 1: Retrieve
+**Script:** `scripts/gauge/retrieve.py`
+
+Collects rain gauge data from the Moata API for a 24-hour period.
+
+**What it does:**
+- Fetches list of all rain gauge assets from project 594
+- Fetches traces (sensors) for each gauge
+- Fetches alarm configurations (thresholds) for each trace
+- Saves all data to JSON file for subsequent steps
+
+**Output:**
+- `rain_gauges_traces_alarms.json` - Complete gauge, traces, and alarms data
+
+**Usage:**
 ```bash
 python scripts/gauge/retrieve.py --date 2025-05-09
 ```
 
-**Step 2: Analyze** - Filter active gauges and generate alarm summary
+---
+
+#### Step 2: Analyze
+**Script:** `scripts/gauge/analyze.py`
+
+Filters active gauges and analyzes alarm configurations.
+
+**What it does:**
+- Reads data from retrieve output
+- Performs 3-step filtering:
+  1. **Exclude non-Auckland**: Removes gauges outside Auckland (Waikato, Northland, etc.)
+  2. **Require physical sensor**: Only keeps gauges with physical sensors (not virtual)
+  3. **Require recent data**: Only keeps gauges with recent data (default: last 3 months)
+- Generates mapping between gauge ID and trace ID for rainfall
+- Analyzes existing alarm configurations
+
+**Output:**
+- `active_auckland_gauges.json` - List of active gauges
+- `all_traces.csv` - All traces with metadata
+- `alarm_summary_full.csv` - Complete alarm details
+- `alarm_summary.csv` - Alarm summary per gauge
+
+**Usage:**
 ```bash
 python scripts/gauge/analyze.py --date 2025-05-09
+python scripts/gauge/analyze.py --date 2025-05-09 --inactive-months 6
 ```
 
-**Step 3: Visualize** - Generate HTML dashboard with gauge pages
+---
+
+#### Step 3: Visualize
+**Script:** `scripts/gauge/visualize.py`
+
+Generates interactive HTML dashboard to view analysis results.
+
+**What it does:**
+- Reads data from analyze output
+- Cleans and formats data for visualization
+- Generates main page with searchable table
+- Generates per-gauge detail pages with alarm configurations
+- Includes statistics and summaries
+
+**Output:**
+- `report.html` - Main dashboard with gauge table
+- `gauge_pages/` - Folder containing per-gauge detail pages
+
+**Usage:**
 ```bash
 python scripts/gauge/visualize.py --date 2025-05-09
 ```
 
-**Step 4: Validate** - Fetch timeseries and validate historical alarms
+---
+
+#### Step 4: Validate Alarms
+**Script:** `scripts/gauge/validate.py`
+
+Validates historical alarms against timeseries data from the API.
+
+**What it does:**
+- Reads list of historical alarm events from `data/inputs/raingauge_ari_alarms.csv` (file from Sam)
+- Uses trace mapping from analyze output to match gauge ID with trace ID
+- Fetches timeseries data from API for each event
+- Calculates ARI based on actual data and compares with alarm threshold
+- Determines whether alarm should have triggered or not
+
+**Required inputs:**
+- `data/inputs/raingauge_ari_alarms.csv` - Static file containing historical alarm events
+- Output from analyze step (for trace mapping)
+
+**Output:**
+- `validation_results.csv` - Validation results per event
+
+**Usage:**
 ```bash
 python scripts/gauge/validate.py --date 2025-05-09
 ```
 
-**Step 5: Check Alarms** - Check ARI alarms with verification
+---
+
+#### Step 5: Visualize Validation
+**Script:** `scripts/gauge/visualize_validation.py`
+
+Generates visualization of alarm validation results.
+
+**What it does:**
+- Reads validation results from previous step
+- Generates visual report on alarm accuracy
+- Displays statistics: true positives, false positives, false negatives, etc.
+
+**Output:**
+- `validation_report.html` - Visual validation report
+
+**Usage:**
 ```bash
+python scripts/gauge/visualize_validation.py --date 2025-05-09
+```
+
+---
+
+#### Step 6: Check Alarms
+**Script:** `scripts/gauge/check_alarms.py`
+
+Checks alarm status at a specific time.
+
+**What it does:**
+- Reads gauge and trace data from cache (retrieve output) if available
+- Or fetches fresh data from API if cache is not available (`--no-cache`)
+- For each gauge with ARI alarms:
+  - Fetches timeseries data for 24-hour period
+  - Calculates ARI for each duration (10min, 20min, 30min, 1hr, 2hr, 6hr, 12hr, 24hr)
+  - Compares with alarm threshold
+  - Determines whether alarm should have triggered
+
+**Output:**
+- Console output with alarm status per gauge
+
+**Usage:**
+```bash
+# Use UTC date as START of period (forward 24 hours)
+python scripts/gauge/check_alarms.py --date 2025-05-09
+
+# Use NZDT datetime as END of period (backward 24 hours)
 python scripts/gauge/check_alarms.py --datetime "2025-05-09 14:00"
+
+# Force fetch from API (do not use cache)
+python scripts/gauge/check_alarms.py --date 2025-05-09 --no-cache
 ```
 
 ### Radar Pipeline
@@ -360,25 +509,124 @@ python scripts/gauge/check_alarms.py --datetime "2025-05-09 14:00"
  *.csv files       summary.csv      dashboard.html   triggered_alarms.csv
 ```
 
-**Step 1: Retrieve** - Collect radar QPE data for all catchments
+#### Step 1: Retrieve
+**Script:** `scripts/radar/retrieve.py`
+
+Collects radar QPE (Quantitative Precipitation Estimation) data from the Moata API.
+
+**What it does:**
+- Fetches list of stormwater catchments from API (233 catchments)
+- Creates/loads pixel mapping - maps radar grid to catchment geometries
+- Fetches QPE timeseries data for each pixel within catchments
+- Calculates area weights to avoid pixel duplication in overlapping catchments
+- Saves per-catchment data to CSV files
+
+**Output:**
+- `pixel_mappings.json` - Pixel to catchment mapping (cached)
+- `catchment_*.csv` - Radar data per catchment
+
+**Usage:**
 ```bash
 python scripts/radar/retrieve.py --date 2025-05-09
+python scripts/radar/retrieve.py --date 2025-05-09 --force-refresh-pixels
 ```
 
-**Step 2: Analyze** - Run ARI analysis on radar data
+---
+
+#### Step 2: Analyze
+**Script:** `scripts/radar/analyze.py`
+
+Analyzes radar data and calculates ARI for each catchment.
+
+**What it does:**
+- Reads catchment data from retrieve output
+- Calculates rainfall intensity for each duration (10min to 24hr)
+- Calculates ARI using TP108 coefficients from `data/inputs/tp108_stats.csv`
+- Identifies catchments exceeding ARI threshold (default: 5 years)
+- Generates summary and statistics
+
+**Output:**
+- `ari_analysis_summary.csv` - ARI summary per catchment
+- `ari_exceedances.csv` - Catchments exceeding threshold
+- `analysis_report.txt` - Detailed report in text format
+
+**Usage:**
 ```bash
 python scripts/radar/analyze.py --date 2025-05-09
+python scripts/radar/analyze.py --date 2025-05-09 --threshold 10.0
 ```
 
-**Step 3: Visualize** - Generate radar dashboard
+---
+
+#### Step 3: Visualize
+**Script:** `scripts/radar/visualize.py`
+
+Generates interactive HTML dashboard for radar data visualization.
+
+**What it does:**
+- Reads data from analyze output
+- Creates interactive map with catchment boundaries
+- Displays ARI values with color coding
+- Provides searchable and filterable table
+
+**Output:**
+- `radar_dashboard.html` - Interactive dashboard
+
+**Usage:**
 ```bash
 python scripts/radar/visualize.py --date 2025-05-09
 ```
 
-**Step 4: Check Alarms** - Check alarm status at specific timestamp
+---
+
+#### Step 4: Check Alarms
+**Script:** `scripts/alarms/check_radar_alarms.py`
+
+Checks radar alarm status at a specific timestamp (REALTIME checking).
+
+**What it does:**
+- Reads radar data from retrieve output
+- For each catchment:
+  - Fetches data at requested timestamp (or most recent timestamp)
+  - Calculates ARI for **LATEST window only** (not maximum across entire period)
+  - Calculates percentage of area exceeding threshold
+  - Determines alarm status based on:
+    - ARI >= threshold (default: 5 years)
+    - Area >= 25% of catchment
+
+**Difference from Analyze:**
+- **Analyze**: Finds MAXIMUM ARI across entire 24-hour period
+- **Check Alarms**: Checks ARI at ONE specific point in time (latest window)
+
+**Output:**
+- `alarm_status.csv` - Alarm status for all catchments
+- `triggered_alarms.csv` - Only catchments with active alarms
+- `alarm_report.txt` - Summary in text format
+
+**Usage:**
 ```bash
-python scripts/alarms/check_radar_alarms.py --date 2025-05-09 --time "2025-05-09 14:00:00"
+# Check most recent timestamp in data
+python scripts/alarms/check_radar_alarms.py --date 2025-05-09
+
+# Check specific timestamp
+python scripts/alarms/check_radar_alarms.py --time "2025-05-09 14:00:00"
+
+# Custom thresholds
+python scripts/alarms/check_radar_alarms.py --ari-threshold 10.0 --area-threshold 0.25
 ```
+
+---
+
+### Rain Gauge vs Rain Radar Comparison
+
+| Aspect | Rain Gauge | Rain Radar |
+|--------|------------|------------|
+| **Data Source** | Physical sensors on-site | Radar estimation (QPE) |
+| **Coverage** | 264 points | ~15,000+ pixels (233 catchments) |
+| **Granularity** | Per-gauge | Per-catchment (pixel aggregation) |
+| **Alarm Type** | Threshold per trace | 25% area + ARI threshold |
+| **Validation** | Available (raingauge_ari_alarms.csv) | Not available |
+| **Check Alarms** | Per-gauge ARI | Per-catchment area percentage |
 
 ---
 
@@ -412,6 +660,7 @@ run_collect_radar(
 - `CatchmentFetcher`: Fetch stormwater catchments
 - `PixelMapper`: Map radar grid to catchment geometries
 - `RadarDataFetcher`: Fetch QPE timeseries
+- `RainfallTraceFilter`: Filter rainfall traces using Sam's optimization method
 - `WeightCalculator`: Calculate pixel area weights for de-duplication
 
 ### `moata_pipeline.analyze`
@@ -436,19 +685,51 @@ print(f"Output: {result['output_dir']}")
 - `ari.py`: ARI calculations using TP108 coefficients
 - `reporting.py`: Generate analysis summaries and CSV reports
 
-### `moata_pipeline.alarms`
+### `moata_pipeline.common.database`
 
-Alarm checking for both gauge and radar data.
+SQLite database for tracking data retrievals and preventing duplicate API calls.
 
 ```python
-from moata_pipeline.alarms import GaugeAlarmChecker, RadarAlarmChecker
+from moata_pipeline.common.database import RetrievalDatabase
 
-# Check gauge alarms
-gauge_checker = GaugeAlarmChecker(
-    tp108_path=Path("data/inputs/tp108_stats.csv"),
-    alarm_config_path=Path("data/inputs/raingauge_ari_alarms.csv")
-)
-result = gauge_checker.check_gauge(gauge_data, check_time)
+db = RetrievalDatabase()
+
+# Check if data already exists
+if db.data_exists("gauge", "20250509-20250510"):
+    print("Data already retrieved!")
+    info = db.get_retrieval_info("gauge", "20250509-20250510")
+    print(f"Retrieved at: {info['retrieved_at']}")
+else:
+    # Proceed with retrieval...
+    db.record_retrieval(
+        data_type="gauge",
+        date_range="20250509-20250510",
+        start_date="2025-05-09",
+        end_date="2025-05-10",
+        item_count=264,
+        status="completed"
+    )
+
+# List all retrievals
+retrievals = db.list_retrievals(data_type="gauge")
+
+# Get statistics
+stats = db.get_stats()
+print(f"Total gauge retrievals: {stats['gauge']['count']}")
+```
+
+**Features:**
+- Automatic duplicate detection when running retrieve scripts
+- User prompt to skip or re-retrieve existing data
+- `--force` flag to bypass prompt and re-retrieve
+- SQLite database stored at `data/retrieval_history.db`
+
+### `moata_pipeline.alarms`
+
+Alarm checking for radar data.
+
+```python
+from moata_pipeline.alarms import RadarAlarmChecker
 
 # Check radar alarms (LATEST window only)
 radar_checker = RadarAlarmChecker(
@@ -751,5 +1032,5 @@ This software is proprietary to Auckland Council. Developed as part of COMPSCI 7
 
 - **Auckland Council Healthy Waters** - Project sponsorship and domain expertise
 - **Kris Fordham** - Supervisor and technical guidance
-- **Sam (Moata Team)** - API documentation and optimization suggestions
-- **University of Auckland** - COMPSCI 778 program coordination
+- **Sam (Mott MacDonald)** - API documentation and optimization suggestions
+- **Yu-Cheng Tu** - COMPSCI 778 supervisor

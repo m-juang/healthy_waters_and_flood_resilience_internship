@@ -77,17 +77,35 @@ class RadarPipeline(BasePipeline):
     # =========================================================================
     
     def run_retrieve(self) -> None:
-        """Run retrieve step - simple date picker."""
+        """Run retrieve step - simple date picker with existing data check."""
         # Get date from user
         date_str = self._get_date_from_user("Select Date to Retrieve")
         if not date_str:
             return
         
+        # Check if data already exists
+        exists, info = self._check_existing_data("radar", date_str)
+        
+        args = ["--date", date_str]
+        
+        if exists and info:
+            # Ask user if they want to re-download
+            if self._confirm_redownload("radar", info):
+                args.append("--force")
+            else:
+                # User chose to skip - show message and return
+                messagebox.showinfo(
+                    "Skipped",
+                    f"Using existing data for {date_str}.\n\n"
+                    "Proceed to Step 2: Analyze Data."
+                )
+                return
+        
         self.app.selected_date = date_str
         self.app.executor.execute(
             "Step 1: Retrieve Data",
             "scripts/radar/retrieve.py",
-            ["--date", date_str],
+            args,
             self._on_retrieve_complete
         )
     

@@ -4,16 +4,19 @@ Base Pipeline Module
 Abstract base class for pipeline implementations.
 
 Author: Auckland Council Internship Team (COMPSCI 778)
-Last Modified: 2025-01-02
-Version: 1.0.0
+Last Modified: 2026-02-01
+Version: 1.1.0 - Added database check for existing data
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Tuple, TYPE_CHECKING
+from typing import Callable, Dict, List, Tuple, Optional, TYPE_CHECKING
+from datetime import datetime, timedelta
 import customtkinter as ctk
+from tkinter import messagebox
 from moata_pipeline.common.paths import PipelinePaths
+from moata_pipeline.common.database import RetrievalDatabase
 
 if TYPE_CHECKING:
     from ..__main__ import ModernApp
@@ -67,6 +70,60 @@ class BasePipeline(ABC):
             return datetime.now().strftime('%Y-%m-%d')
         
         return date_str
+    
+    def _check_existing_data(self, data_type: str, date_str: str) -> Tuple[bool, Optional[dict]]:
+        """
+        Check if data already exists in database.
+        
+        Args:
+            data_type: 'gauge' or 'radar'
+            date_str: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Tuple of (exists: bool, info: dict or None)
+        """
+        try:
+            # Calculate date range string
+            date = datetime.strptime(date_str, "%Y-%m-%d")
+            end_date = date + timedelta(days=1)
+            date_range = f"{date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}"
+            
+            db = RetrievalDatabase()
+            exists = db.data_exists(data_type, date_range)
+            info = db.get_retrieval_info(data_type, date_range) if exists else None
+            return exists, info
+        except Exception:
+            return False, None
+    
+    def _confirm_redownload(self, data_type: str, info: dict) -> bool:
+        """
+        Show confirmation dialog for re-downloading existing data.
+        
+        Args:
+            data_type: 'gauge' or 'radar'
+            info: Existing retrieval info from database
+            
+        Returns:
+            True if user wants to re-download, False to skip
+        """
+        retrieved_at = info.get('retrieved_at', 'Unknown')[:19]  # Trim to datetime
+        item_count = info.get('item_count', 'Unknown')
+        item_name = 'gauges' if data_type == 'gauge' else 'catchments'
+        
+        message = (
+            f"Data already exists!\n\n"
+            f"Type: {data_type.upper()}\n"
+            f"Date Range: {info.get('date_range', 'Unknown')}\n"
+            f"Previously Retrieved: {retrieved_at}\n"
+            f"Items: {item_count} {item_name}\n\n"
+            f"Do you want to re-download and overwrite?"
+        )
+        
+        return messagebox.askyesno(
+            "Data Already Exists",
+            message,
+            icon='warning'
+        )
     
     @property
     @abstractmethod

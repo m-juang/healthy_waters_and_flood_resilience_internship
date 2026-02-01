@@ -4,14 +4,19 @@ Check Alarms Script
 Fetches all rain gauge alarms in the last 24 hours and verifies rainfall data.
 Outputs formatted alarm list with actual rainfall values.
 
+OPTIMIZED (v2.0): Now uses cached gauge data from retrieve step to avoid 
+duplicate API calls. Only fetches realtime rainfall data as needed.
+
 Usage:
     python check_alarms.py --datetime "2026-01-21 22:40"
     python check_alarms.py  # Uses current time
+    python check_alarms.py --date 2026-01-21  # Uses cached data from specific date
 
 Output Format:
     Rainfall Depth: ACC - Rain - Swanson @ Waitakere 100mm in the last 24 hours, 2026-01-21 22:20:00
 
 Author: Auckland Council Internship Team
+Version: 2.0.0 - Optimized to reuse cached gauge data from retrieve step
 """
 
 from __future__ import annotations
@@ -87,6 +92,139 @@ def format_nzdt(utc_dt: datetime) -> str:
     """Format UTC datetime as NZDT string."""
     nzdt = to_nzdt(utc_dt)
     return nzdt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+# =============================================================================
+# CACHED DATA LOADER (NEW - Avoids duplicate API calls)
+# =============================================================================
+
+def load_cached_gauge_data(date_str: Optional[str] = None) -> Optional[List[Dict]]:
+    """
+    Load gauge data from cached retrieve output.
+    
+    This avoids duplicate API calls by reusing data already collected
+    by the retrieve step.
+    
+    Args:
+        date_str: Date string YYYY-MM-DD to find cached data. 
+                  If None, auto-detects most recent available.
+    
+    Returns:
+        List of gauge dictionaries with traces and thresholds, or None if not found.
+    """
+    import json
+    
+    # Build possible cache paths to check
+    cache_paths = []
+    
+    if date_str:
+        # Use specified date
+        paths = PipelinePaths.for_date(date_str)
+        cache_paths.append(paths.rain_gauges_traces_alarms_json)
+    else:
+        # Auto-detect: look for most recent date range folder
+        gauges_base = Path("outputs/rain_gauges")
+        if gauges_base.exists():
+            # Find all date range folders sorted by name (most recent first)
+            date_folders = sorted(
+                [d for d in gauges_base.iterdir() if d.is_dir() and "-" in d.name],
+                key=lambda x: x.name,
+                reverse=True
+            )
+            for folder in date_folders:
+                cache_file = folder / "raw" / "rain_gauges_traces_alarms.json"
+                if cache_file.exists():
+                    cache_paths.append(cache_file)
+                    break
+    
+    # Try to load from cache
+    for cache_path in cache_paths:
+        if cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                print(f"✓ Using cached gauge data from: {cache_path}")
+                print(f"  ({len(data)} gauges loaded from cache)")
+                return data
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"[!] Failed to load cache {cache_path}: {e}")
+                continue
+    
+    return None
+
+
+def extract_gauge_info_from_cache(cached_data: List[Dict]) -> Tuple[List[Dict], Dict[int, List[Dict]]]:
+    """
+    Extract gauge list and traces from cached data.
+    
+    Args:
+        cached_data: Raw data from rain_gauges_traces_alarms.json
+        
+    Returns:
+        Tuple of (gauge_list, traces_by_asset_id)
+    """
+    gauges = []
+    traces_by_asset = {}
+    
+    for item in cached_data:
+        gauge = item.get("gauge", {})
+        traces = item.get("traces", [])
+        
+        gauge_id = gauge.get("id")
+        if gauge_id:
+            gauges.append(gauge)
+            traces_by_asset[gauge_id] = traces
+    
+    return gauges, traces_by_asset
+
+
+def extract_thresholds_from_traces(traces: List[Dict]) -> Dict[float, float]:
+    """
+    Extract alarm thresholds from trace data.
+    
+    Looks for threshold definitions in the trace data and maps
+    them to time windows (hours -> mm threshold).
+    
+    Args:
+        traces: List of trace dictionaries
+        
+    Returns:
+        Dict mapping window_hours -> threshold_mm
+    """
+    # Default thresholds (fallback if not found in trace data)
+    defaults = {
+        0.5: 10,   # 10mm in 30 minutes
+        1: 15,     # 15mm in 60 minutes
+        6: 50,     # 50mm in 6 hours
+        12: 70,    # 70mm in 12 hours
+        24: 100,   # 100mm in 24 hours
+    }
+    
+    # Try to extract from trace thresholds
+    thresholds = {}
+    for trace in traces:
+        desc = trace.get("description", "").lower()
+        for threshold_info in trace.get("thresholds", []):
+            threshold_value = threshold_info.get("value", 0)
+            
+            # Parse window from description
+            if "30 min" in desc or "30min" in desc:
+                thresholds[0.5] = threshold_value
+            elif "60 min" in desc or "1 hour" in desc or "60min" in desc:
+                thresholds[1] = threshold_value
+            elif "6 hour" in desc or "6h" in desc:
+                thresholds[6] = threshold_value
+            elif "12 hour" in desc or "12h" in desc:
+                thresholds[12] = threshold_value
+            elif "24 hour" in desc or "24h" in desc:
+                thresholds[24] = threshold_value
+    
+    # Fill in any missing with defaults
+    for hours, default_val in defaults.items():
+        if hours not in thresholds:
+            thresholds[hours] = default_val
+    
+    return thresholds
 
 
 def get_rainfall_trace(client: MoataClient, asset_id: int) -> Optional[Dict]:
@@ -204,12 +342,23 @@ def get_alarm_thresholds(client: MoataClient, trace_id: int) -> Dict[int, float]
 def check_all_gauges(
     client: MoataClient,
     end_time_utc: datetime,
-    output_dir: Path
+    output_dir: Path,
+    cached_data: Optional[List[Dict]] = None,
 ) -> List[Dict]:
     """
     Check all rain gauges for alarms in the last 24 hours.
     
-    Returns list of alarm records.
+    OPTIMIZED: Uses cached gauge data if available to avoid duplicate API calls.
+    Only fetches realtime rainfall data.
+    
+    Args:
+        client: MoataClient instance for API calls
+        end_time_utc: End time for alarm check
+        output_dir: Directory for output files
+        cached_data: Optional pre-loaded gauge data from retrieve step
+    
+    Returns:
+        List of alarm records
     """
     print(f"\n{'='*70}")
     print("RAIN GAUGE ALARM CHECK")
@@ -219,17 +368,21 @@ def check_all_gauges(
     print(f"Lookback: {LOOKBACK_HOURS} hours")
     print(f"{'='*70}\n")
     
-    # Get all rain gauges
-    print("Fetching rain gauges...")
-    gauges = client.get_rain_gauges(project_id=DEFAULT_PROJECT_ID, asset_type_id=100)
-    print(f"✓ Found {len(gauges)} rain gauges\n")
-    
-    alarms_found = []
-    gauges_checked = 0
-
-    # Batching: fetch all traces for all gauges at once
-    asset_ids = [g.get("id") for g in gauges]
-    traces_by_asset = client.get_traces_for_assets(asset_ids)
+    # Use cached data if available (avoids duplicate API calls!)
+    if cached_data:
+        print("📦 Using CACHED gauge data (no duplicate API calls)")
+        gauges, traces_by_asset = extract_gauge_info_from_cache(cached_data)
+        print(f"✓ Found {len(gauges)} rain gauges from cache\n")
+    else:
+        # Fallback: fetch from API (slower, duplicate call)
+        print("⚠️  No cached data - fetching from API (slower)...")
+        print("   TIP: Run 'gauge-retrieve --date YYYY-MM-DD' first to cache data")
+        gauges = client.get_rain_gauges(project_id=DEFAULT_PROJECT_ID, asset_type_id=100)
+        print(f"✓ Found {len(gauges)} rain gauges from API\n")
+        
+        # Batching: fetch all traces for all gauges at once
+        asset_ids = [g.get("id") for g in gauges]
+        traces_by_asset = client.get_traces_for_assets(asset_ids)
 
     alarms_found = []
     for i, gauge in enumerate(gauges, 1):
@@ -254,7 +407,13 @@ def check_all_gauges(
             print(f"    [!] No rainfall trace found for {gauge_name}")
             continue
         trace_id = rainfall_trace.get("id")
-        thresholds = get_alarm_thresholds(client, trace_id)
+        
+        # Use thresholds from cached data if available, otherwise use defaults
+        if cached_data:
+            thresholds = extract_thresholds_from_traces(traces)
+        else:
+            thresholds = get_alarm_thresholds(client, trace_id)
+        
         for hours, window_desc in ALARM_WINDOWS:
             if hours == 0.5:
                 label = "30min"
@@ -599,11 +758,48 @@ def generate_html_dashboard(alarms: List[Dict], end_time_utc: datetime, output_d
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Check rain gauge alarms in last 24 hours")
+    parser = argparse.ArgumentParser(
+        description="Check rain gauge alarms (OPTIMIZED - uses cached data)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s                                   # Check last 24h from NOW (end=now)
+  %(prog)s --date 2026-01-21                 # Check 24h starting from 2026-01-21 00:00 UTC
+  %(prog)s --datetime "2026-01-21 22:40"     # Check 24h ending at specific time (NZDT input)
+  %(prog)s --no-cache                        # Force fresh API calls (slower)
+
+Time Period Behavior:
+  --date YYYY-MM-DD      : START = date 00:00:00 UTC, check forward 24h (consistent with retrieve.py)
+  --datetime "..." NZDT  : END = specified time, check backward 24h  
+  (no argument)          : END = current time, check backward 24h
+
+Timezone:
+  --date uses UTC (same as retrieve.py for consistency)
+  --datetime input is NZDT (local time), converted to UTC internally
+
+Performance:
+  With cached data: ~1-2 minutes (only fetches rainfall values)
+  Without cache:    ~5-10 minutes (fetches gauge list + traces + rainfall)
+
+Note:
+  Run 'gauge-retrieve --date YYYY-MM-DD' first to cache gauge data.
+        """
+    )
     parser.add_argument(
         "--datetime",
         type=str,
-        help="End datetime in NZDT format: 'YYYY-MM-DD HH:MM'. Defaults to current time.",
+        help="END datetime in NZDT format: 'YYYY-MM-DD HH:MM'. Checks 24h backward from this time.",
+    )
+    parser.add_argument(
+        "--date",
+        type=str,
+        metavar="YYYY-MM-DD",
+        help="START date in UTC. Checks 24h forward from 00:00:00 UTC. Consistent with retrieve.py.",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Force fresh API calls, don't use cached data.",
     )
     parser.add_argument(
         "--output-dir",
@@ -612,13 +808,43 @@ def main():
     )
     args = parser.parse_args()
     
-    # Determine end time
+    # Determine time period based on arguments
     if args.datetime:
+        # Explicit datetime provided - use as end time (input is NZDT, convert to UTC)
         end_time_utc = parse_datetime_arg(args.datetime)
         print(f"Using specified time: {args.datetime} NZDT")
+        print(f"  Checking period: {format_nzdt(end_time_utc - timedelta(hours=LOOKBACK_HOURS))} to {format_nzdt(end_time_utc)} NZDT")
+    elif args.date:
+        # Date provided - use START of that day in UTC (consistent with retrieve.py)
+        # Example: --date 2026-01-21 → 2026-01-21 00:00:00 UTC to 2026-01-22 00:00:00 UTC
+        from datetime import datetime as dt
+        try:
+            date_obj = dt.strptime(args.date, "%Y-%m-%d")
+            # Start of day in UTC = 00:00:00 UTC (consistent with gauge/retrieve.py)
+            start_time_utc = date_obj.replace(hour=0, minute=0, second=0, tzinfo=timezone.utc)
+            # End time = start + 24 hours
+            end_time_utc = start_time_utc + timedelta(hours=LOOKBACK_HOURS)
+            print(f"Using date {args.date} as START of period (UTC)")
+            print(f"  UTC:  {start_time_utc.strftime('%Y-%m-%d %H:%M:%S')} to {end_time_utc.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"  NZDT: {format_nzdt(start_time_utc)} to {format_nzdt(end_time_utc)}")
+        except ValueError:
+            print(f"Invalid date format: {args.date}. Use YYYY-MM-DD")
+            sys.exit(1)
     else:
+        # No date/datetime - use current time as END, go backward 24 hours
         end_time_utc = datetime.now(timezone.utc)
-        print(f"Using current time: {format_nzdt(end_time_utc)} NZDT")
+        print(f"Using current time as END: {format_nzdt(end_time_utc)} NZDT")
+        print(f"  Checking period: {format_nzdt(end_time_utc - timedelta(hours=LOOKBACK_HOURS))} to {format_nzdt(end_time_utc)} NZDT")
+    
+    # Load cached data (unless --no-cache is specified)
+    cached_data = None
+    if not args.no_cache:
+        cached_data = load_cached_gauge_data(args.date)
+        if cached_data is None:
+            print("\n⚠️  No cached gauge data found.")
+            print("   For faster execution, run retrieve first:")
+            print("     gauge-retrieve --date YYYY-MM-DD")
+            print("   Continuing with API calls...\n")
     
     # Output directory
     if args.output_dir:
@@ -658,8 +884,8 @@ def main():
     client = MoataClient(http=http)
     print("✓ Connected\n")
     
-    # Run alarm check
-    alarms = check_all_gauges(client, end_time_utc, output_dir)
+    # Run alarm check (with cached data if available)
+    alarms = check_all_gauges(client, end_time_utc, output_dir, cached_data)
     
     # Generate reports
     print("\nGenerating reports...")
